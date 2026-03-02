@@ -1,0 +1,45 @@
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-hover: #1a1a25;
+  --accent-user: #00ff87;
+  --accent-ai: #ff3366;
+  --accent-score: #ffcc00;
+  --accent-blue: #00aaff;
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.35);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-user: rgba(0, 255, 135, 0.25);
+  --border-ai: rgba(255, 51, 102, 0.2);
+  --font-debate: 'Georgia', 'Times New Roman', serif;
+  --font-ui: 'JetBrains Mono', 'Courier New', monospace;
+  --radius: 12px;
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.df-center {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #181826 0, #050508 60%);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.df-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent-blue);
+  animation: df-spin 0.8s linear infinite;
+}
+
+@keyframes df-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

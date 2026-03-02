@@ -1,0 +1,235 @@
+/* ═══════════════════════════════════
+   LANDING PAGE – Animations & Motion
+   ═══════════════════════════════════ */
+
+/* ── Keyframes ── */
+
+@keyframes orbSpin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes orbPulse {
+  0%, 100% { box-shadow: 0 0 100px rgba(0,255,135,0.35); }
+  50%      { box-shadow: 0 0 160px rgba(0,255,135,0.55), 0 0 60px rgba(0,170,255,0.25); }
+}
+
+@keyframes floatBadge {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-8px); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-50px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 12px 35px rgba(0,0,0,0.7); }
+  50%      { box-shadow: 0 12px 45px rgba(0,255,135,0.4), 0 0 20px rgba(0,170,255,0.2); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes gridDrift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 36px 36px; }
+}
+
+/* ── Hero Orb ── */
+.landing-orb {
+  animation: orbSpin 18s linear infinite, orbPulse 4s ease-in-out infinite;
+}
+
+.landing-orb-inner {
+  transition: transform 0.4s ease;
+}
+
+.landing-orb:hover .landing-orb-inner {
+  transform: scale(1.05);
+}
+
+/* ── Grid Background ── */
+.landing-grid-bg {
+  animation: gridDrift 8s linear infinite;
+}
+
+/* ── Hero Badge Float ── */
+.landing-hero-badge {
+  animation: floatBadge 3.5s ease-in-out infinite;
+}
+
+/* ── Hero Left Text ── */
+.landing-hero-left {
+  animation: slideInLeft 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Hero Right Visual ── */
+.landing-hero-right {
+  animation: slideInRight 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+/* ── Primary Button Glow ── */
+.landing-primary-btn {
+  animation: glowPulse 3s ease-in-out infinite;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.landing-primary-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 16px 50px rgba(0,255,135,0.5) !important;
+}
+
+.landing-primary-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ── Secondary Button ── */
+.landing-secondary-btn {
+  transition: transform 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+.landing-secondary-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-user) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Scroll Reveal ── */
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Card Animations ── */
+.landing-card {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.35s ease,
+              border-color 0.35s ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.5), 0 0 30px rgba(0,255,135,0.08) !important;
+  border-color: rgba(0,255,135,0.2) !important;
+}
+
+/* ── Staggered Card Entrance ── */
+.landing-card.landing-reveal:nth-child(1) { transition-delay: 0s; }
+.landing-card.landing-reveal:nth-child(2) { transition-delay: 0.12s; }
+.landing-card.landing-reveal:nth-child(3) { transition-delay: 0.24s; }
+.landing-card.landing-reveal:nth-child(4) { transition-delay: 0.36s; }
+.landing-card.landing-reveal:nth-child(5) { transition-delay: 0.48s; }
+.landing-card.landing-reveal:nth-child(6) { transition-delay: 0.6s; }
+
+/* ── Section Titles ── */
+.landing-section-header {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-section-header.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Testimonial Cards ── */
+.landing-testimonial {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.35s ease,
+              border-color 0.35s ease;
+}
+
+.landing-testimonial:hover {
+  transform: translateY(-4px);
+  border-color: rgba(0,170,255,0.2) !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4) !important;
+}
+
+.landing-testimonial.landing-reveal:nth-child(1) { transition-delay: 0s; }
+.landing-testimonial.landing-reveal:nth-child(2) { transition-delay: 0.15s; }
+.landing-testimonial.landing-reveal:nth-child(3) { transition-delay: 0.3s; }
+
+/* ── Footer ── */
+.landing-footer {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease 0.2s, transform 0.6s ease 0.2s;
+}
+
+.landing-footer.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Hero Meta Shimmer ── */
+.landing-hero-meta {
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    rgba(0,255,135,0.6) 50%,
+    var(--text-muted) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ══════════════════════════════
+   RESPONSIVE — Landing Page
+   ══════════════════════════════ */
+
+/* ── "Coming Soon" badge ── */
+.coming-soon-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 204, 0, 0.9);
+  background: rgba(255, 204, 0, 0.1);
+  border: 1px solid rgba(255, 204, 0, 0.25);
+  border-radius: 10px;
+  vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+  .landing-hero-left,
+  .landing-hero-right {
+    animation-duration: 0.6s !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .landing-orb {
+    width: 180px !important;
+    height: 180px !important;
+  }
+}
+
