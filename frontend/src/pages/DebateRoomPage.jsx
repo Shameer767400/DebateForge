@@ -253,7 +253,7 @@ export default function DebateRoomPage() {
         baseURL: process.env.REACT_APP_API_URL,
         headers: { Authorization: `Bearer ${token}` },
       })
-      .then((r) => setDebateInfo(r.data))
+      .then((r) => setDebateInfo(r.data?.debate ?? r.data))
       .catch(console.error);
   }, [debateId, token]);
 

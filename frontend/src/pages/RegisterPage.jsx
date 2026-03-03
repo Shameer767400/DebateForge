@@ -23,7 +23,7 @@ export default function RegisterPage() {
     if (password.length < 8) {
       return 'Password must be at least 8 characters.';
     }
-    if (!/(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(password)) {
+    if (!/(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])/.test(password)) {
       return 'Password needs an uppercase letter, a number, and a special character.';
     }
     if (password !== confirmPassword) {
