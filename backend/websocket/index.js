@@ -297,7 +297,12 @@ async function processTranscript(socket, session, debateId, transcript) {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[WS] processTranscript error:', e);
-    socket.emit('error', { message: 'Error generating AI response.' });
+    const isQuota = e.message?.startsWith('QUOTA_EXHAUSTED');
+    socket.emit('error', {
+      message: isQuota
+        ? 'AI rate limit reached. Please wait 1–2 minutes and try again.'
+        : 'Error generating AI response.',
+    });
   }
 }
 
