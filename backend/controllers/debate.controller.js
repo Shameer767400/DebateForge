@@ -101,40 +101,69 @@ async function getDebateById(req, res) {
 
 async function checkAchievements(userId, user, winner) {
   if (!user) {
-    // Reload user if not provided
     // eslint-disable-next-line no-param-reassign
     user = await User.findById(userId);
     if (!user) return;
   }
 
+  // Moved Debate import to top of file or assumed it's already available via closure
+  // const { Debate } = require('../models'); // This line is removed as Debate is already imported at the top
   const achievementsToAdd = [];
 
-  
-  // first_debate
+  /* first_debate */
   if (user.totalDebates === 1) {
     achievementsToAdd.push('first_debate');
   }
 
-  // 10_wins
+  /* 10_wins */
   if (user.wins === 10) {
     achievementsToAdd.push('10_wins');
   }
 
-  // logic_master: avg userFinalScore > 80 in last 5 debates
+  /* Fetch recent debates once for multi-achievement checks */
   const recentDebates = await Debate.find({
     userId,
     userFinalScore: { $ne: null },
   })
     .sort({ endedAt: -1 })
-    .limit(5);
+    .limit(10);
 
-  if (recentDebates.length > 0) {
-    const avg =
-      recentDebates.reduce((sum, d) => sum + (d.userFinalScore || 0), 0) /
-      recentDebates.length;
+  /* logic_master: avg overall score > 80 in last 5 debates */
+  const last5 = recentDebates.slice(0, 5);
+  if (last5.length > 0) {
+    const avgOverall = last5.reduce((sum, d) => sum + (d.userFinalScore || 0), 0) / last5.length;
+    if (avgOverall > 80) achievementsToAdd.push('logic_master');
+  }
 
-    if (avg > 80) {
-      achievementsToAdd.push('logic_master');
+  /* evidence_king: avg evidence score > 85 in last 5 debates */
+  const evidenceScores = last5
+    .flatMap((d) => d.getUserArguments ? d.getUserArguments() : [])
+    .map((a) => a.scores?.evidence)
+    .filter((s) => s != null);
+  if (evidenceScores.length > 0) {
+    const avgEvidence = evidenceScores.reduce((s, v) => s + v, 0) / evidenceScores.length;
+    if (avgEvidence > 85) achievementsToAdd.push('evidence_king');
+  }
+
+  /* no_fallacy_streak_3: last 3 completed debates had zero fallacies */
+  const last3 = recentDebates.slice(0, 3);
+  if (last3.length === 3) {
+    const allClean = last3.every((d) => {
+      const userArgs = d.getUserArguments ? d.getUserArguments() : [];
+      return userArgs.every((a) => !a.fallacy?.detected);
+    });
+    if (allClean) achievementsToAdd.push('no_fallacy_streak_3');
+  }
+
+  /* comeback_king: won this debate after having a score < DRAW threshold in round 3 */
+  if (winner === 'user' && recentDebates.length > 0) {
+    const latestDebate = await Debate.findOne({ userId }).sort({ endedAt: -1 });
+    if (latestDebate) {
+      const userArgs = latestDebate.getUserArguments ? latestDebate.getUserArguments() : [];
+      const round3Arg = userArgs.find((a) => a.turnNumber === 3);
+      if (round3Arg && (round3Arg.scores?.overall ?? 100) < SCORE_THRESHOLDS.DRAW) {
+        achievementsToAdd.push('comeback_king');
+      }
     }
   }
 
@@ -174,8 +203,8 @@ async function endDebate(req, res) {
     }
 
     const K = user.totalDebates < 10 ? 32 : user.totalDebates < 50 ? 16 : 8;
-    const AI_RATING = 1200;
-    const expected = 1 / (1 + Math.pow(10, (AI_RATING - user.eloRating) / 400));
+    const { AI_ELO_RATING } = require('../config/constants');
+    const expected = 1 / (1 + Math.pow(10, (AI_ELO_RATING - user.eloRating) / 400));
     const actual = winner === 'user' ? 1 : winner === 'draw' ? 0.5 : 0;
     const newElo = Math.round(user.eloRating + K * (actual - expected));
 

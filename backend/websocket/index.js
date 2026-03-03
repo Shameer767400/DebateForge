@@ -6,6 +6,7 @@ const { Debate, User } = require('../models');
 const { streamDebateResponse, trimHistory } = require('../services/llm.service');
 const axios      = require('axios');
 const redisClient = require('../config/redis');
+const { SCORE_THRESHOLDS, MAX_ROUNDS } = require('../config/constants');
 
 /* ─────────────────────────────────────────────────────────────
    Entry point — attach Socket.IO to the HTTP server
@@ -13,7 +14,7 @@ const redisClient = require('../config/redis');
 function initWebSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin:      true,
+      origin: (process.env.FRONTEND_URL || 'http://localhost:3000').split(',').map(o => o.trim()),
       credentials: true,
     },
     maxHttpBufferSize: 1e7,  // 10 MB (audio chunks)
@@ -132,11 +133,16 @@ function initWebSocket(server) {
         const sessionRaw = await redisClient.get(`session:${debateId}`);
         if (!sessionRaw) return;
 
-        const debate   = await Debate.findById(debateId);
+        const debate = await Debate.findById(debateId);
+        if (!debate) {
+          socket.emit('error', { message: 'Debate not found' });
+          return;
+        }
+
         const avgScore = debate.getAverageScore();
-        const winner   =
-          avgScore >= 60 ? 'user' :
-          avgScore >= 40 ? 'draw' : 'ai';
+        const winner =
+          avgScore >= SCORE_THRESHOLDS.WIN  ? 'user' :
+          avgScore >= SCORE_THRESHOLDS.DRAW ? 'draw' : 'ai';
 
         socket.emit('debate_ended', { winner, userFinalScore: avgScore });
         await redisClient.del(`session:${debateId}`);
@@ -273,16 +279,18 @@ async function processTranscript(socket, session, debateId, transcript) {
     /* ── 11. Signal turn complete ── */
     socket.emit('ai_turn_complete', { fullText: fullAiText, round: session.round });
 
-    /* ── 12. Auto-end after round 6 ── */
-    if (session.round > 6) {
+    /* ── 12. Auto-end after MAX_ROUNDS ── */
+    if (session.round > MAX_ROUNDS) {
       const debate   = await Debate.findById(debateId);
-      const avgScore = debate.getAverageScore();
-      const winner   =
-        avgScore >= 60 ? 'user' :
-        avgScore >= 40 ? 'draw' : 'ai';
+      if (debate) {
+        const avgScore = debate.getAverageScore();
+        const winner =
+          avgScore >= SCORE_THRESHOLDS.WIN  ? 'user' :
+          avgScore >= SCORE_THRESHOLDS.DRAW ? 'draw' : 'ai';
 
-      socket.emit('debate_ended', { winner, userFinalScore: avgScore });
-      await redisClient.del(`session:${debateId}`);
+        socket.emit('debate_ended', { winner, userFinalScore: avgScore });
+        await redisClient.del(`session:${debateId}`);
+      }
     }
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -311,15 +319,11 @@ async function transcribeAudio(audioBuffer, topic) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Helper: ElevenLabs TTS streaming → socket
+   Helper: TTS (handled client-side via Web Speech API)
 ═══════════════════════════════════════════════════════════════ */
-async function streamTTSToSocket(socket, text) {
-  /* ElevenLabs is disabled due to credit exhaustion. 
-     TTS is now handled locally on the frontend using the Web Speech API. */
-  return;
-  
-  // if (!text.trim()) return;
-  // ... rest of the function commented out
+// eslint-disable-next-line no-unused-vars
+async function streamTTSToSocket(_socket, _text) {
+  /* TTS is handled on the frontend using the Web Speech API. */
 }
 
 /* ═══════════════════════════════════════════════════════════════

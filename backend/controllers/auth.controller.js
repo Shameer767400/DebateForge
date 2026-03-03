@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 
 const { User } = require('../models');
 
+
 function isValidUsername(username) {
   return /^[a-zA-Z0-9_]{3,30}$/.test(username);
 }
@@ -132,9 +133,32 @@ async function getMe(req, res) {
   }
 }
 
+async function refresh(req, res) {
+  try {
+    // req.user is already verified by the protect middleware
+    const user = await User.findById(req.user.id).select('-passwordHash');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, username: user.username, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.status(200).json({ token, user });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in refresh controller:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 module.exports = {
   register,
   login,
   getMe,
+  refresh,
 };
 

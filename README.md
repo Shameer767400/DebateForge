@@ -58,7 +58,7 @@ cd DebateForge/debateforge
 
 ```bash
 cd backend
-cp .env.example .env   # fill in your MongoDB URI, JWT secret, etc.
+cp .env.example .env   # fill in your MongoDB URI, JWT secret, API keys, etc.
 npm install
 npm start              # runs on http://localhost:5001
 ```
@@ -76,8 +76,9 @@ npm start              # runs on http://localhost:3000
 
 ```bash
 cd ml
+cp .env.example .env   # set FRONTEND_URL
 pip install -r requirements.txt
-uvicorn main:app --port 8000
+uvicorn main:app --port 8001
 ```
 
 ---

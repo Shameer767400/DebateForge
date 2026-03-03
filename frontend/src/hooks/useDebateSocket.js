@@ -80,11 +80,9 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    console.log('[useDebateSocket] Speaking:', trimmed);
     const synth = window.speechSynthesis;
     const utterance = new SpeechSynthesisUtterance(trimmed);
     
-    // Choose a professional sounding voice if available (macOSAlex is high quality)
     const voices = synth.getVoices();
     const preferredVoice = voices.find(v => v.name === 'Alex') || 
                           voices.find(v => v.name.includes('Samantha')) ||
@@ -93,7 +91,6 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
                            voices.find(v => v.lang === 'en-US');
     
     if (preferredVoice) {
-      console.log('[useDebateSocket] Using voice:', preferredVoice.name);
       utterance.voice = preferredVoice;
     }
 
@@ -103,10 +100,9 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
 
     utterance.onstart = () => setIsAISpeaking(true);
     utterance.onend = () => {
-      // Only set to false if nothing else is in the queue
       if (!synth.speaking) setIsAISpeaking(false);
     };
-    utterance.onerror = (e) => console.error('[useDebateSocket] TTS Error:', e);
+    utterance.onerror = (e) => console.error('[TTS Error]:', e);
 
     synth.speak(utterance);
   }, []);
@@ -141,13 +137,14 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('[useDebateSocket] connected', socket.id);
       setConnected(true);
       socket.emit('join_debate', { debateId });
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[useDebateSocket] disconnected:', reason);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[useDebateSocket] disconnected:', reason);
+      }
       setConnected(false);
     });
 
@@ -203,7 +200,9 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     };
 
     recognition.onerror = (e) => {
-      console.warn('[useDebateSocket] SpeechRecognition error:', e.error);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[SpeechRecognition error]:', e.error);
+      }
     };
 
     recognition.start();
@@ -281,8 +280,7 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
         startRecordingFallback();
       }
     } catch (err) {
-      console.error('[useDebateSocket] startRecording error:', err);
-      /* getUserMedia denied or MediaRecorder failed — try fallback */
+      console.error('[startRecording error]:', err);
       startRecordingFallback();
     }
   }, [startRecordingWithMediaRecorder, startRecordingFallback]);
