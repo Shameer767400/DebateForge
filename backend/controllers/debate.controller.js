@@ -106,8 +106,6 @@ async function checkAchievements(userId, user, winner) {
     if (!user) return;
   }
 
-  // Moved Debate import to top of file or assumed it's already available via closure
-  // const { Debate } = require('../models'); // This line is removed as Debate is already imported at the top
   const achievementsToAdd = [];
 
   /* first_debate */

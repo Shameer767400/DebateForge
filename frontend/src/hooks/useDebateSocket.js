@@ -310,6 +310,12 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     socketRef.current?.emit('end_debate', { debateId });
   }, [debateId]);
 
+  /** Send a typed text argument via the transcript_direct event */
+  const sendText = useCallback((text) => {
+    if (!text?.trim() || !socketRef.current) return;
+    socketRef.current.emit('transcript_direct', { debateId, text: text.trim() });
+  }, [debateId]);
+
   /* ─────────────────────────────────────────────
      Cleanup on unmount
   ───────────────────────────────────────────── */
@@ -328,6 +334,7 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     startRecording,
     stopRecording,
     endDebate,
+    sendText,
     liveTranscript,
     isAISpeaking,
     audioSupported,

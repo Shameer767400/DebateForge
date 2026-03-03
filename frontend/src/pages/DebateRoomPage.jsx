@@ -112,6 +112,7 @@ export default function DebateRoomPage() {
   const [alertExiting,   setAlertExiting]   = useState(false);
   const [endResult,      setEndResult]      = useState(null);
   const [showConfetti,   setShowConfetti]   = useState(false);
+  const [textInput,      setTextInput]      = useState('');
 
   const toast = useToast();
 
@@ -236,6 +237,7 @@ export default function DebateRoomPage() {
     startRecording,
     stopRecording,
     endDebate,
+    sendText,
     liveTranscript,
     isAISpeaking: hookIsAISpeaking,
   } = useDebateSocket(debateId, { onEvent: handleEvent });
@@ -481,6 +483,39 @@ export default function DebateRoomPage() {
                                 'Hold to Speak'}
               </span>
             </div>
+
+            {/* Text input fallback */}
+            <form
+              className="text-input-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = textInput.trim();
+                if (!trimmed || phase !== 'user_turn') return;
+                setMessages((prev) => [
+                  ...prev,
+                  { id: `user-${Date.now()}`, speaker: 'user', text: trimmed, scores: null },
+                ]);
+                sendText(trimmed);
+                setTextInput('');
+                setPhase('processing');
+              }}
+            >
+              <input
+                className="text-input-field"
+                type="text"
+                placeholder="Or type your argument…"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                disabled={phase !== 'user_turn' || isEnded}
+              />
+              <button
+                className="text-input-send"
+                type="submit"
+                disabled={!textInput.trim() || phase !== 'user_turn' || isEnded}
+              >
+                Send ➤
+              </button>
+            </form>
 
             {/* Waveform */}
             <div
