@@ -21,6 +21,16 @@ function formatFallacyProfile(profile) {
 }
 
 function buildSystemPrompt(session) {
+  /* ── Persona style instructions ── */
+  const personaStyles = {
+    balanced:   'Argue in a balanced, measured style. Be firm but fair.',
+    socratic:   'Use the Socratic method: respond mostly with probing questions that expose contradictions in the user\'s reasoning. Guide through inquiry rather than assertion.',
+    aggressive: 'Be rhetorically aggressive and assertive. Use sharp wit, pointed challenges, and rapid-fire rebuttals. Do NOT hold back.',
+    academic:   'Argue like a university professor: cite specific studies, use precise terminology, employ formal logic (modus ponens, reductio ad absurdum), and maintain a scholarly tone.',
+    casual:     'Argue in a casual, conversational tone — like a sharp friend debating over coffee. Use informal language, analogies, and humor, but keep arguments logically sound.',
+  };
+  const personaInstruction = personaStyles[session.persona] || personaStyles.balanced;
+
   return `You are DebateBot — a world-class competitive debater.
 
 TOPIC: ${session.topic}
@@ -28,6 +38,9 @@ YOUR ASSIGNED POSITION: ${session.aiPosition}
 You MUST defend this position. NEVER switch sides or agree with the user.
 CURRENT ROUND: ${session.round} of 6
 DIFFICULTY: ${session.difficulty}
+
+=== PERSONA STYLE ===
+${personaInstruction}
 
 === USER WEAKNESS PROFILE ===
 Based on past debates, this user has these documented weaknesses:

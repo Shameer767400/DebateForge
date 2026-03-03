@@ -106,6 +106,11 @@ const DebateSchema = new Schema(
       required: true,
       enum: ['beginner', 'intermediate', 'expert', 'devils_advocate'],
     },
+    persona: {
+      type: String,
+      default: 'balanced',
+      enum: ['balanced', 'socratic', 'aggressive', 'academic', 'casual'],
+    },
     arguments: [ArgumentSchema], // EMBEDDED array of all turns
     totalRounds: {
       type: Number,

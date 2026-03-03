@@ -43,6 +43,14 @@ const DIFFICULTIES = [
   },
 ];
 
+const PERSONAS = [
+  { key: 'balanced',   icon: '⚖️', name: 'Balanced',   desc: 'Firm but fair — the default style' },
+  { key: 'socratic',   icon: '🧐', name: 'Socratic',   desc: 'Probing questions — exposes contradictions' },
+  { key: 'aggressive', icon: '💥', name: 'Aggressive', desc: 'Sharp wit, pointed challenges, no mercy' },
+  { key: 'academic',   icon: '🎓', name: 'Academic',   desc: 'Studies, logic notation, scholarly tone' },
+  { key: 'casual',     icon: '☕', name: 'Casual',     desc: 'Smart friend debating over coffee' },
+];
+
 const DIFF_COLORS = {
   easy: '#00ff87',
   medium: '#ffcc00',
@@ -66,11 +74,13 @@ export default function LobbyPage() {
 
   const [side, setSide] = useState(null);
   const [difficulty, setDifficulty] = useState(null);
+  const [persona, setPersona] = useState('balanced');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
 
   const sideRef = useRef(null);
   const diffRef = useRef(null);
+  const personaRef = useRef(null);
   const customInputRef = useRef(null);
 
   /* ── Fetch topics on mount ── */
@@ -89,6 +99,7 @@ export default function LobbyPage() {
   const resetSteps = () => {
     setSide(null);
     setDifficulty(null);
+    setPersona('balanced');
   };
 
   const switchMode = (m) => {
@@ -129,6 +140,11 @@ export default function LobbyPage() {
       () => diffRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
       50
     );
+  const scrollToPersona = () =>
+    setTimeout(
+      () => personaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      50
+    );
 
   /* ── Derived values ── */
   const activeTopic =
@@ -143,11 +159,12 @@ export default function LobbyPage() {
     try {
       const body =
         mode === 'custom'
-          ? { customTopic: customTopicText.trim(), side, difficulty }
+          ? { customTopic: customTopicText.trim(), side, difficulty, persona }
           : {
               topicId: selectedTopic._id ?? selectedTopic.id,
               side,
               difficulty,
+              persona,
             };
 
       const res = await axios.post('/api/debates/start', body, {
@@ -368,11 +385,35 @@ export default function LobbyPage() {
             <button
               key={d.key}
               className={`diff-card ${difficulty === d.key ? 'diff-card--active' : ''} ${d.key === 'devil' ? 'diff-card--devil' : ''}`}
-              onClick={() => setDifficulty(d.key)}
+              onClick={() => {
+                setDifficulty(d.key);
+                scrollToPersona();
+              }}
             >
               <span className="diff-icon">{d.icon}</span>
               <span className="diff-name">{d.name}</span>
               <span className="diff-desc">{d.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Persona selector ── */}
+      <div
+        ref={personaRef}
+        className={`lobby-section ${difficulty ? 'lobby-section--open' : ''}`}
+      >
+        <h2 className="lobby-section-title">Choose AI Persona</h2>
+        <div className="persona-row">
+          {PERSONAS.map((p) => (
+            <button
+              key={p.key}
+              className={`persona-card ${persona === p.key ? 'persona-card--active' : ''}`}
+              onClick={() => setPersona(p.key)}
+            >
+              <span className="persona-icon">{p.icon}</span>
+              <span className="persona-name">{p.name}</span>
+              <span className="persona-desc">{p.desc}</span>
             </button>
           ))}
         </div>

@@ -61,6 +61,7 @@ function initWebSocket(server) {
           userSide:            debate.userSide,
           aiPosition,
           difficulty:          debate.difficulty,
+          persona:             debate.persona || 'balanced',
           round:               1,
           conversationHistory: [],
           userFallacyProfile:  fallacyProfile,
@@ -150,23 +151,7 @@ function initWebSocket(server) {
         socket.emit('error', { message: e.message });
       }
     });
-    /* ── typed text argument (text debate mode) ── */
-    socket.on('transcript_direct', async ({ debateId, text }) => {
-      try {
-        const sessionRaw = await redisClient.get(`session:${debateId}`);
-        if (!sessionRaw) {
-          socket.emit('error', { message: 'Session not found' });
-          return;
-        }
-        const session = JSON.parse(sessionRaw);
-        // Emit as a transcript_final so the UI stays consistent
-        socket.emit('transcript_final', { text });
-        // Process through the same pipeline as voice transcripts
-        await processTranscript(socket, session, debateId, text);
-      } catch (e) {
-        socket.emit('error', { message: e.message });
-      }
-    });
+
 
     socket.on('disconnect', () => {
       // eslint-disable-next-line no-console

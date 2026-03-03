@@ -2,7 +2,7 @@ const { User, Topic, Debate } = require('../models');
 
 async function startDebate(req, res) {
   try {
-    const { topicId, customTopic, side, userSide, difficulty } = req.body;
+    const { topicId, customTopic, side, userSide, difficulty, persona } = req.body;
 
     // Frontend sends "side", model expects "userSide"
     const resolvedSide = userSide || side;
@@ -32,6 +32,7 @@ async function startDebate(req, res) {
       topicSnapshot,
       userSide: resolvedSide,
       difficulty: resolvedDifficulty,
+      persona: persona || 'balanced',
       arguments: [],
     });
 
@@ -42,6 +43,7 @@ async function startDebate(req, res) {
       topicSnapshot: debate.topicSnapshot,
       userSide: debate.userSide,
       difficulty: debate.difficulty,
+      persona: debate.persona,
     });
   } catch (error) {
     // eslint-disable-next-line no-console
