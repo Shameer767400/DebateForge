@@ -2,13 +2,14 @@ import io
 import logging
 import os
 import time
+import google.generativeai as genai
 
-import openai
-
+# Configure Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY"))
 
 async def transcribe_audio(audio_bytes: bytes, topic: str = "") -> dict:
     """
-    Transcribe user's spoken debate argument using OpenAI Whisper.
+    Transcribe user's spoken debate argument using Google Gemini.
     Returns dict with: { text, duration_ms, word_count, success }
     """
     start = time.time()
@@ -23,23 +24,22 @@ async def transcribe_audio(audio_bytes: bytes, topic: str = "") -> dict:
         }
 
     try:
-        audio_file = io.BytesIO(audio_bytes)
-        audio_file.name = "debate.webm"
+        # Gemini 2.0 Flash — higher free-tier quota (1500 RPD vs 20 for 2.5)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        
+        # Audio bytes to Gemini format
+        # MIME type for webm is 'audio/webm'
+        audio_part = {
+            "mime_type": "audio/webm",
+            "data": audio_bytes
+        }
+        
+        prompt = f"Transcribe this audio. Context: This is a formal debate argument about: {topic}" if topic else "Transcribe this audio."
+        
+        response = await model.generate_content_async([prompt, audio_part])
+        text = response.text.strip()
 
-        client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-        transcript = await client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            language="en",
-            prompt=f"This is a formal debate argument about: {topic}" if topic else None,
-            response_format="text",
-            temperature=0,
-        )
-
-        text = transcript.strip()
-
-        # Clean filler words at sentence start
+        # Clean filler words at sentence start (reused logic)
         filler_pattern = r"^(um+,?\s*|uh+,?\s*|like,?\s*|you know,?\s*)+"
         import re
 
@@ -47,7 +47,7 @@ async def transcribe_audio(audio_bytes: bytes, topic: str = "") -> dict:
 
         elapsed = round((time.time() - start) * 1000)
         words = len(text.split())
-        logging.info(f"[WHISPER] {words} words transcribed in {elapsed}ms")
+        logging.info(f"[GEMINI-TRANSCRIPTION] {words} words transcribed in {elapsed}ms")
 
         return {
             "text": text,
@@ -56,8 +56,8 @@ async def transcribe_audio(audio_bytes: bytes, topic: str = "") -> dict:
             "success": True,
         }
 
-    except Exception as e:  # pragma: no cover - external API
-        logging.error(f"[WHISPER] Error: {e}")
+    except Exception as e:
+        logging.error(f"[GEMINI-TRANSCRIPTION] Error: {e}")
         return {
             "text": "",
             "duration_ms": 0,

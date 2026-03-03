@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,6 +11,7 @@ from models.store import model_store
 from routers.fallacy import router as fallacy_router
 from routers.scorer import router as scorer_router
 from routers.memory import router as memory_router
+from routers.transcription import router as transcription_router
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -56,6 +59,7 @@ async def startup_event() -> None:
 app.include_router(fallacy_router, prefix="/fallacy")
 app.include_router(scorer_router, prefix="/scorer")
 app.include_router(memory_router, prefix="/memory")
+app.include_router(transcription_router, prefix="/transcription")
 
 
 @app.get("/health")

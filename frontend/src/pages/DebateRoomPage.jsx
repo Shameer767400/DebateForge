@@ -2,9 +2,47 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
+import Confetti from '../components/Confetti';
 import '../styles/theme.css';
 import '../styles/debate.css';
+
+/* ── Sound helpers (Web Audio API — no files needed) ── */
+function playDing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.5);
+  } catch { /* silent fail if audio not supported */ }
+}
+
+function playVictory() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.4);
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.4);
+    });
+  } catch { /* silent fail */ }
+}
 
 /* ── Results modal ── */
 function ResultsModal({ result, onClose }) {
@@ -73,6 +111,9 @@ export default function DebateRoomPage() {
   const [aiWins,         setAiWins]         = useState(0);
   const [alertExiting,   setAlertExiting]   = useState(false);
   const [endResult,      setEndResult]      = useState(null);
+  const [showConfetti,   setShowConfetti]   = useState(false);
+
+  const toast = useToast();
 
   /* ── refs ── */
   const chatBottomRef = useRef(null);
@@ -162,14 +203,19 @@ export default function DebateRoomPage() {
         );
         setRound(data.round ?? ((r) => r + 1));
         setPhase('user_turn'); // resets timer via the timer useEffect
+        playDing();
         break;
 
       /* Debate over — show results modal then navigate */
       case 'debate_ended':
         setEndResult(data);
         setPhase('ended');
-        if (data?.winner === 'user') setUserWins((w) => w + 1);
-        if (data?.winner === 'ai')   setAiWins((w)   => w + 1);
+        if (data?.winner === 'user') {
+          setUserWins((w) => w + 1);
+          setShowConfetti(true);
+          playVictory();
+        }
+        if (data?.winner === 'ai') setAiWins((w) => w + 1);
         break;
 
       case 'debate_joined':
@@ -212,9 +258,24 @@ export default function DebateRoomPage() {
   /* ── Navigate to dashboard 3s after debate ends ── */
   useEffect(() => {
     if (phase !== 'ended') return;
+    if (endResult?.winner === 'user') toast.success('🏆 You won the debate!');
+    else if (endResult?.winner === 'ai') toast.error('The AI won this round. Keep forging!');
+    else toast.info('Debate ended.');
     const t = setTimeout(() => navigate('/dashboard'), 3000);
     return () => clearTimeout(t);
-  }, [phase, navigate]);
+  }, [phase, navigate, endResult, toast]);
+
+  /* ── Keyboard shortcut: Escape to end debate ── */
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape' && phase !== 'ended') {
+        endDebate();
+        setPhase('ended');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [phase, endDebate]);
 
   /* ── Auto-scroll chat ── */
   useEffect(() => {
@@ -289,6 +350,9 @@ export default function DebateRoomPage() {
   /* ── Render ── */
   return (
     <>
+      {/* Confetti on win */}
+      {showConfetti && <Confetti />}
+
       {/* ════════ MAIN LAYOUT ════════ */}
       <div className="debate-root">
 
@@ -323,7 +387,7 @@ export default function DebateRoomPage() {
                 setPhase('ended');
               }}
             >
-              End Debate
+              End Debate <span style={{ opacity: 0.5, fontSize: '0.7em' }}>(Esc)</span>
             </button>
           </div>
 

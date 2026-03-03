@@ -298,66 +298,44 @@ async function transcribeAudio(audioBuffer, topic) {
   const FormData = require('form-data');
   const form     = new FormData();
 
-  form.append('file',     audioBuffer, {
+  form.append('file', audioBuffer, {
     filename:    'debate.webm',
     contentType: 'audio/webm',
   });
-  form.append('model',    'whisper-1');
-  form.append('language', 'en');
   if (topic) {
-    form.append('prompt', `Formal debate about: ${topic}`);
+    form.append('topic', topic);
   }
 
-  const response = await axios.post(
-    'https://api.openai.com/v1/audio/transcriptions',
-    form,
-    {
-      headers: {
-        ...form.getHeaders(),
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-    }
-  );
-  return { text: response.data.text || '' };
+  const response = await callMLService('/transcription/transcribe', form);
+  return { text: response.text || '' };
 }
 
 /* ═══════════════════════════════════════════════════════════════
    Helper: ElevenLabs TTS streaming → socket
 ═══════════════════════════════════════════════════════════════ */
 async function streamTTSToSocket(socket, text) {
-  if (!text.trim()) return;
-
-  const response = await axios.post(
-    `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVENLABS_VOICE_ID}/stream`,
-    {
-      text,
-      model_id: 'eleven_turbo_v2',
-      voice_settings: {
-        stability:        0.65,
-        similarity_boost: 0.85,
-        style:            0.3,
-      },
-      optimize_streaming_latency: 4,
-    },
-    {
-      headers:      { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
-      responseType: 'stream',
-    }
-  );
-
-  for await (const chunk of response.data) {
-    socket.emit('ai_audio_chunk', { audio: chunk });
-  }
+  /* ElevenLabs is disabled due to credit exhaustion. 
+     TTS is now handled locally on the frontend using the Web Speech API. */
+  return;
+  
+  // if (!text.trim()) return;
+  // ... rest of the function commented out
 }
 
 /* ═══════════════════════════════════════════════════════════════
    Helper: ML microservice call
 ═══════════════════════════════════════════════════════════════ */
 async function callMLService(path, data, method = 'POST') {
-  const url      = `${process.env.ML_SERVICE_URL}${path}`;
+  const url = `${process.env.ML_SERVICE_URL}${path}`;
+  const config = {};
+
+  if (data && typeof data.getHeaders === 'function') {
+    config.headers = data.getHeaders();
+  }
+
   const response = method === 'GET'
-    ? await axios.get(url)
-    : await axios.post(url, data);
+    ? await axios.get(url, config)
+    : await axios.post(url, data, config);
   return response.data;
 }
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import '../styles/auth.css';
 
 export default function LoginPage() {
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -24,11 +26,12 @@ export default function LoginPage() {
         { baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001' }
       );
       login(res.data.token, res.data.user);
+      toast.success('Welcome back!');
       navigate('/lobby');
     } catch (err) {
-      setError(
-        err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed. Please try again.'
-      );
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed. Please try again.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -84,8 +87,11 @@ export default function LoginPage() {
             disabled={loading}
           >
             {loading ? (
-              <span className="auth-btn-loading">
-                <span className="auth-spinner" />
+              <span className="auth-btn-loading" style={{ gap: '12px' }}>
+                <div className="df-spinner sm">
+                  <div className="df-spinner-core" />
+                  <div className="df-spinner-orbit" />
+                </div>
                 Signing in…
               </span>
             ) : (

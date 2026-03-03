@@ -59,6 +59,7 @@ export default function LobbyPage() {
   const [mode, setMode] = useState('browse');
 
   const [topics, setTopics] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [customTopicText, setCustomTopicText] = useState('');
@@ -80,7 +81,8 @@ export default function LobbyPage() {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => setTopics(res.data.topics ?? res.data))
-      .catch(() => setError('Failed to load topics.'));
+      .catch(() => setError('Failed to load topics.'))
+      .finally(() => setLoading(false));
   }, [token]);
 
   /* ── Reset step-2 / step-3 when mode or topic changes ── */
@@ -221,41 +223,49 @@ export default function LobbyPage() {
 
           {/* ── Topics grid ── */}
           <div className="lobby-grid">
-            {filtered.map((topic) => {
-              const id = topic._id ?? topic.id;
-              const selected =
-                selectedTopic && (selectedTopic._id ?? selectedTopic.id) === id;
-              return (
-                <button
-                  key={id}
-                  className={`topic-card ${selected ? 'topic-card--selected' : ''}`}
-                  onClick={() => {
-                    setSelectedTopic(topic);
-                    resetSteps();
-                    scrollToSide();
-                  }}
-                >
-                  <span className="topic-title">{topic.title}</span>
-                  <div className="topic-meta">
-                    <span
-                      className="topic-pill"
-                      data-category={topic.category?.toLowerCase()}
-                    >
-                      {topic.category}
+            {loading ? (
+              [...Array(6)].map((_, i) => (
+                <div key={i} className="topic-skeleton" style={{ animationDelay: `${i * 100}ms` }} />
+              ))
+            ) : filtered.length === 0 ? (
+              <div className="no-topics">No topics found for this category.</div>
+            ) : (
+              filtered.map((topic) => {
+                const id = topic._id ?? topic.id;
+                const selected =
+                  selectedTopic && (selectedTopic._id ?? selectedTopic.id) === id;
+                return (
+                  <button
+                    key={id}
+                    className={`topic-card ${selected ? 'topic-card--selected' : ''}`}
+                    onClick={() => {
+                      setSelectedTopic(topic);
+                      resetSteps();
+                      scrollToSide();
+                    }}
+                  >
+                    <span className="topic-title">{topic.title}</span>
+                    <div className="topic-meta">
+                      <span
+                        className="topic-pill"
+                        data-category={topic.category?.toLowerCase()}
+                      >
+                        {topic.category}
+                      </span>
+                      <span
+                        className="topic-diff"
+                        style={{ color: DIFF_COLORS[topic.difficulty?.toLowerCase()] }}
+                      >
+                        {topic.difficulty}
+                      </span>
+                    </div>
+                    <span className="topic-count">
+                      {topic.debateCount ?? 0} debates
                     </span>
-                    <span
-                      className="topic-diff"
-                      style={{ color: DIFF_COLORS[topic.difficulty?.toLowerCase()] }}
-                    >
-                      {topic.difficulty}
-                    </span>
-                  </div>
-                  <span className="topic-count">
-                    {topic.debateCount ?? 0} debates
-                  </span>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })
+            )}
           </div>
         </>
       )}

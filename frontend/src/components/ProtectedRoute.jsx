@@ -8,7 +8,10 @@ function ProtectedRoute({ children }) {
   if (loading) {
     return (
       <div className="df-center">
-        <div className="df-spinner" />
+        <div className="df-spinner">
+          <div className="df-spinner-core" />
+          <div className="df-spinner-orbit" />
+        </div>
       </div>
     );
   }

@@ -1,12 +1,13 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 /* Lazy singleton — created on first use so a missing key doesn't crash startup */
-let _openaiClient = null;
-function getClient() {
-  if (!_openaiClient) {
-    _openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _genAI = null;
+function getModel() {
+  if (!_genAI) {
+    _genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY);
   }
-  return _openaiClient;
+  // Use Gemini 2.0 Flash — much higher free-tier quota (1500 RPD vs 20 RPD for 2.5)
+  return _genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 }
 
 function formatFallacyProfile(profile) {
@@ -56,31 +57,33 @@ Speak as if physically present at a debate podium.`;
 async function* streamDebateResponse(session, userArgument) {
   const history = (session.conversationHistory || []).slice(-10);
 
-  const messages = [
-    { role: 'system', content: buildSystemPrompt(session) },
-    ...history,
-    { role: 'user', content: userArgument },
-  ];
+  // Convert OpenAI-style history to Gemini-style
+  const contents = history.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
 
-  if (session.round % 2 === 0 && session.weaknessSummary) {
-    messages.splice(-1, 0, {
+  // Gemini handles "system" instructions via the systemInstruction parameter in getGenerativeModel
+  // But for simple replacement in this streaming function, we'll prepend it to the first message or use chat history
+  const model = getModel();
+  const chat = model.startChat({
+    history: contents,
+    systemInstruction: {
       role: 'system',
-      content: `REMINDER: ${session.weaknessSummary} Steer toward this now.`,
-    });
-  }
-
-  const stream = await getClient().chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages,
-    max_tokens: 180,
-    temperature: 0.85,
-    stream: true,
+      parts: [{ text: buildSystemPrompt(session) }],
+    },
+    generationConfig: {
+      maxOutputTokens: 180,
+      temperature: 0.85,
+    },
   });
 
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content;
-    if (delta) {
-      yield delta;
+  const result = await chat.sendMessageStream(userArgument);
+
+  for await (const chunk of result.stream) {
+    const text = chunk.text();
+    if (text) {
+      yield text;
     }
   }
 }

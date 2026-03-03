@@ -55,7 +55,8 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
   const recognitionRef   = useRef(null);   // SpeechRecognition instance
   const streamRef        = useRef(null);   // getUserMedia stream
   const audioCtxRef      = useRef(null);   // AudioContext
-  const audioQueueRef    = useRef([]);     // decoded AudioBuffer queue
+  const audioQueueRef    = useRef([]);     // Not used for Web Speech API, but keeping for reference or future use
+  const sentenceBufRef   = useRef('');     // Buffer for incoming text chunks
   const isPlayingRef     = useRef(false);  // guard against concurrent plays
   const onEventRef       = useRef(onEvent);
 
@@ -65,49 +66,64 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
   /* ─────────────────────────────────────────────
      Audio playback helpers
   ───────────────────────────────────────────── */
-  const playNextChunk = useCallback(() => {
-    if (audioQueueRef.current.length === 0) {
-      isPlayingRef.current = false;
-      setIsAISpeaking(false);
-      return;
+  /* Warm up voices for Chrome/Safari */
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (synth.onvoiceschanged !== undefined) {
+      synth.onvoiceschanged = () => synth.getVoices();
     }
-
-    isPlayingRef.current = true;
-    setIsAISpeaking(true);
-
-    const ctx    = audioCtxRef.current;
-    const source = ctx.createBufferSource();
-    source.buffer = audioQueueRef.current.shift();
-    source.connect(ctx.destination);
-    source.onended = playNextChunk;
-    source.start();
+    synth.getVoices();
   }, []);
 
-  const handleAiAudioChunk = useCallback((data) => {
-    /* Lazily create AudioContext on first real data (requires prior user gesture) */
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+  /** Speak a single sentence using Web Speech API */
+  const speakSentence = useCallback((text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    console.log('[useDebateSocket] Speaking:', trimmed);
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(trimmed);
+    
+    // Choose a professional sounding voice if available (macOSAlex is high quality)
+    const voices = synth.getVoices();
+    const preferredVoice = voices.find(v => v.name === 'Alex') || 
+                          voices.find(v => v.name.includes('Samantha')) ||
+                           voices.find(v => v.name.includes('Daniel')) ||
+                           voices.find(v => v.name.includes('Google US English')) ||
+                           voices.find(v => v.lang === 'en-US');
+    
+    if (preferredVoice) {
+      console.log('[useDebateSocket] Using voice:', preferredVoice.name);
+      utterance.voice = preferredVoice;
     }
-    const ctx = audioCtxRef.current;
 
-    /* data.chunk may be an ArrayBuffer or a base64 string */
-    const toBuffer = (chunk) => {
-      if (chunk instanceof ArrayBuffer) return Promise.resolve(chunk);
-      /* base64 → ArrayBuffer */
-      const binary = atob(chunk);
-      const bytes  = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return Promise.resolve(bytes.buffer);
+    utterance.rate = 1.0; 
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => setIsAISpeaking(true);
+    utterance.onend = () => {
+      // Only set to false if nothing else is in the queue
+      if (!synth.speaking) setIsAISpeaking(false);
     };
+    utterance.onerror = (e) => console.error('[useDebateSocket] TTS Error:', e);
 
-    toBuffer(data.chunk)
-      .then((arrayBuf) => ctx.decodeAudioData(arrayBuf))
-      .then((decoded) => {
-        audioQueueRef.current.push(decoded);
-        if (!isPlayingRef.current) playNextChunk();
-      })
-      .catch((err) => console.warn('[useDebateSocket] audio decode error:', err));
-  }, [playNextChunk]);
+    synth.speak(utterance);
+  }, []);
+
+  const handleAiTextChunk = useCallback((text) => {
+    sentenceBufRef.current += text;
+
+    // Use a regex to find all complete sentences ending in . ! or ?
+    // followed by possible whitespace.
+    const sentences = sentenceBufRef.current.match(/[^.!?]+[.!?](\s|$)/g);
+    
+    if (sentences) {
+      sentences.forEach(s => speakSentence(s));
+      // Remove spoken sentences from the buffer
+      sentenceBufRef.current = sentenceBufRef.current.slice(sentences.join('').length);
+    }
+  }, [speakSentence]);
 
   /* ─────────────────────────────────────────────
      Socket setup / teardown
@@ -138,10 +154,20 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     /* subscribe to all server events */
     SERVER_EVENTS.forEach((event) => {
       socket.on(event, (data) => {
-        /* Handle audio chunks internally */
-        if (event === 'ai_audio_chunk') {
-          handleAiAudioChunk(data);
+        /* Browser-based TTS (Web Speech API) 
+           We speak incoming text chunks as they form sentences. */
+        if (event === 'ai_text_chunk') {
+          handleAiTextChunk(data.text);
         }
+
+        /* Flush any remaining text when the turn is done */
+        if (event === 'ai_turn_complete') {
+          if (sentenceBufRef.current.trim()) {
+            speakSentence(sentenceBufRef.current);
+            sentenceBufRef.current = '';
+          }
+        }
+
         /* Propagate every event to caller */
         onEventRef.current?.(event, data);
       });

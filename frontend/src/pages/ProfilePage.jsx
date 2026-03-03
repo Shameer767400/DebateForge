@@ -149,7 +149,12 @@ export default function ProfilePage() {
       </nav>
 
       {loading ? (
-        <div className="prof-loading">Loading profile…</div>
+        <div className="df-center" style={{ minHeight: '60vh' }}>
+          <div className="df-spinner">
+            <div className="df-spinner-core" />
+            <div className="df-spinner-orbit" />
+          </div>
+        </div>
       ) : (
         <>
           {/* ── Hero ── */}
