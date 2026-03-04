@@ -133,6 +133,8 @@ npm test    # Jest + Supertest with MongoDB Memory Server
 
 ---
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Shameer767400/Shameer767400?utm_source=oss&utm_medium=github&utm_campaign=Shameer767400%2FShameer767400&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 ## 📜 License
 
 MIT
