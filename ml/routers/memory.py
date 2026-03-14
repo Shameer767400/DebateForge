@@ -134,7 +134,6 @@ async def get_weaknesses(user_id: str) -> WeaknessResponse:
                 weakness_summary="",
                 avg_weak_score=50.0,
             )
-
         weak_args = []
         fallacies = []
         topics = []
@@ -191,7 +190,6 @@ async def get_weaknesses(user_id: str) -> WeaknessResponse:
             weakness_summary="",
             avg_weak_score=50.0,
         )
-
 
 @router.delete("/clear/{user_id}")
 async def clear_memory(user_id: str):
