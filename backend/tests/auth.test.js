@@ -82,9 +82,8 @@ describe('Auth Endpoints', () => {
 
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('token');
-      expect(res.body.user.username).toBe('loginuser');
+ expect(res.body.user.username).toBe('loginuser');
     });
-
     it('should fail login with wrong password', async () => {
       const res = await request(app)
         .post('/api/auth/login')
@@ -92,6 +91,7 @@ describe('Auth Endpoints', () => {
           email: 'login@example.com',
           password: 'wrongpassword'
         });
+
 
       expect(res.statusCode).toEqual(401);
       expect(res.body.error).toMatch(/invalid credentials/i);
