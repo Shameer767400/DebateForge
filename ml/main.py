@@ -18,7 +18,6 @@ try:
 except ImportError:  # pragma: no cover - optional at runtime
     SentenceTransformer = None
 
-
 app = FastAPI(title="DebateForge ML Service", version="1.0.0")
 
 app.add_middleware(
@@ -67,7 +66,6 @@ async def health():
     models_loaded = model_store.sentence_model is not None
     return {"status": "ok", "models_loaded": models_loaded}
 
-
 @app.get("/")
 async def root():
     return {
@@ -79,4 +77,3 @@ async def root():
           "/memory",
         ],
     }
-
