@@ -1,0 +1,262 @@
+/* ─── Streak Badge ─── */
+.streak-badge {
+  background: linear-gradient(135deg, rgba(255, 100, 0, 0.08), rgba(255, 200, 0, 0.05));
+  border: 1px solid rgba(255, 140, 0, 0.2);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.streak-flame-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.streak-flame {
+  font-size: 1.8rem;
+  filter: grayscale(1);
+  transition: filter 0.3s ease;
+}
+
+.streak-flame--active {
+  filter: none;
+  animation: flamePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes flamePulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15) rotate(5deg); }
+}
+
+.streak-number {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #ff8c00;
+  text-shadow: 0 0 15px rgba(255, 140, 0, 0.3);
+}
+
+.streak-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.streak-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.streak-longest {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.streak-freeze {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(0, 200, 255, 0.1);
+  color: #00c8ff;
+  border: 1px solid rgba(0, 200, 255, 0.2);
+}
+
+.streak-freeze--used {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Milestone Progress ─── */
+.streak-milestone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.streak-milestone-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.streak-milestone-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff8c00, #ffd700);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.streak-milestone-label {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ─── Streak Celebration ─── */
+.streak-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  animation: celebFadeIn 0.4s ease;
+}
+
+@keyframes celebFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.streak-celebration-card {
+  background: linear-gradient(145deg, #1a1d2e, #12141f);
+  border: 1px solid rgba(255, 140, 0, 0.3);
+  border-radius: 20px;
+  padding: 40px;
+  text-align: center;
+  max-width: 400px;
+  animation: celebSlideUp 0.5s ease 0.1s both;
+}
+
+@keyframes celebSlideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.streak-celebration-emoji {
+  font-size: 4rem;
+  animation: celebBounce 0.8s ease infinite;
+}
+
+@keyframes celebBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+.streak-celebration-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffd700;
+  margin-top: 12px;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+
+.streak-celebration-desc {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* ─── Weekly Activity Grid ─── */
+.activity-grid {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.activity-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.2s ease;
+}
+
+.activity-dot--active {
+  background: rgba(0, 255, 135, 0.15);
+  border-color: rgba(0, 255, 135, 0.3);
+  color: #00ff87;
+}
+
+.activity-dot--today {
+  border-color: var(--accent-user, #4f8ef7);
+  box-shadow: 0 0 8px rgba(79, 142, 247, 0.3);
+}
+
+/* ─── Daily Challenge Card ─── */
+.daily-challenge {
+  background: linear-gradient(135deg, rgba(79, 142, 247, 0.08), rgba(79, 142, 247, 0.03));
+  border: 1px solid rgba(79, 142, 247, 0.2);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.daily-challenge-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-user, #4f8ef7);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.daily-challenge-text {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+}
+
+.daily-challenge-cta {
+  margin-top: 10px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-user, #4f8ef7);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.daily-challenge-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.4);
+}
+
+/* ─── Push notification banner ─── */
+.push-banner {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.push-banner-text {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.push-banner-btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(0, 255, 135, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 255, 135, 0.1);
+  color: #00ff87;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.push-banner-btn:hover {
+  background: rgba(0, 255, 135, 0.2);
+}

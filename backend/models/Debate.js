@@ -77,6 +77,17 @@ const ArgumentSchema = new Schema(
   }
 );
 
+/* ── Phase history sub-document (Addition 6) ── */
+const PhaseEntrySchema = new Schema(
+  {
+    phase: { type: String, required: true },
+    startedAt: { type: Date, default: Date.now },
+    endedAt: { type: Date, default: null },
+    roundsInPhase: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const DebateSchema = new Schema(
   {
     userId: {
@@ -111,6 +122,29 @@ const DebateSchema = new Schema(
       default: 'balanced',
       enum: ['balanced', 'socratic', 'aggressive', 'academic', 'casual'],
     },
+
+    /* ── Addition 6: Formal Debate Format Fields ── */
+    format: {
+      type: String,
+      default: 'freeform',
+      enum: ['freeform', 'oxford', 'lincoln_douglas', 'parliamentary'],
+    },
+    currentPhase: {
+      type: String,
+      default: 'opening',
+      enum: ['opening', 'rebuttal', 'cross_examination', 'closing', 'judging', 'ended'],
+    },
+    judgeScore: {
+      userScore: { type: Number, default: null },
+      aiScore: { type: Number, default: null },
+      feedback: { type: String, default: null },
+      winner: { type: String, default: null },
+      userStrengths: { type: String, default: null },
+      userWeaknesses: { type: String, default: null },
+    },
+    phaseHistory: [PhaseEntrySchema],
+    /* ── End Addition 6 ── */
+
     arguments: [ArgumentSchema], // EMBEDDED array of all turns
     totalRounds: {
       type: Number,
@@ -162,4 +196,3 @@ DebateSchema.methods.getAverageScore = function getAverageScore() {
 const Debate = mongoose.models.Debate || mongoose.model('Debate', DebateSchema);
 
 module.exports = Debate;
-

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import '../styles/lobby.css';
+import '../styles/lobby-format.css';
 
 const API = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
 
@@ -51,6 +52,13 @@ const PERSONAS = [
   { key: 'casual',     icon: '☕', name: 'Casual',     desc: 'Smart friend debating over coffee' },
 ];
 
+const FORMATS = [
+  { key: 'freeform',          icon: '💬', name: 'Freeform',          desc: 'Open debate, no strict rules',       badge: 'RECOMMENDED',  badgeColor: '#00ff87' },
+  { key: 'oxford',            icon: '🎓', name: 'Oxford Union',      desc: 'Opening → Rebuttal → Cross-Exam → Closing', badge: 'INTERMEDIATE', badgeColor: '#ffcc00' },
+  { key: 'lincoln_douglas',   icon: '⚖️',  name: 'Lincoln-Douglas',   desc: 'Classic 1v1 value debate format',    badge: 'ADVANCED',     badgeColor: '#ff9500' },
+  { key: 'parliamentary',     icon: '🏛️', name: 'Parliamentary',     desc: 'British Parliamentary style',        badge: 'EXPERT',       badgeColor: '#ff3366' },
+];
+
 const DIFF_COLORS = {
   easy: '#00ff87',
   medium: '#ffcc00',
@@ -75,12 +83,14 @@ export default function LobbyPage() {
   const [side, setSide] = useState(null);
   const [difficulty, setDifficulty] = useState(null);
   const [persona, setPersona] = useState('balanced');
+  const [format, setFormat] = useState('freeform');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
 
   const sideRef = useRef(null);
   const diffRef = useRef(null);
   const personaRef = useRef(null);
+  const formatRef = useRef(null);
   const customInputRef = useRef(null);
 
   /* ── Fetch topics on mount ── */
@@ -100,6 +110,7 @@ export default function LobbyPage() {
     setSide(null);
     setDifficulty(null);
     setPersona('balanced');
+    setFormat('freeform');
   };
 
   const switchMode = (m) => {
@@ -145,6 +156,11 @@ export default function LobbyPage() {
       () => personaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
       50
     );
+  const scrollToFormat = () =>
+    setTimeout(
+      () => formatRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      50
+    );
 
   /* ── Derived values ── */
   const activeTopic =
@@ -159,12 +175,13 @@ export default function LobbyPage() {
     try {
       const body =
         mode === 'custom'
-          ? { customTopic: customTopicText.trim(), side, difficulty, persona }
+          ? { customTopic: customTopicText.trim(), side, difficulty, persona, format }
           : {
               topicId: selectedTopic._id ?? selectedTopic.id,
               side,
               difficulty,
               persona,
+              format,
             };
 
       const res = await axios.post('/api/debates/start', body, {
@@ -409,11 +426,33 @@ export default function LobbyPage() {
             <button
               key={p.key}
               className={`persona-card ${persona === p.key ? 'persona-card--active' : ''}`}
-              onClick={() => setPersona(p.key)}
+              onClick={() => { setPersona(p.key); scrollToFormat(); }}
             >
               <span className="persona-icon">{p.icon}</span>
               <span className="persona-name">{p.name}</span>
               <span className="persona-desc">{p.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Format selector (Addition 6) ── */}
+      <div
+        ref={formatRef}
+        className={`lobby-section ${persona ? 'lobby-section--open' : ''}`}
+      >
+        <h2 className="lobby-section-title">Choose Debate Format</h2>
+        <div className="format-row">
+          {FORMATS.map((f) => (
+            <button
+              key={f.key}
+              className={`format-card ${format === f.key ? 'format-card--active' : ''}`}
+              onClick={() => setFormat(f.key)}
+            >
+              <span className="format-badge" style={{ background: f.badgeColor }}>{f.badge}</span>
+              <span className="format-icon">{f.icon}</span>
+              <span className="format-name">{f.name}</span>
+              <span className="format-desc">{f.desc}</span>
             </button>
           ))}
         </div>

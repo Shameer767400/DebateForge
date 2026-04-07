@@ -3,10 +3,52 @@
 const { Server } = require('socket.io');
 const jwt        = require('jsonwebtoken');
 const { Debate, User } = require('../models');
-const { streamDebateResponse, trimHistory } = require('../services/llm.service');
+const { streamDebateResponse, buildSystemPrompt, trimHistory } = require('../services/llm.service');
+const DebateFormatEngine = require('../services/formatEngine.service');
 const axios      = require('axios');
 const redisClient = require('../config/redis');
 const { SCORE_THRESHOLDS, MAX_ROUNDS } = require('../config/constants');
+const { finalizeDebateStats } = require('../controllers/debate.controller');
+
+/* ── WebSocket rate limiter ── */
+const WS_RATE_LIMITS = {
+  join_debate:        { max: 5,  windowMs: 60000 },   // 5 joins per min
+  audio_chunk:        { max: 120, windowMs: 60000 },   // 120 chunks per min (2/sec)
+  audio_end:          { max: 10, windowMs: 60000 },    // 10 per min
+  transcript_direct:  { max: 10, windowMs: 60000 },    // 10 per min
+  end_debate:         { max: 5,  windowMs: 60000 },    // 5 per min
+};
+
+function wsRateLimiter(socket, eventName) {
+  if (!WS_RATE_LIMITS[eventName]) return true; // No limit defined = allow
+
+  if (!socket._rateLimits) socket._rateLimits = {};
+  if (!socket._rateLimits[eventName]) {
+    socket._rateLimits[eventName] = { count: 0, resetAt: Date.now() + WS_RATE_LIMITS[eventName].windowMs };
+  }
+
+  const limit = socket._rateLimits[eventName];
+  const now = Date.now();
+
+  // Reset window if expired
+  if (now > limit.resetAt) {
+    limit.count = 0;
+    limit.resetAt = now + WS_RATE_LIMITS[eventName].windowMs;
+  }
+
+  limit.count++;
+
+  if (limit.count > WS_RATE_LIMITS[eventName].max) {
+    socket.emit('error', { message: `Rate limit exceeded for ${eventName}. Slow down.` });
+    return false;
+  }
+
+  return true;
+}
+
+/* ── Track active connections per user ── */
+const userConnections = new Map(); // userId → Set<socketId>
+const MAX_CONNECTIONS_PER_USER = 2;
 
 /* ─────────────────────────────────────────────────────────────
    Entry point — attach Socket.IO to the HTTP server
@@ -18,6 +60,8 @@ function initWebSocket(server) {
       credentials: true,
     },
     maxHttpBufferSize: 1e7,  // 10 MB (audio chunks)
+    pingTimeout: 30000,      // Disconnect idle sockets faster
+    pingInterval: 15000,
   });
 
   /* ── JWT auth middleware ── */
@@ -32,6 +76,20 @@ function initWebSocket(server) {
     }
   });
 
+  /* ── Connection limiter middleware ── */
+  io.use((socket, next) => {
+    const userId = socket.user?.id;
+    if (!userId) return next(new Error('No user'));
+
+    const conns = userConnections.get(userId) || new Set();
+    if (conns.size >= MAX_CONNECTIONS_PER_USER) {
+      return next(new Error('Too many connections. Close other tabs.'));
+    }
+    conns.add(socket.id);
+    userConnections.set(userId, conns);
+    next();
+  });
+
   /* ── Connection handler ── */
   io.on('connection', (socket) => {
     // eslint-disable-next-line no-console
@@ -41,18 +99,27 @@ function initWebSocket(server) {
        join_debate
     ─────────────────────────────────────── */
     socket.on('join_debate', async ({ debateId }) => {
+      if (!wsRateLimiter(socket, 'join_debate')) return;
+      console.log(`[WS] INCOMING: join_debate for debateId: ${debateId} from user: ${socket.user.username}`);
       try {
         const debate = await Debate.findOne({
           _id:    debateId,
           userId: socket.user.id,
         });
         if (!debate) {
+          console.error(`[WS] ERROR: Debate ${debateId} not found for user ${socket.user.id}`);
           return socket.emit('error', { message: 'Debate not found' });
         }
 
-        const user            = await User.findById(socket.user.id);
-        const fallacyProfile  = Object.fromEntries(user.fallacyProfile || new Map());
-        const aiPosition      = debate.userSide === 'for' ? 'against' : 'for';
+        const user               = await User.findById(socket.user.id);
+        const fallacyProfile     = Object.fromEntries(user.fallacyProfile || new Map());
+        const targetImprovements = user.targetImprovements || [];
+        const grammarMistakes    = user.grammarMistakes || [];
+        const aiPosition         = debate.userSide === 'for' ? 'against' : 'for';
+
+        /* ── Format Engine: initialize phase state ── */
+        const debateFormat = debate.format || 'freeform';
+        const phaseInfo    = DebateFormatEngine.getCurrentPhaseInfo(debateFormat, 0);
 
         const sessionState = {
           debateId,
@@ -65,8 +132,14 @@ function initWebSocket(server) {
           round:               1,
           conversationHistory: [],
           userFallacyProfile:  fallacyProfile,
+          targetImprovements,
+          grammarMistakes,
           weaknessSummary:     '',
           audioBuffer:         [],
+          // Addition 6: Format state
+          format:              debateFormat,
+          phaseIndex:          0,
+          roundsInPhase:       0,
         };
 
         await redisClient.setex(
@@ -76,13 +149,29 @@ function initWebSocket(server) {
         );
 
         socket.join(debateId);
+        console.log(`[WS] SUCCESS: User joined debate channel ${debateId}`);
         socket.emit('debate_joined', {
           topic:      debate.topicSnapshot,
           userSide:   debate.userSide,
           aiPosition,
           difficulty: debate.difficulty,
+          format:     debateFormat,
         });
+
+        /* ── Emit initial phase info for format debates ── */
+        if (debateFormat !== 'freeform') {
+          socket.emit('phase_update', {
+            phase:       phaseInfo.phaseKey,
+            phaseName:   phaseInfo.phaseName,
+            timeLimit:   phaseInfo.timeLimit,
+            instruction: phaseInfo.instruction,
+            phaseNumber: phaseInfo.phaseNumber,
+            totalPhases: phaseInfo.totalPhases,
+            phases:      DebateFormatEngine.getPhaseList(debateFormat),
+          });
+        }
       } catch (e) {
+        console.error(`[WS] ERROR in join_debate:`, e);
         socket.emit('error', { message: e.message });
       }
     });
@@ -90,14 +179,11 @@ function initWebSocket(server) {
     /* ────────────────────────────────────────
        audio_chunk — buffer incoming PCM/webm
     ─────────────────────────────────────── */
-    socket.on('audio_chunk', async ({ debateId, chunk }) => {
+    socket.on('audio_chunk', ({ debateId, chunk }) => {
+      if (!wsRateLimiter(socket, 'audio_chunk')) return;
       try {
-        const sessionRaw = await redisClient.get(`session:${debateId}`);
-        if (!sessionRaw) return;
-        const session = JSON.parse(sessionRaw);
-        /* chunk arrives as a Buffer from the socket layer */
-        session.audioBuffer.push(Buffer.from(chunk));
-        await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
+        if (!socket.audioBuffer) socket.audioBuffer = [];
+        socket.audioBuffer.push(Buffer.from(chunk));
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('[WS] audio_chunk error:', e.message);
@@ -108,11 +194,28 @@ function initWebSocket(server) {
        audio_end — transcribe + process turn
     ─────────────────────────────────────── */
     socket.on('audio_end', async ({ debateId }) => {
+      if (!wsRateLimiter(socket, 'audio_end')) return;
+      console.log(`[WS] INCOMING: audio_end for debate: ${debateId}`);
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
         return socket.emit('error', { message: 'Session expired' });
       }
       const session = JSON.parse(sessionRaw);
+
+      /* ── Ownership check: prevent IDOR ── */
+      if (session.userId !== socket.user.id) {
+        return socket.emit('error', { message: 'Unauthorized' });
+      }
+      
+      const chunks = socket.audioBuffer || [];
+      socket.audioBuffer = []; // Clear current buffer
+      
+      if (chunks.length === 0) {
+        console.log(`[WS] WARNING: audio_end received but socket buffer was empty`);
+        return;
+      }
+      
+      session.audioBuffer = chunks;
       await processTurn(socket, session, debateId);
     });
 
@@ -120,9 +223,21 @@ function initWebSocket(server) {
        transcript_direct — fallback (no MediaRecorder)
     ─────────────────────────────────────── */
     socket.on('transcript_direct', async ({ debateId, text }) => {
+      if (!wsRateLimiter(socket, 'transcript_direct')) return;
+      console.log(`[WS] INCOMING: transcript_direct. Debate: ${debateId}, Text length: ${text?.length || 0}`);
       const sessionRaw = await redisClient.get(`session:${debateId}`);
-      if (!sessionRaw) return;
+      if (!sessionRaw) {
+         console.log(`[WS] ERROR: Ignoring transcript_direct because session missing from Redis`);
+         return;
+      }
       const session = JSON.parse(sessionRaw);
+
+      /* ── Ownership check: prevent IDOR ── */
+      if (session.userId !== socket.user.id) {
+        return socket.emit('error', { message: 'Unauthorized' });
+      }
+
+      socket.emit('transcript_final', { text });
       await processTranscript(socket, session, debateId, text);
     });
 
@@ -130,11 +245,19 @@ function initWebSocket(server) {
        end_debate — manual end by user
     ─────────────────────────────────────── */
     socket.on('end_debate', async ({ debateId }) => {
+      if (!wsRateLimiter(socket, 'end_debate')) return;
       try {
         const sessionRaw = await redisClient.get(`session:${debateId}`);
         if (!sessionRaw) return;
 
-        const debate = await Debate.findById(debateId);
+        /* ── Ownership check on session ── */
+        const session = JSON.parse(sessionRaw);
+        if (session.userId !== socket.user.id) {
+          return socket.emit('error', { message: 'Unauthorized' });
+        }
+
+        /* ── Ownership check on debate document ── */
+        const debate = await Debate.findOne({ _id: debateId, userId: socket.user.id });
         if (!debate) {
           socket.emit('error', { message: 'Debate not found' });
           return;
@@ -145,7 +268,8 @@ function initWebSocket(server) {
           avgScore >= SCORE_THRESHOLDS.WIN  ? 'user' :
           avgScore >= SCORE_THRESHOLDS.DRAW ? 'draw' : 'ai';
 
-        socket.emit('debate_ended', { winner, userFinalScore: avgScore });
+        const result = await finalizeDebateStats(socket.user.id, debateId, winner, 0);
+        socket.emit('debate_ended', { winner, userFinalScore: result.avgScore });
         await redisClient.del(`session:${debateId}`);
       } catch (e) {
         socket.emit('error', { message: e.message });
@@ -154,6 +278,13 @@ function initWebSocket(server) {
 
 
     socket.on('disconnect', () => {
+      // Clean up connection tracking
+      const userId = socket.user?.id;
+      if (userId && userConnections.has(userId)) {
+        const conns = userConnections.get(userId);
+        conns.delete(socket.id);
+        if (conns.size === 0) userConnections.delete(userId);
+      }
       // eslint-disable-next-line no-console
       console.log(`[WS] User disconnected: ${socket.user.username}`);
     });
@@ -199,40 +330,52 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     const historyCtx = session.conversationHistory.slice(-4).map((m) => m.content);
 
-    /* ── 1. Run ML tasks in parallel ── */
-    const [fallacyResult, scoreResult, weaknessResult] = await Promise.allSettled([
-      callMLService('/fallacy/detect', {
-        argument: transcript,
-        context:  historyCtx,
-        user_id:  session.userId,
-      }),
-      callMLService('/scorer/score', {
-        argument:    transcript,
-        topic:       session.topic,
-        context:     historyCtx,
-        turn_number: session.round,
-      }),
-      callMLService(`/memory/weaknesses/${session.userId}`, null, 'GET'),
-    ]);
+    /* ── 1. Run ML tasks in parallel (non-blocking) ── */
+    let fallacyResult = {};
+    const fallacyPromise = callMLService('/fallacy/detect', {
+      argument: transcript,
+      context:  historyCtx,
+      user_id:  session.userId,
+    }).then((res) => {
+      if (res?.detected) socket.emit('fallacy_detected', res);
+      if (res) fallacyResult = res;
+    }).catch(err => console.error('[WS] Fallacy error:', err.message));
 
-    /* ── 2. Emit fallacy (if detected) ── */
-    if (fallacyResult.status === 'fulfilled' && fallacyResult.value?.detected) {
-      socket.emit('fallacy_detected', fallacyResult.value);
-    }
+    let scoresResult = {};
+    const scorerPromise = callMLService('/scorer/score', {
+      argument:    transcript,
+      topic:       session.topic,
+      context:     historyCtx,
+      turn_number: session.round,
+    }).then((res) => {
+      if (res) {
+        socket.emit('scores_update', res);
+        scoresResult = res;
+      }
+    }).catch(err => console.error('[WS] Scorer error:', err.message));
 
-    /* ── 3. Emit scores ── */
-    if (scoreResult.status === 'fulfilled') {
-      socket.emit('scores_update', scoreResult.value);
-    }
+    const weaknessPromise = callMLService(`/memory/weaknesses/${session.userId}`, null, 'GET')
+      .then((res) => {
+        if (res?.weakness_summary) session.weaknessSummary = res.weakness_summary;
+      }).catch(err => console.error('[WS] Weakness error:', err.message));
 
-    /* ── 4. Update weakness context ── */
-    if (weaknessResult.status === 'fulfilled') {
-      session.weaknessSummary = weaknessResult.value?.weakness_summary || '';
-    }
+    // ensure errors don't crash
+    Promise.allSettled([fallacyPromise, scorerPromise, weaknessPromise]);
 
     /* ── 5. Append user turn to history ── */
     session.conversationHistory.push({ role: 'user', content: transcript });
     session.conversationHistory = trimHistory(session.conversationHistory);
+
+    /* ── 5.5 Inject phase-specific prompt (Addition 6) ── */
+    const phasePrompt = DebateFormatEngine.getPhaseSystemPromptAddition(
+      session.format || 'freeform',
+      session.phaseIndex || 0,
+      session.userSide
+    );
+    if (phasePrompt) {
+      // Temporarily inject phase context into session for buildSystemPrompt
+      session._phasePromptAddition = phasePrompt;
+    }
 
     /* ── 6. Stream GPT-4 + sentence-level TTS ── */
     let fullAiText    = '';
@@ -255,44 +398,77 @@ async function processTranscript(socket, session, debateId, transcript) {
       await streamTTSToSocket(socket, sentenceBuffer);
     }
 
+    // Clean up temp phase prompt
+    delete session._phasePromptAddition;
+
     /* ── 7. Append AI turn to history ── */
     session.conversationHistory.push({ role: 'assistant', content: fullAiText });
 
+    /* ── wait for ML tasks to finish before saving to Mongo ── */
+    await Promise.all([fallacyPromise, scorerPromise]);
+
     /* ── 8. Persist turn to MongoDB (non-blocking) ── */
-    const scores  = scoreResult.status  === 'fulfilled' ? scoreResult.value  : {};
-    const fallacy = fallacyResult.status === 'fulfilled' ? fallacyResult.value : {};
-    saveTurnToMongo(debateId, transcript, fullAiText, session.round, scores, fallacy)
+    saveTurnToMongo(debateId, transcript, fullAiText, session.round, scoresResult, fallacyResult)
       .catch(console.error);  // eslint-disable-line no-console
 
     /* ── 9. Store embedding in vector DB (non-blocking) ── */
     callMLService('/memory/store', {
       user_id:       session.userId,
       argument_text: transcript,
-      scores,
-      fallacy_type:  fallacy.fallacy_type || 'no_fallacy',
+      scores:        scoresResult,
+      fallacy_type:  fallacyResult?.fallacy_type || 'no_fallacy',
       topic:         session.topic,
       debate_id:     debateId,
     }).catch(console.error);  // eslint-disable-line no-console
 
     /* ── 10. Persist updated session ── */
     session.round++;
+
+    /* ── 10.5 Phase advancement (Addition 6) ── */
+    const fmt = session.format || 'freeform';
+    if (fmt !== 'freeform') {
+      session.roundsInPhase = (session.roundsInPhase || 0) + 1;
+
+      if (DebateFormatEngine.shouldAdvancePhase(fmt, session.phaseIndex || 0, session.roundsInPhase)) {
+        const nextIdx = DebateFormatEngine.getNextPhaseIndex(fmt, session.phaseIndex || 0);
+
+        if (nextIdx === -1) {
+          // Debate ended
+          session.phaseIndex = -1;
+        } else {
+          session.phaseIndex = nextIdx;
+          session.roundsInPhase = 0;
+
+          const nextInfo = DebateFormatEngine.getCurrentPhaseInfo(fmt, nextIdx);
+
+          if (nextInfo.phaseKey === 'judging') {
+            // Trigger AI judge scoring
+            await runJudgeScoring(socket, session, debateId);
+          } else {
+            socket.emit('phase_update', {
+              phase:       nextInfo.phaseKey,
+              phaseName:   nextInfo.phaseName,
+              timeLimit:   nextInfo.timeLimit,
+              instruction: nextInfo.instruction,
+              phaseNumber: nextInfo.phaseNumber,
+              totalPhases: nextInfo.totalPhases,
+              phases:      DebateFormatEngine.getPhaseList(fmt),
+            });
+          }
+        }
+      }
+    }
+
     await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
 
     /* ── 11. Signal turn complete ── */
     socket.emit('ai_turn_complete', { fullText: fullAiText, round: session.round });
 
-    /* ── 12. Auto-end after MAX_ROUNDS ── */
-    if (session.round > MAX_ROUNDS) {
-      const debate   = await Debate.findById(debateId);
-      if (debate) {
-        const avgScore = debate.getAverageScore();
-        const winner =
-          avgScore >= SCORE_THRESHOLDS.WIN  ? 'user' :
-          avgScore >= SCORE_THRESHOLDS.DRAW ? 'draw' : 'ai';
-
-        socket.emit('debate_ended', { winner, userFinalScore: avgScore });
-        await redisClient.del(`session:${debateId}`);
-      }
+    /* ── 12. Auto-end after MAX_ROUNDS (freeform only) ── */
+    if (fmt === 'freeform' && session.round > MAX_ROUNDS) {
+      // Instead of calculating scores locally, use the unified LLM judge for the Report Card
+      await runJudgeScoring(socket, session, debateId);
+      await redisClient.del(`session:${debateId}`);
     }
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -303,6 +479,107 @@ async function processTranscript(socket, session, debateId, transcript) {
         ? 'AI rate limit reached. Please wait 1–2 minutes and try again.'
         : 'Error generating AI response.',
     });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   runJudgeScoring — AI judge evaluates the full debate (Addition 6)
+═══════════════════════════════════════════════════════════════ */
+async function runJudgeScoring(socket, session, debateId) {
+  try {
+    const debate = await Debate.findById(debateId);
+    if (!debate) return;
+
+    const judgePrompt = `You are an impartial debate judge.
+Review this complete debate transcript and score both sides.
+
+TOPIC: ${session.topic}
+USER POSITION: ${session.userSide}
+AI POSITION: ${session.aiPosition}
+FORMAT: ${session.format}
+
+FULL TRANSCRIPT:
+${debate.arguments.map(a =>
+  `[${a.speaker.toUpperCase()}]: ${a.content}`
+).join('\n\n')}
+
+Score each debater 0-100 on:
+- Argument quality
+- Use of evidence
+- Rebuttal effectiveness
+- Adherence to debate format
+
+Provide specific, constructive feedback for the user. Identify any grammatical errors they made, and list exactly what they need to improve for next time.
+
+Respond ONLY in this JSON format:
+{
+  "userScore": 72,
+  "aiScore": 68,
+  "winner": "user",
+  "feedback": "The user demonstrated stronger evidence use...",
+  "userStrengths": "Clear structure, good use of statistics...",
+  "userWeaknesses": "Could improve rebuttal directness...",
+  "areasToImprove": ["Rebuttals need more evidence", "Avoid ad hominem attacks"],
+  "grammarMistakes": ["'their' instead of 'there'", "missing commas in compound sentences"]
+}`;
+
+    // Use the LLM to get judge response
+    let judgeText = '';
+    for await (const chunk of streamDebateResponse(
+      { ...session, round: 1, conversationHistory: [] },
+      judgePrompt
+    )) {
+      judgeText += chunk;
+    }
+
+    // Parse JSON from response
+    let judgeResponse;
+    try {
+      // Try to extract JSON from the response
+      const jsonMatch = judgeText.match(/\{[\s\S]*\}/);
+      judgeResponse = JSON.parse(jsonMatch ? jsonMatch[0] : judgeText);
+    } catch {
+      judgeResponse = {
+        userScore: 65,
+        aiScore: 60,
+        winner: 'user',
+        feedback: judgeText,
+        userStrengths: 'Good argumentation',
+        userWeaknesses: 'Room for improvement',
+        areasToImprove: [],
+        grammarMistakes: [],
+      };
+    }
+
+    // Save judge scores to debate document
+    await Debate.findByIdAndUpdate(debateId, {
+      judgeScore: judgeResponse,
+      currentPhase: 'judging',
+    });
+    
+    // Process final stats (wins, streaks, etc.)
+    await finalizeDebateStats(session.userId, debateId, judgeResponse.winner, 0);
+
+    // Persist weaknesses and grammar mistakes to the user profile for future coaching
+    const updateTasks = {};
+    if (judgeResponse.areasToImprove && judgeResponse.areasToImprove.length > 0) {
+      updateTasks.targetImprovements = { $each: judgeResponse.areasToImprove, $slice: -10 };
+    }
+    if (judgeResponse.grammarMistakes && judgeResponse.grammarMistakes.length > 0) {
+      updateTasks.grammarMistakes = { $each: judgeResponse.grammarMistakes, $slice: -10 };
+    }
+
+    if (Object.keys(updateTasks).length > 0) {
+      // We use $push with $slice to keep the lists from growing indefinitely
+      await User.findByIdAndUpdate(session.userId, { $push: updateTasks });
+    }
+
+    // Emit judge results to client
+    socket.emit('judge_verdict', judgeResponse);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[WS] Judge scoring error:', e.message);
+    socket.emit('error', { message: 'Judge scoring failed.' });
   }
 }
 
@@ -338,7 +615,7 @@ async function streamTTSToSocket(_socket, _text) {
 ═══════════════════════════════════════════════════════════════ */
 async function callMLService(path, data, method = 'POST') {
   const url = `${process.env.ML_SERVICE_URL}${path}`;
-  const config = {};
+  const config = { timeout: 10000 }; // Prevent infinite hangs if ML service freezes
 
   if (data && typeof data.getHeaders === 'function') {
     config.headers = data.getHeaders();

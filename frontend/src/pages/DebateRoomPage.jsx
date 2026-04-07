@@ -7,6 +7,8 @@ import { useDebateSocket } from '../hooks/useDebateSocket';
 import Confetti from '../components/Confetti';
 import '../styles/theme.css';
 import '../styles/debate.css';
+import '../styles/lobby-format.css';
+import '../styles/judge-verdict.css';
 
 /* ── Sound helpers (Web Audio API — no files needed) ── */
 function playDing() {
@@ -44,22 +46,7 @@ function playVictory() {
   } catch { /* silent fail */ }
 }
 
-/* ── Results modal ── */
-function ResultsModal({ result, onClose }) {
-  const winner = result?.winner;
-  const score  = result?.userFinalScore ?? 0;
-  const emoji  = winner === 'user' ? '🏆' : winner === 'draw' ? '🤝' : '😔';
-  const label  = winner === 'user' ? 'You Win!' : winner === 'draw' ? 'Draw' : 'AI Wins';
-  return (
-    <div className="debate-ended-banner">
-      <div style={{ fontSize: '3rem' }}>{emoji}</div>
-      <div className="debate-ended-title">{label}</div>
-      <div className="debate-ended-sub">Your score: {score} · Redirecting to dashboard…</div>
-    </div>
-  );
-}
-
-/* ── helpers ── */
+/* ── Helpers ── */
 const WAVE_BARS = 30;
 const TIMER_MAX = 60;
 const RING_R = 45;          // SVG circle radius for timer
@@ -113,6 +100,10 @@ export default function DebateRoomPage() {
   const [endResult,      setEndResult]      = useState(null);
   const [showConfetti,   setShowConfetti]   = useState(false);
   const [textInput,      setTextInput]      = useState('');
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
+  // Addition 6: Format/phase state
+  const [phaseInfo,      setPhaseInfo]      = useState(null);
+  const [judgeVerdict,   setJudgeVerdict]   = useState(null);
 
   const toast = useToast();
 
@@ -207,9 +198,22 @@ export default function DebateRoomPage() {
         playDing();
         break;
 
-      /* Debate over — show results modal then navigate */
+      /* Legacy Debate over — still set phase to 'ended' to disable inputs */
       case 'debate_ended':
-        setEndResult(data);
+        setPhase('ended');
+        break;
+
+      case 'debate_joined':
+        break;
+
+      /* Phase transition (Addition 6) */
+      case 'phase_update':
+        setPhaseInfo(data);
+        break;
+
+      /* AI Judge verdict (Addition 6 & 9 Report Card) */
+      case 'judge_verdict':
+        setJudgeVerdict(data);
         setPhase('ended');
         if (data?.winner === 'user') {
           setUserWins((w) => w + 1);
@@ -219,8 +223,6 @@ export default function DebateRoomPage() {
         if (data?.winner === 'ai') setAiWins((w) => w + 1);
         break;
 
-      case 'debate_joined':
-        break;
       case 'error':
         console.error('[DebateRoom] socket error:', data);
         // Reset to user_turn so UI doesn't freeze on backend errors
@@ -240,7 +242,8 @@ export default function DebateRoomPage() {
     sendText,
     liveTranscript,
     isAISpeaking: hookIsAISpeaking,
-  } = useDebateSocket(debateId, { onEvent: handleEvent });
+    availableVoices,
+  } = useDebateSocket(debateId, { onEvent: handleEvent, selectedVoiceURI });
 
   /* Keep stopRecording accessible inside the timer callback without stale closure */
   useEffect(() => { stopRecRef.current = stopRecording; }, [stopRecording]);
@@ -289,25 +292,33 @@ export default function DebateRoomPage() {
        - Auto-calls stopRecording() when it hits 0 (in case user forgot)
        - Clears itself when phase leaves 'user_turn'
   ── */
+  const phaseRef = useRef(phase);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+
   useEffect(() => {
-    if (phase !== 'user_turn') {
+    if (phase !== 'user_turn' && phase !== 'recording') {
       clearInterval(timerRef.current);
       return;
     }
-    setTimer(TIMER_MAX);
+    if (phase === 'user_turn') {
+      setTimer(TIMER_MAX);
+    }
     timerRef.current = setInterval(() => {
       setTimer((t) => {
         if (t <= 1) {
           clearInterval(timerRef.current);
-          // If user is still recording when time runs out, stop them
-          stopRecRef.current?.();
+          // Use phaseRef to get the LIVE phase (not stale closure)
+          if (phaseRef.current === 'recording') {
+            stopRecRef.current?.();
+          }
           return 0;
         }
         return t - 1;
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-  }, [phase, round]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase === 'user_turn' ? 'user_turn' : phase, round]);
 
   /* ── Fallacy alert auto-dismiss ── */
   const dismissAlert = useCallback(() => {
@@ -327,19 +338,17 @@ export default function DebateRoomPage() {
   useEffect(() => () => clearTimeout(alertTimerRef.current), []);
 
   /* ── Mic button handlers ── */
-  const handleMicDown = useCallback((e) => {
-    e.preventDefault();
-    if (phase !== 'user_turn') return;
-    startRecording();
-    setPhase('recording');
-  }, [phase, startRecording]);
-
-  const handleMicUp = useCallback((e) => {
-    e.preventDefault();
-    if (phase !== 'recording') return;
-    stopRecording();
-    setPhase('processing');
-  }, [phase, stopRecording]);
+  const handleMicToggle = useCallback((e) => {
+    if (e) e.preventDefault();
+    
+    if (phase === 'user_turn') {
+      startRecording();
+      setPhase('recording');
+    } else if (phase === 'recording') {
+      stopRecording();
+      setPhase('processing');
+    }
+  }, [phase, startRecording, stopRecording]);
 
   /* ── Derived ── */
   const timerOffset  = RING_C - (timer / TIMER_MAX) * RING_C;
@@ -357,6 +366,36 @@ export default function DebateRoomPage() {
 
       {/* ════════ MAIN LAYOUT ════════ */}
       <div className="debate-root">
+
+        {/* ──── PHASE PROGRESS BAR (Addition 6) ──── */}
+        {phaseInfo && phaseInfo.phases && (
+          <div className="phase-progress">
+            {phaseInfo.phases.map((p, i) => (
+              <div key={i} className="phase-step">
+                {i > 0 && (
+                  <div className={`phase-connector ${i < phaseInfo.phaseNumber ? 'phase-connector--done' : ''}`} />
+                )}
+                <div className={`phase-dot ${
+                  i + 1 === phaseInfo.phaseNumber ? 'phase-dot--active' :
+                  i + 1 < phaseInfo.phaseNumber ? 'phase-dot--done' : ''
+                }`}>
+                  {i + 1 < phaseInfo.phaseNumber ? '✓' : i + 1}
+                </div>
+                <span className={`phase-label ${i + 1 === phaseInfo.phaseNumber ? 'phase-label--active' : ''}`}>
+                  {p.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ──── PHASE INSTRUCTION BANNER ──── */}
+        {phaseInfo && phaseInfo.instruction && (
+          <div className="phase-banner">
+            <span className="phase-banner-phase">{phaseInfo.phaseName}</span>
+            <span className="phase-banner-instruction">{phaseInfo.instruction}</span>
+          </div>
+        )}
 
         {/* ──── LEFT PANEL ──── */}
 
@@ -382,15 +421,35 @@ export default function DebateRoomPage() {
               {debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? 'Loading topic…'}
             </span>
             <span className="debate-round">Round {round}</span>
-            <button
-              className="debate-end-btn"
-              onClick={() => {
-                endDebate();
-                setPhase('ended');
-              }}
-            >
-              End Debate <span style={{ opacity: 0.5, fontSize: '0.7em' }}>(Esc)</span>
-            </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <select 
+                value={selectedVoiceURI} 
+                onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                style={{
+                  background: 'var(--surface-color)',
+                  color: 'var(--text-color)',
+                  border: '1px solid var(--border-color)',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.85rem'
+                }}
+              >
+                <option value="">Default AI Voice</option>
+                {availableVoices.map(v => (
+                  <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>
+                ))}
+              </select>
+
+              <button
+                className="debate-end-btn"
+                onClick={() => {
+                  endDebate();
+                  setPhase('ended');
+                }}
+              >
+                End Debate <span style={{ opacity: 0.5, fontSize: '0.7em' }}>(Esc)</span>
+              </button>
+            </div>
           </div>
 
           {/* Chat area */}
@@ -463,12 +522,9 @@ export default function DebateRoomPage() {
                   isRecording  ? 'mic-btn--recording'  : '',
                   isProcessing || isAISpeaking ? 'mic-btn--processing' : '',
                 ].join(' ')}
-                onMouseDown={handleMicDown}
-                onMouseUp={handleMicUp}
-                onTouchStart={handleMicDown}
-                onTouchEnd={handleMicUp}
+                onClick={handleMicToggle}
                 disabled={isProcessing || isAISpeaking || isEnded}
-                aria-label="Hold to speak"
+                aria-label={isRecording ? 'Tap to Submit' : 'Tap to Speak'}
               >
                 {isProcessing ? (
                   <span className="mic-spinner" />
@@ -477,10 +533,10 @@ export default function DebateRoomPage() {
                 )}
               </button>
               <span className="mic-label">
-                {isRecording  ? 'Release to Submit' :
+                {isRecording  ? 'Tap to Submit'     :
                  isProcessing ? 'Processing…'       :
                  isAISpeaking ? 'AI Speaking…'      :
-                                'Hold to Speak'}
+                                'Tap to Speak'}
               </span>
             </div>
 
@@ -491,10 +547,7 @@ export default function DebateRoomPage() {
                 e.preventDefault();
                 const trimmed = textInput.trim();
                 if (!trimmed || phase !== 'user_turn') return;
-                setMessages((prev) => [
-                  ...prev,
-                  { id: `user-${Date.now()}`, speaker: 'user', text: trimmed, scores: null },
-                ]);
+                // Rely on transcript_final from socket to avoid double-messages
                 sendText(trimmed);
                 setTextInput('');
                 setPhase('processing');
@@ -647,8 +700,86 @@ export default function DebateRoomPage() {
         </div>
       )}
 
-      {/* ════════ ENDED OVERLAY ════════ */}
-      {isEnded && <ResultsModal result={endResult} />}
+      {/* ════════ ENDED OVERLAY (Removed in favor of Report Card) ════════ */}
+
+      {/* ════════ JUDGE VERDICT OVERLAY (Addition 6) ════════ */}
+      {judgeVerdict && (
+        <div className="judge-overlay">
+          <div className="judge-card">
+            <div className="judge-header">📊 Debate Report Card</div>
+
+            <div className={`judge-winner judge-winner--${judgeVerdict.winner}`}>
+              {judgeVerdict.winner === 'user' ? '🏆 You Win!' :
+               judgeVerdict.winner === 'ai' ? '🤖 AI Wins' : '🤝 Draw'}
+            </div>
+
+            <div className="judge-scores">
+              <div className="judge-score-col">
+                <span className="judge-score-number judge-score-number--user">
+                  {judgeVerdict.userScore}
+                </span>
+                <span className="judge-score-label">You</span>
+              </div>
+              <span className="judge-vs">VS</span>
+              <div className="judge-score-col">
+                <span className="judge-score-number judge-score-number--ai">
+                  {judgeVerdict.aiScore}
+                </span>
+                <span className="judge-score-label">AI</span>
+              </div>
+            </div>
+
+            {judgeVerdict.feedback && (
+              <div className="judge-feedback">
+                <div className="judge-feedback-title">Judge's Feedback</div>
+                <div className="judge-feedback-text">{judgeVerdict.feedback}</div>
+              </div>
+            )}
+
+            {judgeVerdict.userStrengths && (
+              <div className="judge-strengths">
+                <div className="judge-strengths-title">✅ Your Strengths</div>
+                <div className="judge-strengths-text">{judgeVerdict.userStrengths}</div>
+              </div>
+            )}
+            {judgeVerdict.areasToImprove && judgeVerdict.areasToImprove.length > 0 && (
+              <div className="judge-weaknesses">
+                <div className="judge-weaknesses-title">⚠️ Areas to Improve</div>
+                <ul className="judge-list">
+                  {judgeVerdict.areasToImprove.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {judgeVerdict.grammarMistakes && judgeVerdict.grammarMistakes.length > 0 && (
+              <div className="judge-grammar">
+                <div className="judge-grammar-title">📝 Grammar & Vocabulary</div>
+                <ul className="judge-list judge-list--grammar">
+                  {judgeVerdict.grammarMistakes.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="judge-actions">
+              <button
+                className="judge-btn judge-btn--primary"
+                onClick={() => navigate('/lobby')}
+              >
+                New Debate
+              </button>
+              <button
+                className="judge-btn judge-btn--secondary"
+                onClick={() => navigate('/dashboard')}
+              >
+                Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

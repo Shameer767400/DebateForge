@@ -280,12 +280,9 @@ EXPLANATIONS: Dict[str, str] = {
 
 @router.post("/detect", response_model=FallacyResponse)
 async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
-  text_parts = [payload.argument.strip()]
-  if payload.context:
-    text_parts.extend([c.strip() for c in payload.context if c.strip()])
-  full_text = " ".join(text_parts).strip()
+  argument_text = payload.argument.strip()
 
-  if not full_text:
+  if not argument_text:
     return FallacyResponse(
       detected=False,
       fallacy_type="no_fallacy",
@@ -295,7 +292,7 @@ async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
     )
 
   # Layer 1: rule-based
-  rule_result = _rule_based_detection(full_text)
+  rule_result = _rule_based_detection(argument_text)
   if rule_result:
     fallacy_type, conf, phrase = rule_result
     if conf >= 60.0:
@@ -316,7 +313,7 @@ async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
         )
 
   # Layer 2: semantic similarity (if rule-based is weak or absent)
-  semantic_result = _semantic_detection(full_text)
+  semantic_result = _semantic_detection(argument_text)
   if semantic_result:
     fallacy_type, conf, phrase = semantic_result
     if conf >= 60.0:

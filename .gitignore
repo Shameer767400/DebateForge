@@ -11,9 +11,11 @@ venv/
 .venv/
 env/
 
-# Environment Variables
+# Environment Variables — NEVER commit secrets
 .env
+.env.*
 *.env
+!.env.example
 
 # MacOS
 .DS_Store
@@ -26,3 +28,11 @@ env/
 build/
 dist/
 coverage/
+
+# Logs (may contain leaked secrets in error output)
+*.log
+*.pid
+
+# Uploads (user data)
+uploads/avatars/
+

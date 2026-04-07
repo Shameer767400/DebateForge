@@ -7,8 +7,11 @@ import {
 } from 'recharts';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import StreakBadge from '../components/StreakBadge';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import '../styles/theme.css';
 import '../styles/dashboard.css';
+import '../styles/streak.css';
 
 /* ──────────────────────────────────────────
    Static achievements catalogue
@@ -100,6 +103,20 @@ export default function DashboardPage() {
   const [fallacies, setFallacies] = useState([]);
   const [history, setHistory] = useState([]);
 
+  const { supported: pushSupported, subscribed: pushSubscribed, subscribe: subscribePush } =
+    usePushNotifications(token);
+
+  const DAILY_CHALLENGES = [
+    'Win a debate using only questions (Socratic style)',
+    'Debate a topic you disagree with personally',
+    'Complete a debate without any fallacies detected',
+    'Win an Expert-level debate',
+    'Use at least 3 statistics in your arguments',
+    'Win a debate in under 5 minutes',
+    'Complete a formal Oxford-style debate',
+  ];
+  const todaysChallenge = DAILY_CHALLENGES[new Date().getDay()];
+
   /* ── parallel fetch ── */
   useEffect(() => {
     if (!token) return;
@@ -124,6 +141,22 @@ export default function DashboardPage() {
   const winRate      = totalDebates > 0 ? Math.round((wins / totalDebates) * 100) : 0;
   const avgScore     = profile?.avgScore ?? 0;
   const elo          = profile?.elo ?? user?.elo ?? 1200;
+  const streakData   = profile?.user?.streak || user?.streak || { current: 0, longest: 0, freezeUsed: false };
+
+  /* ── weekly activity (last 7 days from debate history) ── */
+  const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const today = new Date();
+  const activityDots = weekDays.map((label, i) => {
+    const day = new Date(today);
+    day.setDate(today.getDate() - (6 - i));
+    const dayStr = day.toISOString().slice(0, 10);
+    const isActive = history.some((d) => {
+      const debateDate = (d.startedAt || d.createdAt || '').slice(0, 10);
+      return debateDate === dayStr;
+    });
+    const isToday = i === 6;
+    return { label, isActive, isToday };
+  });
 
   /* ── score trend data (last 20) ── */
   const trendData = history.slice().reverse().map((d, i) => ({
@@ -191,6 +224,53 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+      </section>
+
+      {/* ── STREAK & HABIT SECTION (Addition 7) ── */}
+      <section className="dash-section">
+        <h2 className="dash-section-title">Habit Tracker</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+
+          {/* Streak Badge */}
+          <StreakBadge streak={streakData} />
+
+          {/* Weekly Activity Grid */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 16 }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>This Week</div>
+            <div className="activity-grid">
+              {activityDots.map((dot, i) => (
+                <div
+                  key={i}
+                  className={`activity-dot ${dot.isActive ? 'activity-dot--active' : ''} ${dot.isToday ? 'activity-dot--today' : ''}`}
+                  title={dot.isActive ? 'Debated this day' : 'No debate'}
+                >
+                  {dot.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Daily Challenge */}
+          <div className="daily-challenge">
+            <div className="daily-challenge-title">🎯 Daily Challenge</div>
+            <div className="daily-challenge-text">{todaysChallenge}</div>
+            <button className="daily-challenge-cta" onClick={() => navigate('/lobby')}>
+              Accept Challenge
+            </button>
+          </div>
+        </div>
+
+        {/* Push notification opt-in */}
+        {pushSupported && !pushSubscribed && (
+          <div className="push-banner" style={{ marginTop: 12 }}>
+            <span className="push-banner-text">
+              🔔 Get reminders to keep your streak alive?
+            </span>
+            <button className="push-banner-btn" onClick={subscribePush}>
+              Enable Notifications
+            </button>
+          </div>
+        )}
       </section>
 
       {/* ── FALLACY DNA ── */}

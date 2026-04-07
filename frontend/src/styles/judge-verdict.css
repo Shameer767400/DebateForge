@@ -1,0 +1,236 @@
+/* ─── Judge Verdict overlay ─── */
+.judge-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  animation: judgeOverlayFadeIn 0.6s ease forwards;
+}
+
+@keyframes judgeOverlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.judge-card {
+  background: linear-gradient(145deg, #1a1d2e, #12141f);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 560px;
+  width: 90vw;
+  text-align: center;
+  animation: judgeCardSlideUp 0.5s ease 0.2s both;
+}
+
+@keyframes judgeCardSlideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.judge-header {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Winner */
+.judge-winner {
+  font-size: 2.4rem;
+  font-weight: 800;
+  margin: 16px 0;
+  animation: judgeWinnerPulse 1.5s ease infinite;
+}
+
+.judge-winner--user {
+  color: #ffd700;
+  text-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+}
+
+.judge-winner--ai {
+  color: #ff3366;
+  text-shadow: 0 0 30px rgba(255, 51, 102, 0.4);
+}
+
+.judge-winner--draw {
+  color: #aaa;
+}
+
+@keyframes judgeWinnerPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.03); }
+}
+
+/* Score comparison */
+.judge-scores {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin: 24px 0;
+}
+
+.judge-score-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.judge-score-number {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.judge-score-number--user {
+  color: #00ff87;
+}
+
+.judge-score-number--ai {
+  color: #ff3366;
+}
+
+.judge-score-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.judge-vs {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Feedback */
+.judge-feedback {
+  margin: 20px 0;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.judge-feedback-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-user, #4f8ef7);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.judge-feedback-text {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.6;
+}
+
+.judge-strengths,
+.judge-weaknesses {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.judge-strengths-title,
+.judge-weaknesses-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.judge-strengths-title { color: #00ff87; }
+.judge-weaknesses-title { color: #ff9500; }
+
+.judge-strengths-text,
+.judge-weaknesses-text {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.5;
+}
+
+.judge-grammar {
+  margin-top: 12px;
+  text-align: left;
+}
+
+.judge-grammar-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  color: #ffcc00; /* Yellow for grammar */
+}
+
+.judge-list {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.5;
+}
+
+.judge-list li {
+  margin-bottom: 4px;
+}
+
+/* Buttons */
+.judge-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.judge-btn {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.judge-btn--primary {
+  background: var(--accent-user, #4f8ef7);
+  color: #fff;
+}
+
+.judge-btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(79, 142, 247, 0.4);
+}
+
+.judge-btn--secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.judge-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.judge-btn--share {
+  background: rgba(0, 255, 135, 0.1);
+  color: #00ff87;
+  border: 1px solid rgba(0, 255, 135, 0.3);
+}
+
+.judge-btn--share:hover {
+  background: rgba(0, 255, 135, 0.2);
+}

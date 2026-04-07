@@ -1,25 +1,20 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import '../styles/auth.css';
 
-export default function RegisterPage() {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
+export default function ResetPasswordPage() {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const toast = useToast();
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const toast = useToast();
-  const navigate = useNavigate();
+  const [error, setError] = useState('');
 
   const validate = () => {
-    if (username.length < 3 || username.length > 30) {
-      return 'Username must be between 3 and 30 characters.';
-    }
     if (password.length < 8) {
       return 'Password must be at least 8 characters.';
     }
@@ -46,15 +41,14 @@ export default function RegisterPage() {
 
     try {
       const res = await axios.post(
-        '/api/auth/register',
-        { username, email, password },
+        `/api/auth/reset-password/${token}`,
+        { password },
         { baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001' }
       );
-      login(res.data.token, res.data.user);
-      toast.success('Account created! Welcome to the arena.');
-      navigate('/lobby');
+      toast.success(res.data.message || 'Password reset successfully!');
+      navigate('/login');
     } catch (err) {
-      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Registration failed. Please try again.';
+      const msg = err.response?.data?.error || 'Reset failed. The link may have expired.';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -66,58 +60,18 @@ export default function RegisterPage() {
     <div className="df-center">
       <div className="auth-card">
         <div className="auth-logo">
-          <span className="auth-logo-icon">⚔</span>
-          <h1 className="auth-title">DebateForge</h1>
-          <p className="auth-subtitle">Create your account</p>
+          <span className="auth-logo-icon">🔐</span>
+          <h1 className="auth-title">Set New Password</h1>
+          <p className="auth-subtitle">Choose a strong, unique password</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          {/* Honeypot fields — hidden from real users, bots auto-fill them */}
-          <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
-            <input type="text" name="website" tabIndex={-1} autoComplete="off" />
-            <input type="text" name="phone" tabIndex={-1} autoComplete="off" />
-          </div>
           <div className="auth-field">
-            <label className="auth-label" htmlFor="username">
-              Username
+            <label className="auth-label" htmlFor="new-password">
+              New Password
             </label>
             <input
-              id="username"
-              className="auth-input"
-              type="text"
-              placeholder="debater42"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              minLength={3}
-              maxLength={30}
-              autoComplete="username"
-            />
-            <span className="auth-hint">3–30 characters</span>
-          </div>
-
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              className="auth-input"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-
-          <div className="auth-field">
-            <label className="auth-label" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
+              id="new-password"
               className="auth-input"
               type="password"
               placeholder="••••••••"
@@ -131,11 +85,11 @@ export default function RegisterPage() {
           </div>
 
           <div className="auth-field">
-            <label className="auth-label" htmlFor="confirmPassword">
+            <label className="auth-label" htmlFor="confirm-new-password">
               Confirm Password
             </label>
             <input
-              id="confirmPassword"
+              id="confirm-new-password"
               className="auth-input"
               type="password"
               placeholder="••••••••"
@@ -159,19 +113,16 @@ export default function RegisterPage() {
                   <div className="df-spinner-core" />
                   <div className="df-spinner-orbit" />
                 </div>
-                Creating account…
+                Resetting…
               </span>
             ) : (
-              'Create Account'
+              'Reset Password'
             )}
           </button>
         </form>
 
         <p className="auth-switch">
-          Already have an account?{' '}
-          <Link to="/login" className="auth-link">
-            Login
-          </Link>
+          <Link to="/login" className="auth-link">← Back to Login</Link>
         </p>
       </div>
     </div>

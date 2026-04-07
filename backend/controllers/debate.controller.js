@@ -1,8 +1,9 @@
 const { User, Topic, Debate } = require('../models');
+const { updateStreak } = require('../services/streak.service');
 
 async function startDebate(req, res) {
   try {
-    const { topicId, customTopic, side, userSide, difficulty, persona } = req.body;
+    const { topicId, customTopic, side, userSide, difficulty, persona, format } = req.body;
 
     // Frontend sends "side", model expects "userSide"
     const resolvedSide = userSide || side;
@@ -33,6 +34,7 @@ async function startDebate(req, res) {
       userSide: resolvedSide,
       difficulty: resolvedDifficulty,
       persona: persona || 'balanced',
+      format: format || 'freeform',
       arguments: [],
     });
 
@@ -44,6 +46,7 @@ async function startDebate(req, res) {
       userSide: debate.userSide,
       difficulty: debate.difficulty,
       persona: debate.persona,
+      format: debate.format,
     });
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -174,78 +177,88 @@ async function checkAchievements(userId, user, winner) {
   }
 }
 
+async function finalizeDebateStats(userId, debateId, winner, durationSecs = 0) {
+  const debate = await Debate.findOne({ _id: debateId, userId });
+  if (!debate) throw new Error('Debate not found');
+
+  // Do not double-finalize
+  if (debate.endedAt) return debate;
+
+  const avgScore = debate.getAverageScore();
+
+  await Debate.findByIdAndUpdate(debateId, {
+    winner,
+    userFinalScore: avgScore,
+    durationSecs,
+    endedAt: new Date(),
+  });
+
+  const user = await User.findById(userId);
+  if (!user) throw new Error('User not found');
+
+  const K = user.totalDebates < 10 ? 32 : user.totalDebates < 50 ? 16 : 8;
+  const { AI_ELO_RATING } = require('../config/constants');
+  const expected = 1 / (1 + Math.pow(10, (AI_ELO_RATING - user.eloRating) / 400));
+  const actual = winner === 'user' ? 1 : winner === 'draw' ? 0.5 : 0;
+  const newElo = Math.round(user.eloRating + K * (actual - expected));
+
+  const statUpdate = {
+    totalDebates: 1,
+    eloRating: newElo - user.eloRating,
+  };
+
+  if (winner === 'user') statUpdate.wins = 1;
+  else if (winner === 'ai') statUpdate.losses = 1;
+  else if (winner === 'draw') statUpdate.draws = 1;
+
+  await User.findByIdAndUpdate(userId, { $inc: statUpdate });
+
+  const fallacyInc = {};
+  debate.getUserArguments().forEach((arg) => {
+    if (arg.fallacy && arg.fallacy.detected && arg.fallacy.type) {
+      const key = `fallacyProfile.${arg.fallacy.type}`;
+      fallacyInc[key] = (fallacyInc[key] || 0) + 1;
+    }
+  });
+
+  if (Object.keys(fallacyInc).length > 0) {
+    await User.findByIdAndUpdate(userId, { $inc: fallacyInc });
+  }
+
+  await checkAchievements(userId, user, winner);
+
+  // Update streak
+  const freshUser = await User.findById(userId);
+  const streakResult = updateStreak(freshUser);
+  freshUser.markModified('streak');
+  await freshUser.save();
+
+  return { avgScore, newElo, streakResult, freshUser };
+}
+
 async function endDebate(req, res) {
   try {
     const { winner, durationSecs } = req.body;
     const debateId = req.params.id;
 
-    const debate = await Debate.findOne({
-      _id: debateId,
-      userId: req.user.id,
-    });
-
-    if (!debate) {
-      return res.status(404).json({ error: 'Debate not found' });
-    }
-
-    const avgScore = debate.getAverageScore();
-
-    await Debate.findByIdAndUpdate(debateId, {
-      winner,
-      userFinalScore: avgScore,
-      durationSecs,
-      endedAt: new Date(),
-    });
-
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const K = user.totalDebates < 10 ? 32 : user.totalDebates < 50 ? 16 : 8;
-    const { AI_ELO_RATING } = require('../config/constants');
-    const expected = 1 / (1 + Math.pow(10, (AI_ELO_RATING - user.eloRating) / 400));
-    const actual = winner === 'user' ? 1 : winner === 'draw' ? 0.5 : 0;
-    const newElo = Math.round(user.eloRating + K * (actual - expected));
-
-    const statUpdate = {
-      totalDebates: 1,
-      eloRating: newElo - user.eloRating,
-    };
-
-    if (winner === 'user') {
-      statUpdate.wins = 1;
-    } else if (winner === 'ai') {
-      statUpdate.losses = 1;
-    } else if (winner === 'draw') {
-      statUpdate.draws = 1;
-    }
-
-    await User.findByIdAndUpdate(req.user.id, { $inc: statUpdate });
-
-    // Update fallacy profile
-    const fallacyInc = {};
-    debate.getUserArguments().forEach((arg) => {
-      if (arg.fallacy && arg.fallacy.detected && arg.fallacy.type) {
-        const key = `fallacyProfile.${arg.fallacy.type}`;
-        // eslint-disable-next-line no-unused-expressions
-        fallacyInc[key] ? (fallacyInc[key] += 1) : (fallacyInc[key] = 1);
-      }
-    });
-
-    if (Object.keys(fallacyInc).length > 0) {
-      await User.findByIdAndUpdate(req.user.id, { $inc: fallacyInc });
-    }
-
-    await checkAchievements(req.user.id, user, winner);
+    const result = await finalizeDebateStats(req.user.id, debateId, winner, durationSecs);
 
     return res.status(200).json({
       winner,
-      userFinalScore: avgScore,
-      newElo,
+      userFinalScore: result.avgScore,
+      newElo: result.newElo,
+      streak: {
+        current: result.freshUser.streak?.current || 0,
+        longest: result.freshUser.streak?.longest || 0,
+        milestoneReached: result.streakResult.milestoneReached,
+        freezeUsed: result.streakResult.freezeUsed,
+      },
       message: 'Debate ended',
     });
   } catch (error) {
+    if (error.message === 'Debate not found' || error.message === 'User not found') {
+      return res.status(404).json({ error: error.message });
+    }
     // eslint-disable-next-line no-console
     console.error('Error in endDebate controller:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -257,5 +270,6 @@ module.exports = {
   getDebateHistory,
   getDebateById,
   endDebate,
+  finalizeDebateStats,
 };
 

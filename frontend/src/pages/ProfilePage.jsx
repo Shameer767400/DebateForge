@@ -136,6 +136,52 @@ export default function ProfilePage() {
     }
   };
 
+  /* ── Change Password ── */
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordMsg, setPasswordMsg] = useState({ type: '', text: '' });
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    setPasswordMsg({ type: '', text: '' });
+
+    if (!currentPassword) {
+      setPasswordMsg({ type: 'error', text: 'Current password is required' });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordMsg({ type: 'error', text: 'New password must be at least 8 characters' });
+      return;
+    }
+    if (!/(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])/.test(newPassword)) {
+      setPasswordMsg({ type: 'error', text: 'Need 1 uppercase, 1 number, and 1 special character' });
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordMsg({ type: 'error', text: 'Passwords do not match' });
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      await axios.post('/api/auth/change-password', { currentPassword, newPassword }, {
+        baseURL: API,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPasswordMsg({ type: 'success', text: 'Password changed successfully!' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setTimeout(() => setChangingPassword(false), 2000);
+    } catch (err) {
+      setPasswordMsg({ type: 'error', text: err.response?.data?.error || 'Failed to change password' });
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   return (
     <div className="prof-page">
       {/* ── Nav ── */}
@@ -230,6 +276,12 @@ export default function ProfilePage() {
               >
                 ✏️ {bio ? 'Edit Bio' : 'Add Bio'}
               </button>
+              <button
+                className="prof-option-btn"
+                onClick={() => setChangingPassword(!changingPassword)}
+              >
+                🔑 Change Password
+              </button>
             </div>
 
             {/* Bio editor */}
@@ -262,6 +314,79 @@ export default function ProfilePage() {
                       disabled={savingBio}
                     >
                       {savingBio ? 'Saving…' : 'Save Bio'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Change Password form */}
+            {changingPassword && (
+              <div className="prof-bio-editor" style={{ marginTop: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="password"
+                    className="prof-bio-input"
+                    placeholder="Current Password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    autoComplete="current-password"
+                    style={{ resize: 'none', minHeight: 'auto', padding: '10px 12px' }}
+                  />
+                  <input
+                    type="password"
+                    className="prof-bio-input"
+                    placeholder="New Password (min 8, 1 upper, 1 number, 1 special)"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                    style={{ resize: 'none', minHeight: 'auto', padding: '10px 12px' }}
+                  />
+                  <input
+                    type="password"
+                    className="prof-bio-input"
+                    placeholder="Confirm New Password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                    style={{ resize: 'none', minHeight: 'auto', padding: '10px 12px' }}
+                  />
+                </div>
+                {passwordMsg.text && (
+                  <p style={{
+                    margin: '8px 0 0',
+                    fontSize: '0.82rem',
+                    color: passwordMsg.type === 'success' ? '#4ade80' : '#ff4d6a',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: passwordMsg.type === 'success'
+                      ? 'rgba(74, 222, 128, 0.08)'
+                      : 'rgba(255, 77, 106, 0.08)',
+                  }}>
+                    {passwordMsg.text}
+                  </p>
+                )}
+                <div className="prof-bio-footer" style={{ marginTop: '10px' }}>
+                  <span />
+                  <div className="prof-bio-actions">
+                    <button
+                      className="prof-bio-cancel"
+                      onClick={() => {
+                        setChangingPassword(false);
+                        setPasswordMsg({ type: '', text: '' });
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmNewPassword('');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="prof-bio-save"
+                      onClick={handleChangePassword}
+                      disabled={savingPassword}
+                    >
+                      {savingPassword ? 'Saving…' : 'Update Password'}
                     </button>
                   </div>
                 </div>

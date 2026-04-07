@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 const { Schema } = mongoose;
 
@@ -23,6 +24,33 @@ const userSchema = new Schema(
     passwordHash: {
       type: String,
       required: true,
+    },
+    /* ── Email verification ── */
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: {
+      type: String,
+      default: null,
+    },
+    /* ── Password reset ── */
+    passwordResetToken: {
+      type: String,
+      default: null,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+    },
+    /* ── Account lockout ── */
+    loginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockUntil: {
+      type: Date,
+      default: null,
     },
     eloRating: {
       type: Number,
@@ -75,6 +103,24 @@ const userSchema = new Schema(
       type: Date,
       default: Date.now,
     },
+    streak: {
+      current: { type: Number, default: 0 },
+      longest: { type: Number, default: 0 },
+      lastDebateDate: { type: Date, default: null },
+      freezeUsed: { type: Boolean, default: false },
+    },
+    pushSubscription: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    targetImprovements: {
+      type: [String],
+      default: [],
+    },
+    grammarMistakes: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -90,9 +136,34 @@ userSchema.methods.getWinRate = function getWinRate() {
   return Math.round((this.wins / this.totalDebates) * 100);
 };
 
+/* ── Generate a hashed password reset token (returns the raw token for the email) ── */
+userSchema.methods.createPasswordResetToken = function createPasswordResetToken() {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  this.passwordResetToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  this.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+  return rawToken;
+};
+
+/* ── Generate email verification token ── */
+userSchema.methods.createEmailVerificationToken = function createEmailVerificationToken() {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  this.emailVerificationToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  return rawToken;
+};
+
+/* ── Check if account is currently locked ── */
+userSchema.methods.isLocked = function isLocked() {
+  return !!(this.lockUntil && this.lockUntil > Date.now());
+};
+
 userSchema.methods.toSafeObject = function toSafeObject() {
   const obj = this.toObject({ virtuals: true });
   delete obj.passwordHash;
+  delete obj.passwordResetToken;
+  delete obj.passwordResetExpires;
+  delete obj.emailVerificationToken;
+  delete obj.loginAttempts;
+  delete obj.lockUntil;
   return obj;
 };
 

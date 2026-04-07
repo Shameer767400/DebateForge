@@ -1,19 +1,8 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { OpenAI }              = require('openai');
+const axios = require('axios');
 
-/* ── Lazy singletons ── */
-let _genAI  = null;
-let _openai = null;
-
-function getGemini() {
-  if (!_genAI) _genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return _genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-}
-
-function getOpenAI() {
-  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return _openai;
-}
+/* ── Local Ollama Config (Addition 4) ── */
+const OLLAMA_URL    = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_MODEL  = process.env.OLLAMA_MODEL || 'llama3';
 
 /* ── Wait helper ── */
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -50,7 +39,11 @@ ${personaInstruction}
 
 === USER WEAKNESS PROFILE ===
 Top Fallacies Used: ${formatFallacyProfile(session.userFallacyProfile)}
+Areas to Improve: ${session.targetImprovements && session.targetImprovements.length > 0 ? session.targetImprovements.join('; ') : 'None yet'}
+Grammar Mistakes: ${session.grammarMistakes && session.grammarMistakes.length > 0 ? session.grammarMistakes.join('; ') : 'None yet'}
 Weakness Summary: ${session.weaknessSummary || 'No data yet — debate normally'}
+
+As the user's debate coach, actively exploit the "Areas to Improve" and penalize the "Grammar Mistakes" in your responses to push them to do better.
 
 === STRICT RULES ===
 1. NEVER agree with the user. Never concede your position.
@@ -71,56 +64,12 @@ Respond ONLY with your spoken debate argument (max 4 sentences).
 No labels, stage directions, or meta-commentary.`;
 }
 
-/* ─── Gemini streaming (with one retry on 429) ─── */
-async function* streamGemini(session, userArgument) {
-  const history  = (session.conversationHistory || []).slice(-10);
-
-  const model = getGemini();
-  const chat  = model.startChat({
-    history: history.map(msg => ({
-      role:  msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }],
-    })),
-    systemInstruction: {
-      role:  'system',
-      parts: [{ text: buildSystemPrompt(session) }],
-    },
-    generationConfig: { maxOutputTokens: 180, temperature: 0.85 },
-  });
-
-  let attempts = 0;
-  while (attempts < 2) {
-    try {
-      const result = await chat.sendMessageStream(userArgument);
-      for await (const chunk of result.stream) {
-        const text = chunk.text();
-        if (text) yield text;
-      }
-      return; // success
-    } catch (e) {
-      if (e?.status === 429 && attempts === 0) {
-        // Parse retry delay from error details
-        const retryDelay = e.errorDetails?.find(d => d['@type']?.includes('RetryInfo'))?.retryDelay;
-        const delaySec = retryDelay ? parseInt(retryDelay, 10) : 5;
-        const delayMs  = Math.min(delaySec * 1000, 15000); // cap at 15s
-        // eslint-disable-next-line no-console
-        console.warn(`[LLM] Gemini 429, retrying after ${delayMs}ms...`);
-        await wait(delayMs);
-        attempts++;
-      } else {
-        throw e;
-      }
-    }
-  }
-}
-
-/* ─── OpenAI streaming fallback ─── */
-async function* streamOpenAI(session, userArgument) {
-  const systemPrompt = buildSystemPrompt(session);
-  const history      = (session.conversationHistory || []).slice(-10);
+/* ─── Ollama streaming (local LLM) ─── */
+async function* streamOllama(session, userArgument) {
+  const history = (session.conversationHistory || []).slice(-10);
 
   const messages = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: buildSystemPrompt(session) },
     ...history.map(m => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
@@ -128,41 +77,64 @@ async function* streamOpenAI(session, userArgument) {
     { role: 'user', content: userArgument },
   ];
 
-  const stream = await getOpenAI().chat.completions.create({
-    model:       'gpt-4o-mini',
-    messages,
-    max_tokens:  200,
-    temperature: 0.85,
-    stream:      true,
-  });
+  if (session.round % 2 === 0 && session.weaknessSummary) {
+    messages.splice(-1, 0, {
+      role: 'system',
+      content: `REMINDER: ${session.weaknessSummary} Steer toward this now.`,
+    });
+  }
 
-  for await (const chunk of stream) {
-    const text = chunk.choices[0]?.delta?.content;
-    if (text) yield text;
+  try {
+    const response = await axios.post(
+      `${OLLAMA_URL}/api/chat`,
+      {
+        model: OLLAMA_MODEL,
+        messages,
+        stream: true,
+        options: {
+          temperature: 0.85,
+          num_predict: 180,
+          top_p: 0.9,
+          repeat_penalty: 1.1,
+        },
+      },
+      {
+        responseType: 'stream',
+        timeout: 60000,
+      }
+    );
+
+    for await (const chunk of response.data) {
+      const lines = chunk.toString().split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.message?.content) {
+            yield parsed.message.content;
+          }
+          if (parsed.done) return;
+        } catch {
+          // Skip malformed JSON chunks
+        }
+      }
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[OLLAMA] Error:', e.message);
+    yield "That's an interesting point, but I must strongly disagree. " +
+          "Your argument lacks the empirical foundation needed to be convincing. " +
+          "Can you provide specific evidence to support that claim?";
   }
 }
 
-/* ─── Public: Gemini first, OpenAI fallback ─── */
+/* ─── Public: stream response via Ollama ─── */
 async function* streamDebateResponse(session, userArgument) {
   try {
-    yield* streamGemini(session, userArgument);
-  } catch (geminiErr) {
-    const isQuota = geminiErr?.status === 429;
-    const is404   = geminiErr?.status === 404;
-    if (isQuota || is404) {
-      // eslint-disable-next-line no-console
-      console.warn(`[LLM] Gemini ${geminiErr.status}, falling back to OpenAI gpt-4o-mini`);
-      try {
-        yield* streamOpenAI(session, userArgument);
-      } catch (openaiErr) {
-        if (openaiErr?.status === 429) {
-          throw new Error('QUOTA_EXHAUSTED: Both Gemini and OpenAI rate limits are currently exceeded. Please wait a few minutes and try again.');
-        }
-        throw openaiErr;
-      }
-    } else {
-      throw geminiErr;
-    }
+    yield* streamOllama(session, userArgument);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(`[LLM] Ollama failed:`, err?.message);
+    throw new Error('Local AI failed to respond. Ensure Ollama is running and the llama3 model is installed (`ollama run llama3`).');
   }
 }
 

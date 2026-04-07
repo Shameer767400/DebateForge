@@ -1,0 +1,155 @@
+/* ─── Format selector cards ─── */
+.format-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.format-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 14px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+}
+
+.format-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-2px);
+}
+
+.format-card--active {
+  border-color: var(--accent-user, #4f8ef7);
+  background: rgba(79, 142, 247, 0.1);
+  box-shadow: 0 0 20px rgba(79, 142, 247, 0.15);
+}
+
+.format-badge {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #000;
+}
+
+.format-icon {
+  font-size: 2rem;
+}
+
+.format-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.format-desc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.3;
+}
+
+/* ─── Phase progress bar (in debate room) ─── */
+.phase-progress {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.phase-step {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
+}
+
+.phase-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.4);
+  background: transparent;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.phase-dot--active {
+  border-color: var(--accent-user, #4f8ef7);
+  color: #fff;
+  background: var(--accent-user, #4f8ef7);
+  box-shadow: 0 0 12px rgba(79, 142, 247, 0.4);
+}
+
+.phase-dot--done {
+  border-color: #00ff87;
+  color: #000;
+  background: #00ff87;
+}
+
+.phase-label {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 4px;
+  margin-right: 8px;
+}
+
+.phase-label--active {
+  color: var(--accent-user, #4f8ef7);
+  font-weight: 600;
+}
+
+.phase-connector {
+  width: 20px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.phase-connector--done {
+  background: #00ff87;
+}
+
+/* ─── Phase instruction banner ─── */
+.phase-banner {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, rgba(79, 142, 247, 0.1), rgba(79, 142, 247, 0.05));
+  border-bottom: 1px solid rgba(79, 142, 247, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.phase-banner-phase {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-user, #4f8ef7);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.phase-banner-instruction {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}

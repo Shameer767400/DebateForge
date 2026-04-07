@@ -15,6 +15,8 @@ const SERVER_EVENTS = [
   'ai_audio_chunk',
   'ai_turn_complete',
   'debate_ended',
+  'phase_update',
+  'judge_verdict',
   'error',
 ];
 
@@ -40,11 +42,12 @@ const SERVER_EVENTS = [
  *   audioSupported: boolean,
  * }}
  */
-export function useDebateSocket(debateId, { onEvent } = {}) {
+export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
   /* ── public state ── */
   const [connected,      setConnected]      = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [isAISpeaking,   setIsAISpeaking]   = useState(false);
+  const [availableVoices, setAvailableVoices] = useState([]);
   const [audioSupported] = useState(
     () => typeof MediaRecorder !== 'undefined' || 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
   );
@@ -58,10 +61,14 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
   const audioQueueRef    = useRef([]);     // Not used for Web Speech API, but keeping for reference or future use
   const sentenceBufRef   = useRef('');     // Buffer for incoming text chunks
   const isPlayingRef     = useRef(false);  // guard against concurrent plays
+  const isRecordingRef   = useRef(false);  // track if a recording is actually active
   const onEventRef       = useRef(onEvent);
+  const selectedVoiceURIRef = useRef(selectedVoiceURI);
+  const liveTranscriptRef = useRef('');
 
-  /* keep onEvent ref fresh without re-running socket effect */
+  /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
+  useEffect(() => { selectedVoiceURIRef.current = selectedVoiceURI; }, [selectedVoiceURI]);
 
   /* ─────────────────────────────────────────────
      Audio playback helpers
@@ -69,10 +76,15 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
   /* Warm up voices for Chrome/Safari */
   useEffect(() => {
     const synth = window.speechSynthesis;
+    const updateVoices = () => {
+      const voices = synth.getVoices().filter(v => v.lang.startsWith('en'));
+      setAvailableVoices(voices);
+    };
+
     if (synth.onvoiceschanged !== undefined) {
-      synth.onvoiceschanged = () => synth.getVoices();
+      synth.onvoiceschanged = updateVoices;
     }
-    synth.getVoices();
+    updateVoices();
   }, []);
 
   /** Speak a single sentence using Web Speech API */
@@ -84,11 +96,19 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     const utterance = new SpeechSynthesisUtterance(trimmed);
     
     const voices = synth.getVoices();
-    const preferredVoice = voices.find(v => v.name === 'Alex') || 
-                          voices.find(v => v.name.includes('Samantha')) ||
-                           voices.find(v => v.name.includes('Daniel')) ||
-                           voices.find(v => v.name.includes('Google US English')) ||
-                           voices.find(v => v.lang === 'en-US');
+    
+    let preferredVoice = null;
+    if (selectedVoiceURIRef.current) {
+      preferredVoice = voices.find(v => v.voiceURI === selectedVoiceURIRef.current);
+    }
+    
+    if (!preferredVoice) {
+      preferredVoice = voices.find(v => v.name === 'Alex') || 
+                       voices.find(v => v.name.includes('Samantha')) ||
+                       voices.find(v => v.name.includes('Daniel')) ||
+                       voices.find(v => v.name.includes('Google US English')) ||
+                       voices.find(v => v.lang === 'en-US');
+    }
     
     if (preferredVoice) {
       utterance.voice = preferredVoice;
@@ -104,6 +124,12 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     };
     utterance.onerror = (e) => console.error('[TTS Error]:', e);
 
+    // Safari/Chrome bug: sometimes the speech queue gets invisibly stuck.
+    // If we are starting a fresh response, we should probably ensure the queue is clear,
+    // but clearing here would cancel the previous sentence of the SAME response.
+    // Calling resume() un-sticks the audio context without dropping sentences.
+    synth.resume();
+    console.log(`[TTS] Speaking (${preferredVoice?.name || 'default'}):`, trimmed.substring(0, 30) + '...');
     synth.speak(utterance);
   }, []);
 
@@ -197,6 +223,7 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
         .map((r) => r[0].transcript)
         .join('');
       setLiveTranscript(transcript);
+      liveTranscriptRef.current = transcript;
     };
 
     recognition.onerror = (e) => {
@@ -211,6 +238,7 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
 
   /** PRIMARY path: MediaRecorder + parallel SpeechRecognition */
   const startRecordingWithMediaRecorder = useCallback(async () => {
+    isRecordingRef.current = true;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
 
@@ -230,7 +258,13 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
       }
     };
 
-    rec.start(250);  // emit every 250 ms
+    rec.onstop = () => {
+      if (socketRef.current) {
+        socketRef.current.emit('audio_end', { debateId });
+      }
+    };
+
+    rec.start();  // emit once on stop (avoids Safari timeslice bugs)
 
     /* Parallel live transcript */
     startSpeechRecognition();
@@ -238,6 +272,7 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
 
   /** FALLBACK path: SpeechRecognition only → emit transcript_direct on final result */
   const startRecordingFallback = useCallback(() => {
+    isRecordingRef.current = true;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
 
@@ -273,6 +308,9 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
   ───────────────────────────────────────────── */
 
   const startRecording = useCallback(async () => {
+    // Start local speech recognition first
+    startSpeechRecognition();
+    
     try {
       if (typeof MediaRecorder !== 'undefined') {
         await startRecordingWithMediaRecorder();
@@ -283,9 +321,19 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
       console.error('[startRecording error]:', err);
       startRecordingFallback();
     }
-  }, [startRecordingWithMediaRecorder, startRecordingFallback]);
+  }, [startSpeechRecognition, startRecordingWithMediaRecorder, startRecordingFallback]);
+
+  /** Send a typed text argument via the transcript_direct event */
+  const sendText = useCallback((text) => {
+    if (!text?.trim() || !socketRef.current) return;
+    socketRef.current.emit('transcript_direct', { debateId, text: text.trim() });
+  }, [debateId]);
 
   const stopRecording = useCallback(() => {
+    /* Only emit audio_end if a recording was actually active */
+    const wasRecording = isRecordingRef.current;
+    isRecordingRef.current = false;
+
     /* Stop MediaRecorder */
     if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
       mediaRecRef.current.stop();
@@ -296,24 +344,31 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
 
-    /* Stop speech recognition */
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
+    /* Stop speech recognition and send the final text directly */
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
 
-    /* Signal server that audio is done */
-    socketRef.current?.emit('audio_end', { debateId });
+    /* Signal server that audio is done — only if we were actually recording */
+    /* Wait briefly for the final transcript to catch up, then send */
+    setTimeout(() => {
+      const finalTranscript = liveTranscriptRef.current?.trim();
+      if (finalTranscript) {
+        console.log('[useDebateSocket] Sending client-side transcript:', finalTranscript);
+        sendText(finalTranscript);
+      } else if (wasRecording) {
+        // Fallback to backend audio processing ONLY if client failed to get text
+        socketRef.current?.emit('audio_end', { debateId });
+      }
+      setLiveTranscript('');
+      liveTranscriptRef.current = '';
+    }, 400);
 
-    setLiveTranscript('');
-  }, [debateId]);
+  }, [debateId, sendText]);
 
   const endDebate = useCallback(() => {
     socketRef.current?.emit('end_debate', { debateId });
-  }, [debateId]);
-
-  /** Send a typed text argument via the transcript_direct event */
-  const sendText = useCallback((text) => {
-    if (!text?.trim() || !socketRef.current) return;
-    socketRef.current.emit('transcript_direct', { debateId, text: text.trim() });
   }, [debateId]);
 
   /* ─────────────────────────────────────────────
@@ -338,5 +393,6 @@ export function useDebateSocket(debateId, { onEvent } = {}) {
     liveTranscript,
     isAISpeaking,
     audioSupported,
+    availableVoices,
   };
 }

@@ -81,6 +81,12 @@ export default function LoginPage() {
 
           {error && <p className="auth-error">{error}</p>}
 
+          <div style={{ textAlign: 'right', marginTop: '-8px' }}>
+            <Link to="/forgot-password" className="auth-link" style={{ fontSize: '0.78rem' }}>
+              Forgot Password?
+            </Link>
+          </div>
+
           <button
             className="auth-submit"
             type="submit"
