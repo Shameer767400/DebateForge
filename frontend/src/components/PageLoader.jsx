@@ -12,9 +12,16 @@ export default function PageLoader({ children }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => setLoading(false), 600); // 600ms visible
-    return () => clearTimeout(timer);
+    let showTimer;
+    let hideTimer;
+
+    showTimer = setTimeout(() => setLoading(true), 120);
+    hideTimer = setTimeout(() => setLoading(false), 260);
+
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
   }, [location.pathname]);
 
   if (loading) {

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
 import Confetti from '../components/Confetti';
+import StreakCelebration from '../components/StreakCelebration';
 import '../styles/theme.css';
 import '../styles/debate.css';
 import '../styles/lobby-format.css';
@@ -47,8 +48,8 @@ function playVictory() {
 }
 
 /* ── Helpers ── */
-const WAVE_BARS = 30;
-const TIMER_MAX = 60;
+const WAVE_BARS  = 30;
+const DEFAULT_TIMER_MAX = 60;
 const RING_R = 45;          // SVG circle radius for timer
 const RING_C = 2 * Math.PI * RING_R;  // circumference
 
@@ -93,7 +94,8 @@ export default function DebateRoomPage() {
   const [fallacyAlert,   setFallacyAlert]   = useState(null);
   const [fallacyHistory, setFallacyHistory] = useState([]);
   const [round,          setRound]          = useState(1);
-  const [timer,          setTimer]          = useState(TIMER_MAX);
+  const [timerMax,       setTimerMax]       = useState(DEFAULT_TIMER_MAX);
+  const [timer,          setTimer]          = useState(DEFAULT_TIMER_MAX);
   const [userWins,       setUserWins]       = useState(0);
   const [aiWins,         setAiWins]         = useState(0);
   const [alertExiting,   setAlertExiting]   = useState(false);
@@ -104,6 +106,9 @@ export default function DebateRoomPage() {
   // Addition 6: Format/phase state
   const [phaseInfo,      setPhaseInfo]      = useState(null);
   const [judgeVerdict,   setJudgeVerdict]   = useState(null);
+  // Addition 7: Streak celebration
+  const [streakMilestone, setStreakMilestone] = useState(null);
+  const [streakFreezeUsed, setStreakFreezeUsed] = useState(false);
 
   const toast = useToast();
 
@@ -206,9 +211,13 @@ export default function DebateRoomPage() {
       case 'debate_joined':
         break;
 
-      /* Phase transition (Addition 6) */
+      /* Phase transition (Addition 6) — also update timer max for new phase */
       case 'phase_update':
         setPhaseInfo(data);
+        if (data?.timeLimit && data.timeLimit > 0) {
+          setTimerMax(data.timeLimit);
+          setTimer(data.timeLimit);
+        }
         break;
 
       /* AI Judge verdict (Addition 6 & 9 Report Card) */
@@ -221,6 +230,13 @@ export default function DebateRoomPage() {
           playVictory();
         }
         if (data?.winner === 'ai') setAiWins((w) => w + 1);
+        // Streak celebration (Addition 7)
+        if (data?.streak?.milestoneReached) {
+          setStreakMilestone(data.streak.milestoneReached);
+        }
+        if (data?.streak?.freezeUsed) {
+          setStreakFreezeUsed(true);
+        }
         break;
 
       case 'error':
@@ -260,15 +276,18 @@ export default function DebateRoomPage() {
       .catch(console.error);
   }, [debateId, token]);
 
-  /* ── Navigate to dashboard 3s after debate ends ── */
+  /* ── Navigate to dashboard after debate ends ──
+       If judgeVerdict is showing, user navigates manually via the verdict buttons.
+       If there's no verdict (e.g. user pressed Esc), auto-navigate after 3s. ── */
   useEffect(() => {
     if (phase !== 'ended') return;
+    if (judgeVerdict) return; // Let user dismiss the verdict overlay manually
     if (endResult?.winner === 'user') toast.success('🏆 You won the debate!');
     else if (endResult?.winner === 'ai') toast.error('The AI won this round. Keep forging!');
     else toast.info('Debate ended.');
     const t = setTimeout(() => navigate('/dashboard'), 3000);
     return () => clearTimeout(t);
-  }, [phase, navigate, endResult, toast]);
+  }, [phase, navigate, endResult, toast, judgeVerdict]);
 
   /* ── Keyboard shortcut: Escape to end debate ── */
   useEffect(() => {
@@ -301,7 +320,8 @@ export default function DebateRoomPage() {
       return;
     }
     if (phase === 'user_turn') {
-      setTimer(TIMER_MAX);
+      // Use the phase-specific time limit if available (Addition 6)
+      setTimer(timerMax);
     }
     timerRef.current = setInterval(() => {
       setTimer((t) => {
@@ -318,7 +338,7 @@ export default function DebateRoomPage() {
     }, 1000);
     return () => clearInterval(timerRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase === 'user_turn' ? 'user_turn' : phase, round]);
+  }, [phase === 'user_turn' ? 'user_turn' : phase, round, timerMax]);
 
   /* ── Fallacy alert auto-dismiss ── */
   const dismissAlert = useCallback(() => {
@@ -351,18 +371,32 @@ export default function DebateRoomPage() {
   }, [phase, startRecording, stopRecording]);
 
   /* ── Derived ── */
-  const timerOffset  = RING_C - (timer / TIMER_MAX) * RING_C;
+  const timerOffset  = RING_C - (timer / timerMax) * RING_C;
   const isRecording  = phase === 'recording';
   const isProcessing = phase === 'processing';
   // isAISpeaking: trust both phase state AND the hook's AudioContext flag
   const isAISpeaking = phase === 'ai_speaking' || hookIsAISpeaking;
   const isEnded      = phase === 'ended';
 
+  /* ── Share result handler ── */
+  const handleShare = useCallback(() => {
+    if (!judgeVerdict) return;
+    const text = `I scored ${judgeVerdict.userScore}/100 in a formal debate on DebateForge!\nTopic: ${debateInfo?.topicSnapshot || 'Custom topic'} | Format: ${debateInfo?.format || 'Freeform'}\nResult: ${judgeVerdict.winner === 'user' ? 'WIN 🏆' : judgeVerdict.winner === 'ai' ? 'LOSS' : 'DRAW'}\nTry it at debateforge.app`;
+    navigator.clipboard?.writeText(text).then(() => toast.success('Result copied to clipboard!')).catch(() => {});
+  }, [judgeVerdict, debateInfo, toast]);
+
   /* ── Render ── */
   return (
     <>
       {/* Confetti on win */}
       {showConfetti && <Confetti />}
+
+      {/* Streak celebration (Addition 7) */}
+      <StreakCelebration
+        milestone={streakMilestone}
+        freezeUsed={streakFreezeUsed}
+        onDismiss={() => { setStreakMilestone(null); setStreakFreezeUsed(false); }}
+      />
 
       {/* ════════ MAIN LAYOUT ════════ */}
       <div className="debate-root">
@@ -708,6 +742,12 @@ export default function DebateRoomPage() {
           <div className="judge-card">
             <div className="judge-header">📊 Debate Report Card</div>
 
+            {judgeVerdict.reportCardHeadline && (
+              <div className="judge-headline">
+                {judgeVerdict.reportCardHeadline}
+              </div>
+            )}
+
             <div className={`judge-winner judge-winner--${judgeVerdict.winner}`}>
               {judgeVerdict.winner === 'user' ? '🏆 You Win!' :
                judgeVerdict.winner === 'ai' ? '🤖 AI Wins' : '🤝 Draw'}
@@ -742,6 +782,12 @@ export default function DebateRoomPage() {
                 <div className="judge-strengths-text">{judgeVerdict.userStrengths}</div>
               </div>
             )}
+            {judgeVerdict.userWeaknesses && (
+              <div className="judge-weaknesses">
+                <div className="judge-weaknesses-title">⚠️ Main Weakness</div>
+                <div className="judge-weaknesses-text">{judgeVerdict.userWeaknesses}</div>
+              </div>
+            )}
             {judgeVerdict.areasToImprove && judgeVerdict.areasToImprove.length > 0 && (
               <div className="judge-weaknesses">
                 <div className="judge-weaknesses-title">⚠️ Areas to Improve</div>
@@ -752,11 +798,37 @@ export default function DebateRoomPage() {
                 </ul>
               </div>
             )}
+            {judgeVerdict.improvementSummary && (
+              <div className="judge-summary">
+                <div className="judge-summary-title">🎯 Next Debate Focus</div>
+                <div className="judge-summary-text">{judgeVerdict.improvementSummary}</div>
+              </div>
+            )}
             {judgeVerdict.grammarMistakes && judgeVerdict.grammarMistakes.length > 0 && (
               <div className="judge-grammar">
                 <div className="judge-grammar-title">📝 Grammar & Vocabulary</div>
                 <ul className="judge-list judge-list--grammar">
                   {judgeVerdict.grammarMistakes.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {judgeVerdict.savedFocusAreas && judgeVerdict.savedFocusAreas.length > 0 && (
+              <div className="judge-persistent">
+                <div className="judge-persistent-title">📌 Recurring Weaknesses The AI Will Keep Pressing</div>
+                <ul className="judge-list">
+                  {judgeVerdict.savedFocusAreas.slice(0, 8).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {judgeVerdict.savedGrammarPatterns && judgeVerdict.savedGrammarPatterns.length > 0 && (
+              <div className="judge-persistent">
+                <div className="judge-persistent-title">✍️ Recurring Grammar Issues To Clean Up</div>
+                <ul className="judge-list judge-list--grammar">
+                  {judgeVerdict.savedGrammarPatterns.slice(0, 8).map((item, i) => (
                     <li key={i}>{item}</li>
                   ))}
                 </ul>
@@ -775,6 +847,13 @@ export default function DebateRoomPage() {
                 onClick={() => navigate('/dashboard')}
               >
                 Dashboard
+              </button>
+              <button
+                className="judge-btn judge-btn--share"
+                onClick={handleShare}
+                title="Copy result to clipboard"
+              >
+                📤 Share
               </button>
             </div>
           </div>

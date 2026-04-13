@@ -39,6 +39,18 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+.judge-headline {
+  margin: 0 auto 18px;
+  max-width: 44ch;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 149, 0, 0.12);
+  border: 1px solid rgba(255, 149, 0, 0.28);
+  color: #ffd39a;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 /* Winner */
 .judge-winner {
   font-size: 2.4rem;
@@ -165,6 +177,35 @@
   text-align: left;
 }
 
+.judge-summary,
+.judge-persistent {
+  margin-top: 14px;
+  text-align: left;
+}
+
+.judge-summary-title,
+.judge-persistent-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.judge-summary-title {
+  color: #7cc6ff;
+}
+
+.judge-persistent-title {
+  color: #ff7b7b;
+}
+
+.judge-summary-text {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+}
+
 .judge-grammar-title {
   font-size: 0.75rem;
   font-weight: 700;
@@ -233,4 +274,81 @@
 
 .judge-btn--share:hover {
   background: rgba(0, 255, 135, 0.2);
+}
+
+/* ══════════════════════════════
+   RESPONSIVE — Judge Verdict
+   ══════════════════════════════ */
+
+@media (max-width: 480px) {
+  .judge-card {
+    padding: 28px 20px;
+    border-radius: 14px;
+  }
+
+  .judge-header {
+    font-size: 1.3rem;
+    margin-bottom: 14px;
+  }
+
+  .judge-winner {
+    font-size: 1.8rem;
+    margin: 10px 0;
+  }
+
+  /* Stack scores vertically on small screens */
+  .judge-scores {
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    margin: 16px 0;
+  }
+
+  .judge-vs {
+    transform: rotate(90deg);
+    font-size: 1rem;
+  }
+
+  .judge-score-number {
+    font-size: 2.4rem;
+  }
+
+  .judge-feedback {
+    padding: 12px;
+    margin: 14px 0;
+  }
+
+  .judge-actions {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .judge-btn {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .judge-card {
+    padding: 20px 14px;
+  }
+
+  .judge-header {
+    font-size: 1.15rem;
+  }
+
+  .judge-winner {
+    font-size: 1.5rem;
+  }
+
+  .judge-score-number {
+    font-size: 2rem;
+  }
+
+  .judge-score-label {
+    font-size: 0.75rem;
+  }
 }

@@ -121,6 +121,30 @@ const userSchema = new Schema(
       type: [String],
       default: [],
     },
+
+    /* ── Cumulative per-dimension score tracking ── */
+    totalLogicScore:    { type: Number, default: 0 },
+    totalEvidenceScore: { type: Number, default: 0 },
+    totalClarityScore:  { type: Number, default: 0 },
+    totalScoredTurns:   { type: Number, default: 0 },
+
+    /* ── Adaptive Coaching State (Addition 7+) ── */
+    coachingState: {
+      // Tracks each weakness the user has been drilled on
+      weaknessHistory: [{
+        fallacyType:      { type: String },       // e.g. "hasty_generalization"
+        totalOccurrences: { type: Number, default: 0 },
+        cleanStreak:      { type: Number, default: 0 },   // consecutive turns avoiding this fallacy
+        improved:         { type: Boolean, default: false }, // true after 3+ clean streak
+        lastSeen:         { type: Date, default: null },
+      }],
+      // Which debate phase the user is weakest at (opening / rebuttal / closing)
+      weakPhase:       { type: String, default: null },
+      // 0–100 overall coaching progress
+      coachingLevel:   { type: Number, default: 0 },
+      // Current active drill target
+      activeDrillFallacy: { type: String, default: null },
+    },
   },
   {
     timestamps: true,

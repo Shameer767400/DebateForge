@@ -80,12 +80,18 @@
 
 ### Prerequisites
 
-- Node.js ≥ 18
+- Node.js 20 LTS recommended (`.nvmrc` included)
 - MongoDB (local or Atlas URI)
 - Python ≥ 3.9 (for the ML microservice)
 - Redis (optional)
 - SMTP credentials (for email verification & password reset)
 - VAPID keys (for push notifications — generate with `npx web-push generate-vapid-keys`)
+
+This repo is not compatible with Node 24/25. Use Node 20 before installing dependencies:
+
+```bash
+nvm use
+```
 
 ### 1. Clone
 
@@ -111,6 +117,8 @@ cp .env.example .env   # set REACT_APP_API_URL=http://localhost:5001
 npm install
 npm start              # runs on http://localhost:3000
 ```
+
+If the frontend was previously installed with a newer Node version, remove `frontend/node_modules` and reinstall after switching to Node 20.
 
 ### 4. ML Service (optional — required for voice + AI)
 

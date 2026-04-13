@@ -316,3 +316,52 @@
     padding: 3px 10px;
   }
 }
+
+/* ── Ultra-small phone (≤ 360px) ── */
+@media (max-width: 360px) {
+  .lb-page {
+    padding: 14px 10px 50px;
+  }
+
+  .lb-title {
+    font-size: 1.15rem;
+  }
+
+  /* Hide Win Rate column too — show only rank, name, ELO */
+  .lb-table th.th-num:nth-child(n+3),
+  .lb-row td.td-num:nth-child(n+3) {
+    display: none;
+  }
+
+  .lb-table {
+    font-size: 0.72rem;
+  }
+
+  .lb-table th {
+    padding: 8px 8px;
+    font-size: 0.58rem;
+  }
+
+  .lb-row td {
+    padding: 8px 8px;
+  }
+
+  .rank-badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+
+  .lb-user-rank-card {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .lb-user-rank-val {
+    font-size: 0.9rem;
+  }
+
+  .lb-user-rank-scroll {
+    display: none; /* too tiny to show on 360px */
+  }
+}
+

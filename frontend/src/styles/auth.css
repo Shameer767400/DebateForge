@@ -1,4 +1,5 @@
-/* ── Auth pages (Login / Register) ── */
+/* ── Auth pages (Login / Register / Forgot / Reset Password) ── */
+@import './theme.css';
 
 .auth-card {
   width: 100%;
@@ -162,3 +163,43 @@
   opacity: 0.8;
   text-decoration: underline;
 }
+
+/* ══════════════════════════════
+   RESPONSIVE — Auth Pages
+   ══════════════════════════════ */
+
+/* Prevent iOS from zooming on input focus (inputs must be ≥ 16px) */
+.auth-input {
+  font-size: 1rem;
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 28px 20px 24px;
+    border-radius: 10px;
+  }
+
+  .auth-title {
+    font-size: 1.3rem;
+  }
+
+  .auth-submit {
+    padding: 16px;
+    font-size: 1rem;
+  }
+
+  .auth-input {
+    padding: 14px 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .auth-card {
+    padding: 22px 14px 20px;
+  }
+
+  .auth-logo-icon {
+    font-size: 2rem;
+  }
+}
+

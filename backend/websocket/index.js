@@ -10,6 +10,90 @@ const redisClient = require('../config/redis');
 const { SCORE_THRESHOLDS, MAX_ROUNDS } = require('../config/constants');
 const { finalizeDebateStats } = require('../controllers/debate.controller');
 
+// Export immediately to prevent CommonJS circular dependency issues
+module.exports = initWebSocket;
+
+function normalizeList(items, limit = 25) {
+  if (!Array.isArray(items)) return [];
+  const seen = new Set();
+  const cleaned = [];
+
+  for (const item of items) {
+    const value = String(item || '').replace(/\s+/g, ' ').trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(value);
+    if (cleaned.length >= limit) break;
+  }
+
+  return cleaned;
+}
+
+function buildImprovementSummary(areasToImprove, grammarMistakes) {
+  const topAreas = areasToImprove.slice(0, 2);
+  const topGrammar = grammarMistakes.slice(0, 2);
+  const segments = [];
+
+  if (topAreas.length > 0) {
+    segments.push(`Main debate weaknesses: ${topAreas.join('; ')}`);
+  }
+  if (topGrammar.length > 0) {
+    segments.push(`Grammar issues to fix: ${topGrammar.join('; ')}`);
+  }
+
+  return segments.join(' | ') || 'Keep sharpening your rebuttals, evidence, and clarity.';
+}
+
+async function persistReportCard(userId, judgeResponse) {
+  const user = await User.findById(userId).select('targetImprovements grammarMistakes');
+  if (!user) return { savedFocusAreas: [], savedGrammarPatterns: [] };
+
+  const mergedFocusAreas = normalizeList([
+    ...(user.targetImprovements || []),
+    ...(judgeResponse.areasToImprove || []),
+  ], 50);
+  const mergedGrammarPatterns = normalizeList([
+    ...(user.grammarMistakes || []),
+    ...(judgeResponse.grammarMistakes || []),
+  ], 50);
+
+  user.targetImprovements = mergedFocusAreas;
+  user.grammarMistakes = mergedGrammarPatterns;
+  await user.save();
+
+  return {
+    savedFocusAreas: mergedFocusAreas,
+    savedGrammarPatterns: mergedGrammarPatterns,
+  };
+}
+
+function sanitizeJudgeResponse(judgeResponse, fallbackFeedback = '') {
+  const areasToImprove = normalizeList(judgeResponse?.areasToImprove);
+  const grammarMistakes = normalizeList(judgeResponse?.grammarMistakes);
+  const userWeaknesses = String(judgeResponse?.userWeaknesses || '').trim();
+  const reportCardHeadline = String(
+    judgeResponse?.reportCardHeadline ||
+    (areasToImprove[0]
+      ? `Your next biggest upgrade is: ${areasToImprove[0]}`
+      : 'Solid effort, but there are still clear weaknesses to tighten up.')
+  ).trim();
+
+  return {
+    userScore: Number(judgeResponse?.userScore ?? 65),
+    aiScore: Number(judgeResponse?.aiScore ?? 60),
+    winner: ['user', 'ai', 'draw'].includes(judgeResponse?.winner) ? judgeResponse.winner : 'draw',
+    feedback: String(judgeResponse?.feedback || fallbackFeedback || 'Good effort, but your case still needs tighter execution.').trim(),
+    userStrengths: String(judgeResponse?.userStrengths || 'You showed effort and stayed engaged.').trim(),
+    userWeaknesses: userWeaknesses || (areasToImprove[0] || 'Your rebuttals and clarity still need more discipline.'),
+    areasToImprove,
+    grammarMistakes,
+    reportCardHeadline,
+    improvementSummary: buildImprovementSummary(areasToImprove, grammarMistakes),
+  };
+}
+
 /* ── WebSocket rate limiter ── */
 const WS_RATE_LIMITS = {
   join_debate:        { max: 5,  windowMs: 60000 },   // 5 joins per min
@@ -117,6 +201,12 @@ function initWebSocket(server) {
         const grammarMistakes    = user.grammarMistakes || [];
         const aiPosition         = debate.userSide === 'for' ? 'against' : 'for';
 
+        /* ── Fetch coaching plan from ML memory service ── */
+        let coachingPlan = null;
+        try {
+          coachingPlan = await callMLService(`/memory/coaching-plan/${socket.user.id}`, null, 'GET');
+        } catch { /* non-critical */ }
+
         /* ── Format Engine: initialize phase state ── */
         const debateFormat = debate.format || 'freeform';
         const phaseInfo    = DebateFormatEngine.getCurrentPhaseInfo(debateFormat, 0);
@@ -135,6 +225,7 @@ function initWebSocket(server) {
           targetImprovements,
           grammarMistakes,
           weaknessSummary:     '',
+          coachingPlan,
           audioBuffer:         [],
           // Addition 6: Format state
           format:              debateFormat,
@@ -260,6 +351,12 @@ function initWebSocket(server) {
         const debate = await Debate.findOne({ _id: debateId, userId: socket.user.id });
         if (!debate) {
           socket.emit('error', { message: 'Debate not found' });
+          return;
+        }
+
+        if (debate.arguments.length >= 2) {
+          await runJudgeScoring(socket, session, debateId);
+          await redisClient.del(`session:${debateId}`);
           return;
         }
 
@@ -411,6 +508,18 @@ async function processTranscript(socket, session, debateId, transcript) {
     saveTurnToMongo(debateId, transcript, fullAiText, session.round, scoresResult, fallacyResult)
       .catch(console.error);  // eslint-disable-line no-console
 
+    /* ── 8.5 Increment cumulative per-dimension scores on User ── */
+    if (scoresResult && (scoresResult.logic || scoresResult.evidence || scoresResult.clarity)) {
+      User.findByIdAndUpdate(session.userId, {
+        $inc: {
+          totalLogicScore:    scoresResult.logic    || 0,
+          totalEvidenceScore: scoresResult.evidence || 0,
+          totalClarityScore:  scoresResult.clarity  || 0,
+          totalScoredTurns:   1,
+        },
+      }).catch(console.error);  // eslint-disable-line no-console
+    }
+
     /* ── 9. Store embedding in vector DB (non-blocking) ── */
     callMLService('/memory/store', {
       user_id:       session.userId,
@@ -419,6 +528,7 @@ async function processTranscript(socket, session, debateId, transcript) {
       fallacy_type:  fallacyResult?.fallacy_type || 'no_fallacy',
       topic:         session.topic,
       debate_id:     debateId,
+      turn_number:   session.round,
     }).catch(console.error);  // eslint-disable-line no-console
 
     /* ── 10. Persist updated session ── */
@@ -509,10 +619,13 @@ Score each debater 0-100 on:
 - Rebuttal effectiveness
 - Adherence to debate format
 
-Provide specific, constructive feedback for the user. Identify any grammatical errors they made, and list exactly what they need to improve for next time.
+Provide a strict but constructive report card for the user.
+Identify their strongest points, their weakest habits, grammatical mistakes, and the exact things they must improve next time.
+Do not soften recurring weaknesses. If the same weakness appears multiple times, stress that they must fix it.
 
 Respond ONLY in this JSON format:
 {
+  "reportCardHeadline": "Your clearest weakness tonight was weak rebuttal targeting.",
   "userScore": 72,
   "aiScore": 68,
   "winner": "user",
@@ -540,6 +653,7 @@ Respond ONLY in this JSON format:
       judgeResponse = JSON.parse(jsonMatch ? jsonMatch[0] : judgeText);
     } catch {
       judgeResponse = {
+        reportCardHeadline: 'You finished the debate, but there are still weaknesses you need to fix.',
         userScore: 65,
         aiScore: 60,
         winner: 'user',
@@ -551,31 +665,30 @@ Respond ONLY in this JSON format:
       };
     }
 
-    // Save judge scores to debate document
+    judgeResponse = sanitizeJudgeResponse(judgeResponse, judgeText);
+
+    const persistedProfile = await persistReportCard(session.userId, judgeResponse);
+
     await Debate.findByIdAndUpdate(debateId, {
       judgeScore: judgeResponse,
       currentPhase: 'judging',
     });
     
     // Process final stats (wins, streaks, etc.)
-    await finalizeDebateStats(session.userId, debateId, judgeResponse.winner, 0);
-
-    // Persist weaknesses and grammar mistakes to the user profile for future coaching
-    const updateTasks = {};
-    if (judgeResponse.areasToImprove && judgeResponse.areasToImprove.length > 0) {
-      updateTasks.targetImprovements = { $each: judgeResponse.areasToImprove, $slice: -10 };
-    }
-    if (judgeResponse.grammarMistakes && judgeResponse.grammarMistakes.length > 0) {
-      updateTasks.grammarMistakes = { $each: judgeResponse.grammarMistakes, $slice: -10 };
-    }
-
-    if (Object.keys(updateTasks).length > 0) {
-      // We use $push with $slice to keep the lists from growing indefinitely
-      await User.findByIdAndUpdate(session.userId, { $push: updateTasks });
-    }
+    const statsResult = await finalizeDebateStats(session.userId, debateId, judgeResponse.winner, 0);
+    const streakResult = statsResult?.streakResult || {};
 
     // Emit judge results to client
-    socket.emit('judge_verdict', judgeResponse);
+    socket.emit('judge_verdict', {
+      ...judgeResponse,
+      savedFocusAreas: persistedProfile.savedFocusAreas,
+      savedGrammarPatterns: persistedProfile.savedGrammarPatterns,
+      streak: {
+        new:              streakResult.newStreak        || 0,
+        milestoneReached: streakResult.milestoneReached || null,
+        freezeUsed:       streakResult.freezeUsed       || false,
+      },
+    });
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[WS] Judge scoring error:', e.message);
@@ -660,5 +773,3 @@ async function saveTurnToMongo(debateId, userText, aiText, round, scores, fallac
     $inc:  { totalRounds: 1 },
   });
 }
-
-module.exports = initWebSocket;

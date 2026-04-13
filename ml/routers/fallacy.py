@@ -35,6 +35,14 @@ PATTERNS: Dict[str, Dict] = {
       "opens the door to",
       "if we allow",
       "where does it end",
+      "this will snowball",
+      "it won't stop there",
+      "mark my words",
+      "give them an inch",
+      "the floodgates",
+      "slippery slope",
+      "down the road this",
+      "one step away from",
     ],
     "confidence": 70,
   },
@@ -47,6 +55,16 @@ PATTERNS: Dict[str, Dict] = {
       "nobody believes",
       "everyone agrees",
       "all people",
+      "every single",
+      "none of them",
+      "they always",
+      "they never",
+      "people always",
+      "no one ever",
+      "literally everyone",
+      "i've seen it happen",
+      "that's just how it is",
+      "100 percent of the time",
     ],
     "confidence": 68,
   },
@@ -58,6 +76,16 @@ PATTERNS: Dict[str, Dict] = {
       "how could anyone",
       "it's obvious that",
       "clearly anyone",
+      "don't you care",
+      "you should be ashamed",
+      "unforgivable",
+      "disgusting",
+      "horrifying",
+      "it's outrageous",
+      "any decent person",
+      "are you heartless",
+      "imagine the suffering",
+      "this is a tragedy",
     ],
     "confidence": 65,
     "extra_check": "exclamations",
@@ -68,6 +96,12 @@ PATTERNS: Dict[str, Dict] = {
       "so you believe",
       "your argument means",
       "what you're really claiming",
+      "so basically you want",
+      "you think we should just",
+      "that's like saying",
+      "so you're telling me",
+      "in other words you",
+      "you want to",
     ],
     "confidence": 72,
   },
@@ -77,6 +111,14 @@ PATTERNS: Dict[str, Dict] = {
       "only someone who",
       "typical of people who",
       "you would think that",
+      "you're not qualified",
+      "what do you know about",
+      "you're biased",
+      "that's naive",
+      "spoken like someone who",
+      "you obviously don't",
+      "people like you",
+      "of course you'd say that",
     ],
     "confidence": 75,
   },
@@ -87,6 +129,11 @@ PATTERNS: Dict[str, Dict] = {
       "you're either with",
       "it's one or the other",
       "only two options",
+      "it's black or white",
+      "there's no middle ground",
+      "you have to choose",
+      "pick a side",
+      "no alternative",
     ],
     "confidence": 73,
   },
@@ -100,8 +147,60 @@ PATTERNS: Dict[str, Dict] = {
       "scientists all agree",
       "studies prove",
       "it's scientifically proven",
+      "research confirms",
+      "everybody in the field",
+      "the experts have spoken",
+      "authorities agree",
+      "trust the science",
+      "qualified people say",
     ],
     "confidence": 60,
+  },
+  "bandwagon": {
+    "keywords": [
+      "everyone is doing it",
+      "most people agree",
+      "the majority believes",
+      "popular opinion",
+      "it's the trend",
+      "jump on the bandwagon",
+      "get with the times",
+      "nobody disagrees",
+      "widely accepted",
+      "the consensus is",
+      "millions of people",
+    ],
+    "confidence": 66,
+  },
+  "appeal_to_nature": {
+    "keywords": [
+      "it's natural",
+      "nature intended",
+      "unnatural",
+      "against nature",
+      "naturally",
+      "the natural way",
+      "organic is better",
+      "that's not how nature works",
+      "humans were designed to",
+      "we evolved to",
+    ],
+    "confidence": 63,
+  },
+  "red_herring": {
+    "keywords": [
+      "but what about",
+      "the real issue is",
+      "let's talk about something",
+      "that's not the point but",
+      "forget about that",
+      "more importantly",
+      "you're ignoring the fact",
+      "let me change the subject",
+      "speaking of which",
+      "anyway",
+    ],
+    "confidence": 62,
   },
 }
 
@@ -162,6 +261,27 @@ FALLACY_EXAMPLES: Dict[str, List[str]] = {
     "Studies prove that this method is always best.",
     "It's scientifically proven, so there's no need to question it.",
     "All the top analysts endorse this idea.",
+  ],
+  "bandwagon": [
+    "Everyone's buying this product, so it must be great.",
+    "Millions of people can't be wrong about this.",
+    "It's the most popular opinion, so it must be correct.",
+    "Get with the times — everybody supports this now.",
+    "Most people agree with me, so I must be right.",
+  ],
+  "appeal_to_nature": [
+    "It's natural, so it must be good for you.",
+    "Humans were designed to live this way.",
+    "That chemical is unnatural, so it must be harmful.",
+    "Nature intended for us to eat only plants.",
+    "Going against nature is always wrong.",
+  ],
+  "red_herring": [
+    "Sure the economy matters, but what about the environment?",
+    "Forget about the budget — the real issue is leadership.",
+    "That's an interesting point, but let's talk about education instead.",
+    "You're ignoring the fact that people are suffering elsewhere.",
+    "More importantly, we should focus on something entirely different.",
   ],
 }
 
@@ -275,7 +395,19 @@ EXPLANATIONS: Dict[str, str] = {
   "appeal_to_authority": (
     "The argument relies mainly on authority figures instead of presenting independent reasons or evidence."
   ),
+  "bandwagon": (
+    "The argument assumes something is true or correct because many people believe it or do it."
+  ),
+  "appeal_to_nature": (
+    "The argument assumes that what is 'natural' is inherently good or correct, which is not necessarily true."
+  ),
+  "red_herring": (
+    "The argument introduces an unrelated topic to divert attention from the actual issue being discussed."
+  ),
 }
+
+# Lowered threshold from 60 → 52 for better detection of short debate utterances
+SEMANTIC_THRESHOLD = 52.0
 
 
 @router.post("/detect", response_model=FallacyResponse)
@@ -303,7 +435,7 @@ async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
       explanation = explanation_template.format(
         triggered_phrase=phrase, fallacy_type=fallacy_type
       )
-      if conf >= 65.0:
+      if conf >= 62.0:
         return FallacyResponse(
           detected=True,
           fallacy_type=fallacy_type,
@@ -316,7 +448,7 @@ async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
   semantic_result = _semantic_detection(argument_text)
   if semantic_result:
     fallacy_type, conf, phrase = semantic_result
-    if conf >= 60.0:
+    if conf >= SEMANTIC_THRESHOLD:
       explanation_template = EXPLANATIONS.get(
         fallacy_type,
         "This argument exhibits characteristics of {fallacy_type}.",

@@ -260,3 +260,61 @@
 .push-banner-btn:hover {
   background: rgba(0, 255, 135, 0.2);
 }
+
+/* ══════════════════════════════
+   RESPONSIVE — Streak
+   ══════════════════════════════ */
+
+@media (max-width: 480px) {
+  .streak-celebration-card {
+    padding: 28px 20px;
+    max-width: 90vw;
+    border-radius: 14px;
+  }
+
+  .streak-celebration-emoji {
+    font-size: 3rem;
+  }
+
+  .streak-celebration-title {
+    font-size: 1.3rem;
+  }
+
+  .streak-celebration-desc {
+    font-size: 0.85rem;
+  }
+
+  .push-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .push-banner-btn {
+    align-self: flex-end;
+  }
+
+  .activity-dot {
+    width: 24px;
+    height: 24px;
+    font-size: 0.55rem;
+    border-radius: 5px;
+  }
+
+  .daily-challenge {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .streak-celebration-card {
+    padding: 22px 14px;
+  }
+
+  .activity-dot {
+    width: 20px;
+    height: 20px;
+    font-size: 0.5rem;
+  }
+}
+

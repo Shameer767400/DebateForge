@@ -306,6 +306,64 @@ export default function DashboardPage() {
         )}
       </section>
 
+      {/* ── COACHING FOCUS (Adaptive Coaching Engine) ── */}
+      {!loading && profile?.coaching && profile.coaching.activeDrill && (
+        <section className="dash-section">
+          <h2 className="dash-section-title">🎯 Coaching Focus</h2>
+          <div className="coaching-card">
+            <div className="coaching-header">
+              <div className="coaching-target">
+                <span className="coaching-label">Active Drill</span>
+                <span className="coaching-fallacy">
+                  {profile.coaching.activeDrill.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {profile.coaching.weakPhase && (
+                <div className="coaching-target">
+                  <span className="coaching-label">Weak Phase</span>
+                  <span className="coaching-phase">{profile.coaching.weakPhase}</span>
+                </div>
+              )}
+              <div className="coaching-target">
+                <span className="coaching-label">Coaching Level</span>
+                <span className="coaching-level">{profile.coaching.level}/100</span>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="coaching-progress-wrap">
+              <div
+                className="coaching-progress-bar"
+                style={{ width: `${Math.min(profile.coaching.level, 100)}%` }}
+              />
+            </div>
+
+            {/* Active weaknesses */}
+            {profile.coaching.weaknesses && profile.coaching.weaknesses.length > 0 && (
+              <div className="coaching-weaknesses">
+                <span className="coaching-label" style={{ marginBottom: 8, display: 'block' }}>Weaknesses Being Drilled</span>
+                {profile.coaching.weaknesses.map((w) => (
+                  <div key={w.fallacy} className="coaching-weakness-row">
+                    <span className="coaching-weakness-name">{w.fallacy?.replace(/_/g, ' ')}</span>
+                    <span className="coaching-weakness-count">{w.occurrences}× detected</span>
+                    <span className="coaching-weakness-streak">
+                      {w.cleanStreak > 0 ? `🟢 ${w.cleanStreak} clean` : '🔴 Active'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              className="coaching-cta"
+              onClick={() => navigate('/lobby')}
+            >
+              ⚔ Practice This Weakness
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* ── SCORE TREND ── */}
       <section className="dash-section">
         <h2 className="dash-section-title">Score Trends (Last 20 Debates)</h2>

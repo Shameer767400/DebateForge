@@ -141,6 +141,16 @@ const DebateSchema = new Schema(
       winner: { type: String, default: null },
       userStrengths: { type: String, default: null },
       userWeaknesses: { type: String, default: null },
+      areasToImprove: {
+        type: [String],
+        default: [],
+      },
+      grammarMistakes: {
+        type: [String],
+        default: [],
+      },
+      reportCardHeadline: { type: String, default: null },
+      improvementSummary: { type: String, default: null },
     },
     phaseHistory: [PhaseEntrySchema],
     /* ── End Addition 6 ── */

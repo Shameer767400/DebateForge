@@ -16,6 +16,14 @@ function formatFallacyProfile(profile) {
     .join(', ');
 }
 
+function formatWeaknessList(items, limit = 8) {
+  if (!Array.isArray(items) || items.length === 0) return 'None yet';
+  return items
+    .filter(Boolean)
+    .slice(-limit)
+    .join('; ');
+}
+
 function buildSystemPrompt(session) {
   const personaStyles = {
     balanced:   'Argue in a balanced, measured style. Be firm but fair.',
@@ -25,6 +33,27 @@ function buildSystemPrompt(session) {
     casual:     'Argue in a casual, conversational tone — like a sharp friend debating over coffee.',
   };
   const personaInstruction = personaStyles[session.persona] || personaStyles.balanced;
+
+  // Build adaptive coaching section if coaching plan is available
+  let coachingSection = '';
+  const plan = session.coachingPlan;
+  if (plan && plan.drill_fallacy && plan.drill_fallacy !== 'none') {
+    const fallacyReadable = plan.drill_fallacy.replace(/_/g, ' ');
+    coachingSection = `
+=== ADAPTIVE COACHING MISSION ===
+You are not just a debate opponent — you are this user's COACH.
+TARGET WEAKNESS: ${fallacyReadable} (committed ${plan.drill_fallacy_count || 0} times in past debates)
+WEAK PHASE: ${plan.weak_phase || 'rebuttal'}
+${plan.scenario_prompt ? `STRATEGY: ${plan.scenario_prompt}` : ''}
+${plan.improvement_areas && plan.improvement_areas.length > 0 ? `AREAS TO IMPROVE: ${plan.improvement_areas.join('; ')}` : ''}
+
+COACHING RULES:
+- Every 2-3 turns, deliberately set up a scenario that TEMPTS the user to use ${fallacyReadable}
+- If the user AVOIDS the fallacy and argues logically, briefly acknowledge it: "Good rebuttal — you avoided generalizing"
+- If the user FALLS INTO the fallacy, name it explicitly: "That's a ${fallacyReadable} — here's why..."
+- Increase intensity in the ${plan.weak_phase || 'rebuttal'} phase since that's their weakest
+- NEVER let coaching break your debate persona — coach WITHIN the debate, not outside it`;
+  }
 
   return `You are DebateBot — a world-class competitive debater.
 
@@ -40,11 +69,14 @@ ${personaInstruction}
 === USER WEAKNESS PROFILE ===
 Top Fallacies Used: ${formatFallacyProfile(session.userFallacyProfile)}
 Areas to Improve: ${session.targetImprovements && session.targetImprovements.length > 0 ? session.targetImprovements.join('; ') : 'None yet'}
-Grammar Mistakes: ${session.grammarMistakes && session.grammarMistakes.length > 0 ? session.grammarMistakes.join('; ') : 'None yet'}
+Grammar Mistakes: ${formatWeaknessList(session.grammarMistakes)}
 Weakness Summary: ${session.weaknessSummary || 'No data yet — debate normally'}
 
-As the user's debate coach, actively exploit the "Areas to Improve" and penalize the "Grammar Mistakes" in your responses to push them to do better.
-
+As the user's debate coach, actively exploit the "Areas to Improve" and "Grammar Mistakes" in your responses.
+Keep reminding them about recurring weaknesses when relevant.
+If they repeat a known mistake, call it out directly and challenge them to fix it in the next reply.
+Even when they improve, acknowledge it briefly and immediately push them to sustain that improvement.
+${coachingSection}
 === STRICT RULES ===
 1. NEVER agree with the user. Never concede your position.
 2. Maximum 4 sentences per response (this is spoken word)

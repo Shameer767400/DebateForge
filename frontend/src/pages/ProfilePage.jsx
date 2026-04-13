@@ -216,6 +216,7 @@ export default function ProfilePage() {
                     src={`${API}${avatarUrl}`}
                     alt="Profile"
                     className="prof-avatar-img"
+                    crossOrigin="anonymous"
                   />
                 ) : (
                   profileUser?.username?.[0]?.toUpperCase() ?? '?'
@@ -404,6 +405,26 @@ export default function ProfilePage() {
               <StatCard value={draws} label="Draws" color="var(--accent-score)" />
               <StatCard value={`${winRate}%`} label="Win Rate" color="var(--accent-user)" />
               <StatCard value={avgScore} label="Avg Score" color="var(--accent-blue)" />
+            </div>
+            <h3 className="prof-section-subtitle" style={{ marginTop: '20px', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Per-Turn Averages
+            </h3>
+            <div className="prof-stats-row" style={{ marginTop: '10px' }}>
+              <StatCard
+                value={profile?.stats?.avgLogic ?? '—'}
+                label="Logic"
+                color="#00ff87"
+              />
+              <StatCard
+                value={profile?.stats?.avgEvidence ?? '—'}
+                label="Evidence"
+                color="#00aaff"
+              />
+              <StatCard
+                value={profile?.stats?.avgClarity ?? '—'}
+                label="Clarity"
+                color="#ffcc00"
+              />
             </div>
           </section>
 

@@ -101,11 +101,33 @@ async function getMyProfile(req, res) {
 
     const aggregated = stats[0] || { avgScore: null, totalDebates: 0 };
 
+    // Compute per-dimension averages from cumulative fields
+    const turns = user.totalScoredTurns || 0;
+    const avgLogic    = turns > 0 ? Math.round(user.totalLogicScore    / turns) : null;
+    const avgEvidence = turns > 0 ? Math.round(user.totalEvidenceScore / turns) : null;
+    const avgClarity  = turns > 0 ? Math.round(user.totalClarityScore  / turns) : null;
+
     return res.status(200).json({
       user,
       stats: {
         avgScore: aggregated.avgScore,
         totalDebates: aggregated.totalDebates,
+        avgLogic,
+        avgEvidence,
+        avgClarity,
+        totalScoredTurns: turns,
+      },
+      coaching: {
+        level:        user.coachingState?.coachingLevel  || 0,
+        activeDrill:  user.coachingState?.activeDrillFallacy || null,
+        weakPhase:    user.coachingState?.weakPhase || null,
+        weaknesses:   (user.coachingState?.weaknessHistory || [])
+          .filter((w) => !w.improved)
+          .map((w) => ({
+            fallacy:     w.fallacyType,
+            occurrences: w.totalOccurrences,
+            cleanStreak: w.cleanStreak,
+          })),
       },
     });
   } catch (error) {

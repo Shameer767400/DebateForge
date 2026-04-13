@@ -64,7 +64,6 @@ function LandingPage() {
     },
     heroTitle: {
       fontFamily: 'var(--font-debate)',
-      fontSize: '3.8rem',
       lineHeight: 1.05,
       letterSpacing: '0.03em',
       margin: '0 0 1.5rem',
@@ -265,9 +264,6 @@ function LandingPage() {
     },
     footer: {
       borderTop: '1px solid rgba(255,255,255,0.06)',
-      padding: '1.6rem 1.5rem 2.2rem',
-      fontSize: '0.8rem',
-      color: 'var(--text-muted)',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -277,22 +273,22 @@ function LandingPage() {
 
   return (
     <div style={styles.page} ref={pageRef}>
-      <main style={styles.container}>
+      <main style={styles.container} className="landing-container--responsive">
         {/* HERO */}
-        <section style={styles.hero} id="top">
+        <section style={styles.hero} className="landing-hero--responsive" id="top">
           <div style={styles.heroLeft} className="landing-hero-left">
             <p style={styles.heroMeta} className="landing-hero-meta">AI POWERED DEBATE TRAINING</p>
-            <h1 style={styles.heroTitle}>
+            <h1 style={styles.heroTitle} className="landing-hero-title">
               Debate Smarter.
               <br />
               <span style={styles.heroAccent}>Every Single Day.</span>
             </h1>
-            <p style={styles.heroSub}>
+            <p style={styles.heroSub} className="landing-hero-sub--responsive">
               The AI opponent that studies your habits, memorizes your fallacies,
               and comes back sharper in every round. Stop arguing in the dark —
               see exactly where your reasoning breaks.
             </p>
-            <div style={styles.heroButtons}>
+            <div style={styles.heroButtons} className="landing-hero-buttons--responsive">
               <button
                 type="button"
                 style={styles.primaryBtn}
@@ -444,7 +440,7 @@ function LandingPage() {
         </section>
       </main>
 
-      <footer style={styles.footer} className="landing-footer landing-reveal">
+      <footer style={styles.footer} className="landing-footer landing-reveal landing-footer--responsive">
         <span>© {new Date().getFullYear()} DebateForge. All rights reserved.</span>
         <span>Built with ❤️ for the DebateForge Hackathon.</span>
       </footer>

@@ -629,3 +629,55 @@
     font-size: 0.74rem;
   }
 }
+
+/* ── Ultra-small phone (≤ 360px) ── */
+@media (max-width: 360px) {
+  .lobby {
+    padding: 16px 12px 36px;
+  }
+
+  .lobby-heading {
+    font-size: 1rem;
+  }
+
+  .lobby-tab {
+    font-size: 0.72rem;
+    padding: 5px 10px;
+  }
+
+  .topic-title {
+    font-size: 0.88rem;
+  }
+
+  .diff-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .diff-card {
+    padding: 10px 4px;
+  }
+
+  .diff-icon {
+    font-size: 1.2rem;
+  }
+
+  .diff-name {
+    font-size: 0.68rem;
+  }
+
+  .diff-desc {
+    font-size: 0.6rem;
+  }
+
+  .side-btn {
+    padding: 12px;
+    font-size: 0.82rem;
+  }
+
+  .lobby-start {
+    height: 48px;
+    font-size: 0.85rem;
+  }
+}
+

@@ -34,6 +34,7 @@ class StoreRequest(BaseModel):
     fallacy_type: str = "no_fallacy"
     topic: str
     debate_id: str
+    turn_number: int = 1
 
 
 class WeaknessResponse(BaseModel):
@@ -41,6 +42,14 @@ class WeaknessResponse(BaseModel):
     weak_topics: List[str]
     weakness_summary: str
     avg_weak_score: float
+
+
+class CoachingPlanResponse(BaseModel):
+    drill_fallacy: str
+    drill_fallacy_count: int
+    weak_phase: str
+    scenario_prompt: str
+    improvement_areas: List[str]
 
 
 # ═══════════════════════════════════════
@@ -155,6 +164,7 @@ async def _store_faiss(payload: StoreRequest):
                 "fallacy_type": payload.fallacy_type,
                 "topic": payload.topic,
                 "debate_id": payload.debate_id,
+                "turn_number": payload.turn_number,
                 "timestamp": str(time.time()),
             }
         )
@@ -429,3 +439,133 @@ async def _clear_pinecone(user_id: str):
     except Exception as exc:
         print(f"[memory] Failed to clear user memory in Pinecone: {exc}")
         return {"deleted": False}
+
+
+# ═══════════════════════════════════════
+#    COACHING PLAN ENDPOINT
+# ═══════════════════════════════════════
+
+def _classify_phase(turn_number: int, max_rounds: int = 6) -> str:
+    """Classify a turn into a debate phase: opening, rebuttal, or closing."""
+    if turn_number <= 1:
+        return "opening"
+    elif turn_number >= max_rounds:
+        return "closing"
+    else:
+        return "rebuttal"
+
+
+@router.get("/coaching-plan/{user_id}", response_model=CoachingPlanResponse)
+async def get_coaching_plan(user_id: str) -> CoachingPlanResponse:
+    """Analyze user's debate history to create a targeted coaching plan.
+
+    This is the core of the adaptive spaced-repetition system:
+    1. Find the user's most frequent fallacy
+    2. Determine which debate phase they're weakest at
+    3. Generate a scenario prompt for the LLM to drill them
+    """
+    try:
+        _, metadata = get_user_index(user_id)
+
+        if not metadata or len(metadata) < 3:
+            return CoachingPlanResponse(
+                drill_fallacy="none",
+                drill_fallacy_count=0,
+                weak_phase="rebuttal",
+                scenario_prompt="",
+                improvement_areas=[],
+            )
+
+        # ── 1. Find top fallacy to drill ──
+        fallacy_counts: Dict[str, int] = {}
+        for arg in metadata:
+            ft = arg.get("fallacy_type", "no_fallacy")
+            if ft and ft != "no_fallacy":
+                fallacy_counts[ft] = fallacy_counts.get(ft, 0) + 1
+
+        if fallacy_counts:
+            drill_fallacy = max(fallacy_counts, key=fallacy_counts.get)
+            drill_count = fallacy_counts[drill_fallacy]
+        else:
+            drill_fallacy = "none"
+            drill_count = 0
+
+        # ── 2. Determine weakest debate phase ──
+        phase_scores: Dict[str, List[int]] = {"opening": [], "rebuttal": [], "closing": []}
+        for arg in metadata:
+            turn = int(arg.get("turn_number", 1) or 1)
+            phase = _classify_phase(turn)
+            overall = int(arg.get("overall_score", 50) or 50)
+            phase_scores[phase].append(overall)
+
+        phase_avgs = {}
+        for phase, scores in phase_scores.items():
+            if scores:
+                phase_avgs[phase] = sum(scores) / len(scores)
+            else:
+                phase_avgs[phase] = 50.0
+
+        weak_phase = min(phase_avgs, key=phase_avgs.get) if phase_avgs else "rebuttal"
+
+        # ── 3. Build improvement areas ──
+        improvement_areas: List[str] = []
+
+        # Check per-dimension weaknesses
+        all_logic = [int(a.get("logic_score", 50) or 50) for a in metadata]
+        all_evidence = [int(a.get("evidence_score", 50) or 50) for a in metadata]
+        all_clarity = [int(a.get("clarity_score", 50) or 50) for a in metadata]
+
+        avg_logic = sum(all_logic) / len(all_logic) if all_logic else 50
+        avg_evidence = sum(all_evidence) / len(all_evidence) if all_evidence else 50
+        avg_clarity = sum(all_clarity) / len(all_clarity) if all_clarity else 50
+
+        if avg_logic < 55:
+            improvement_areas.append(f"Logic is weak (avg {avg_logic:.0f}/100) — use more causal connectors like 'therefore', 'because', 'thus'")
+        if avg_evidence < 55:
+            improvement_areas.append(f"Evidence is weak (avg {avg_evidence:.0f}/100) — cite specific data, studies, or examples")
+        if avg_clarity < 55:
+            improvement_areas.append(f"Clarity is weak (avg {avg_clarity:.0f}/100) — use shorter sentences and clearer structure")
+
+        # ── 4. Generate coaching scenario prompt ──
+        scenario_prompt = ""
+        if drill_fallacy != "none":
+            fallacy_readable = drill_fallacy.replace("_", " ").title()
+            if weak_phase == "opening":
+                scenario_prompt = (
+                    f"The user frequently uses {fallacy_readable} fallacies ({drill_count} times). "
+                    f"Their opening arguments are weakest. In the FIRST round, present a claim that "
+                    f"tempts them to use {fallacy_readable}. If they avoid it, praise them. "
+                    f"If they fall into it, explicitly name the fallacy and coach them."
+                )
+            elif weak_phase == "closing":
+                scenario_prompt = (
+                    f"The user frequently uses {fallacy_readable} fallacies ({drill_count} times). "
+                    f"Their closing arguments are weakest. In rounds 4-6, escalate pressure to "
+                    f"tempt the user into {fallacy_readable}. If they construct a strong closing "
+                    f"without that fallacy, that's improvement."
+                )
+            else:
+                scenario_prompt = (
+                    f"The user frequently uses {fallacy_readable} fallacies ({drill_count} times). "
+                    f"Their rebuttals are weakest. Make provocative claims that tempt the user "
+                    f"to respond with {fallacy_readable}. If they respond logically instead, "
+                    f"acknowledge the improvement. Keep the pressure up."
+                )
+
+        return CoachingPlanResponse(
+            drill_fallacy=drill_fallacy,
+            drill_fallacy_count=drill_count,
+            weak_phase=weak_phase,
+            scenario_prompt=scenario_prompt,
+            improvement_areas=improvement_areas,
+        )
+
+    except Exception as exc:
+        print(f"[memory] Coaching plan error: {exc}")
+        return CoachingPlanResponse(
+            drill_fallacy="none",
+            drill_fallacy_count=0,
+            weak_phase="rebuttal",
+            scenario_prompt="",
+            improvement_areas=[],
+        )

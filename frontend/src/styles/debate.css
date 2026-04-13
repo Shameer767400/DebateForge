@@ -852,3 +852,62 @@
     opacity: 0;
   }
 }
+
+/* ── Text input: prevent horizontal overflow on narrow screens ── */
+.text-input-row {
+  min-width: 0;
+}
+
+.text-input-field {
+  min-width: 0; /* flex children need this to shrink properly */
+}
+
+/* ── Ultra-small phone (≤ 360px) ── */
+@media (max-width: 360px) {
+  .debate-topbar {
+    padding: 7px 10px;
+  }
+
+  .debate-topic {
+    font-size: 0.72rem;
+  }
+
+  .debate-bottom {
+    padding: 8px 10px 12px;
+  }
+
+  .mic-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
+
+  .text-input-send {
+    padding: 8px 12px;
+    font-size: 0.76rem;
+  }
+
+  .msg-bubble {
+    font-size: 0.8rem;
+    padding: 8px 10px;
+  }
+
+  .fallacy-alert {
+    left: 8px;
+    right: 8px;
+    padding: 12px 14px;
+  }
+
+  .fallacy-alert-title {
+    font-size: 0.82rem;
+  }
+
+  .fallacy-alert-desc {
+    font-size: 0.75rem;
+  }
+
+  .debate-ended-title {
+    font-size: 1.3rem;
+  }
+}
+

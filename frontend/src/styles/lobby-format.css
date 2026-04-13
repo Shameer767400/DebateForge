@@ -12,54 +12,139 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 20px 14px 14px;
+  padding: 24px 14px 18px;
   background: rgba(255, 255, 255, 0.04);
   border: 2px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: 16px;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
   text-align: center;
+  overflow: hidden;
+}
+
+/* Shimmer pseudo-element */
+.format-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .format-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.format-card:hover::before {
+  opacity: 1;
+  animation: formatShimmer 0.8s ease forwards;
+}
+
+@keyframes formatShimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Active state — glowing border matching badge color */
+.format-card--active {
+  border-color: var(--format-active-color, #4f8ef7);
+  background: rgba(79, 142, 247, 0.1);
+  box-shadow:
+    0 0 0 1px var(--format-active-color, #4f8ef7),
+    0 0 20px color-mix(in srgb, var(--format-active-color, #4f8ef7) 30%, transparent),
+    0 6px 20px rgba(0, 0, 0, 0.3);
   transform: translateY(-2px);
 }
 
-.format-card--active {
-  border-color: var(--accent-user, #4f8ef7);
-  background: rgba(79, 142, 247, 0.1);
-  box-shadow: 0 0 20px rgba(79, 142, 247, 0.15);
+/* Per-format active colors using badge color as CSS var */
+.format-card--active .format-badge[style*="#00ff87"],
+.format-card--active:has(.format-badge[style*="00ff87"]) {
+  --format-active-color: #00ff87;
+}
+
+/* Recommended (green) */
+.format-card:nth-child(1).format-card--active {
+  --format-active-color: #00ff87;
+  background: rgba(0, 255, 135, 0.08);
+}
+
+/* Intermediate (yellow) */
+.format-card:nth-child(2).format-card--active {
+  --format-active-color: #ffcc00;
+  background: rgba(255, 204, 0, 0.08);
+}
+
+/* Advanced (orange) */
+.format-card:nth-child(3).format-card--active {
+  --format-active-color: #ff9500;
+  background: rgba(255, 149, 0, 0.08);
+}
+
+/* Expert (red-pink) */
+.format-card:nth-child(4).format-card--active {
+  --format-active-color: #ff3366;
+  background: rgba(255, 51, 102, 0.08);
 }
 
 .format-badge {
   position: absolute;
-  top: -8px;
+  top: -9px;
   right: 10px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 6px;
   font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
   color: #000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Badge pulse on active card */
+.format-card--active .format-badge {
+  animation: badgePulse 2s ease infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.08); }
 }
 
 .format-icon {
-  font-size: 2rem;
+  font-size: 2.2rem;
+  line-height: 1;
+  margin-top: 4px;
+  transition: transform 0.2s ease;
+}
+
+.format-card:hover .format-icon,
+.format-card--active .format-icon {
+  transform: scale(1.12);
 }
 
 .format-name {
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
+  margin-top: 2px;
 }
 
 .format-desc {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.5);
-  line-height: 1.3;
+  line-height: 1.4;
 }
+
 
 /* ─── Phase progress bar (in debate room) ─── */
 .phase-progress {
@@ -153,3 +238,79 @@
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.7);
 }
+
+/* ══════════════════════════════
+   RESPONSIVE — Lobby Formats
+   ══════════════════════════════ */
+
+@media (max-width: 600px) {
+  .format-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .format-card {
+    padding: 16px 10px 12px;
+  }
+
+  .format-icon {
+    font-size: 1.6rem;
+  }
+
+  .format-name {
+    font-size: 0.85rem;
+  }
+
+  .format-desc {
+    font-size: 0.7rem;
+  }
+
+  .phase-progress {
+    padding: 8px 12px;
+  }
+
+  .phase-dot {
+    width: 22px;
+    height: 22px;
+    font-size: 0.62rem;
+  }
+
+  .phase-label {
+    font-size: 0.6rem;
+    margin-left: 3px;
+    margin-right: 6px;
+  }
+
+  .phase-connector {
+    width: 14px;
+  }
+
+  .phase-banner {
+    padding: 8px 14px;
+    gap: 8px;
+  }
+
+  .phase-banner-phase {
+    font-size: 0.68rem;
+  }
+
+  .phase-banner-instruction {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .format-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .format-card {
+    padding: 14px 8px 10px;
+  }
+
+  .format-icon {
+    font-size: 1.4rem;
+  }
+}
+

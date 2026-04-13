@@ -24,6 +24,12 @@ const securityLogStream = fs.createWriteStream(
 );
 
 /* ── Severity levels ── */
+
+// Handle write stream errors gracefully
+securityLogStream.on('error', (err) => {
+  // eslint-disable-next-line no-console
+  console.error('[SECURITY LOGGER ERROR]', err.message);
+});
 const LEVELS = {
   INFO: 'INFO',
   WARN: 'WARN',
