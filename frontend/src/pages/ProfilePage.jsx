@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import '../styles/profile.css';
+import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
 
 const API = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
 
@@ -325,32 +326,26 @@ export default function ProfilePage() {
             {changingPassword && (
               <div className="prof-bio-editor" style={{ marginTop: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="password"
+                  <AnimatedPasswordInput
                     className="prof-bio-input"
                     placeholder="Current Password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     autoComplete="current-password"
-                    style={{ resize: 'none', minHeight: 'auto', padding: '10px 12px' }}
                   />
-                  <input
-                    type="password"
+                  <AnimatedPasswordInput
                     className="prof-bio-input"
                     placeholder="New Password (min 8, 1 upper, 1 number, 1 special)"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     autoComplete="new-password"
-                    style={{ resize: 'none', minHeight: 'auto', padding: '10px 12px' }}
                   />
-                  <input
-                    type="password"
+                  <AnimatedPasswordInput
                     className="prof-bio-input"
                     placeholder="Confirm New Password"
                     value={confirmNewPassword}
                     onChange={(e) => setConfirmNewPassword(e.target.value)}
                     autoComplete="new-password"
-                    style={{ resize: 'none', minHeight: 'auto', padding: '10px 12px' }}
                   />
                 </div>
                 {passwordMsg.text && (

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import '../styles/auth.css';
+import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -116,10 +117,9 @@ export default function RegisterPage() {
             <label className="auth-label" htmlFor="password">
               Password
             </label>
-            <input
+            <AnimatedPasswordInput
               id="password"
               className="auth-input"
-              type="password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -134,10 +134,9 @@ export default function RegisterPage() {
             <label className="auth-label" htmlFor="confirmPassword">
               Confirm Password
             </label>
-            <input
+            <AnimatedPasswordInput
               id="confirmPassword"
               className="auth-input"
-              type="password"
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

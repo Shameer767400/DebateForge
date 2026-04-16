@@ -26,7 +26,7 @@ function normalizeList(items, limit = 25) {
     seen.add(key);
     cleaned.push(value);
     if (cleaned.length >= limit) break;
-  }
+  } 
 
   return cleaned;
 }

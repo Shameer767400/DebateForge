@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from '../context/ToastContext';
 import '../styles/auth.css';
+import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
 
 export default function ResetPasswordPage() {
   const { token } = useParams();
@@ -70,10 +71,9 @@ export default function ResetPasswordPage() {
             <label className="auth-label" htmlFor="new-password">
               New Password
             </label>
-            <input
+            <AnimatedPasswordInput
               id="new-password"
               className="auth-input"
-              type="password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -88,10 +88,9 @@ export default function ResetPasswordPage() {
             <label className="auth-label" htmlFor="confirm-new-password">
               Confirm Password
             </label>
-            <input
+            <AnimatedPasswordInput
               id="confirm-new-password"
               className="auth-input"
-              type="password"
               placeholder="••••••••"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
