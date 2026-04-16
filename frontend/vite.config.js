@@ -29,11 +29,11 @@ export default defineConfig(({ mode }) => {
       open: false,
       proxy: {
         '/api': {
-          target: 'http://localhost:5000',
+          target: 'http://localhost:5001',
           changeOrigin: true,
         },
         '/socket.io': {
-          target: 'http://localhost:5000',
+          target: 'http://localhost:5001',
           ws: true,
           changeOrigin: true,
         },
