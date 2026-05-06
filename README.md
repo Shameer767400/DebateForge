@@ -11,7 +11,7 @@
 |---------|-------------|
 | 🎤 **Voice Debates** | Speak your arguments in real-time via browser mic — transcribed by Whisper |
 | 📝 **Text Debates** | Full text-based debate mode as an alternative to voice |
-| 🤖 **AI Opponent** | GPT/Gemini-powered responses with streaming text + TTS voice output |
+| 🤖 **AI Opponent** | GPT/Gemini-powered responses (or local Ollama fallback) with streaming text + TTS voice output |
 | 📊 **Live Scoring** | Logic, Evidence, and Clarity scored after each round |
 | 🔍 **Fallacy Detection** | Real-time detection of logical fallacies (strawman, ad hominem, slippery slope, etc.) |
 | 🧠 **AI Memory** | FAISS / Pinecone vector store tracks your argument history and weaknesses across debates |
@@ -33,7 +33,7 @@
 | Feature | Description |
 |---------|-------------|
 | 👤 **User Profiles** | Avatar upload, bio, stats overview |
-| ✉ **Email Verification** | Secure email verification on sign-up with token-based confirmation |
+| ✉ **Email Verification** | Secure email OTP (One Time Password) verification on sign-up |
 | 🔑 **Password Reset** | Self-service forgot-password / reset flow via email |
 | 🔔 **Push Notifications** | Web Push API for debate reminders and streak alerts |
 | 🔒 **Account Lockout** | Auto-lock after repeated failed login attempts |
@@ -67,8 +67,8 @@
 | **Backend** | Node.js, Express 5, Mongoose, JWT auth |
 | **Database** | MongoDB (Atlas or local) |
 | **Cache** | Redis (optional, for ELO + leaderboard) |
-| **WebSocket** | ws — real-time debate events |
-| **AI/ML** | Python FastAPI — Whisper transcription, GPT/Gemini responses, TTS |
+| **WebSocket** | ws — real-time debate events (with robust Redis fallback proxy) |
+| **AI/ML** | Python FastAPI — Whisper transcription, Ollama/GPT/Gemini responses, TTS |
 | **Vector Memory** | FAISS (local) or Pinecone (cloud) for argument history |
 | **Email** | Nodemailer (SMTP) — verification & password reset |
 | **Push** | Web Push API (VAPID) — browser push notifications |
@@ -83,8 +83,9 @@
 - Node.js 20 LTS recommended (`.nvmrc` included)
 - MongoDB (local or Atlas URI)
 - Python ≥ 3.9 (for the ML microservice)
-- Redis (optional)
-- SMTP credentials (for email verification & password reset)
+- Ollama (optional, required if using local LLM fallback)
+- Redis (optional, robust in-memory fallback included)
+- SMTP credentials (for email OTP verification & password reset)
 - VAPID keys (for push notifications — generate with `npx web-push generate-vapid-keys`)
 
 This repo is not compatible with Node 24/25. Use Node 20 before installing dependencies:
@@ -178,7 +179,7 @@ debateforge/
 │   ├── middleware/       # JWT auth middleware
 │   ├── models/          # Mongoose schemas (User, Debate, Topic)
 │   ├── routes/          # auth, debates, profile, topics, push
-│   ├── seeds/           # mark-existing-verified migration script
+│   ├── seeds/           # topics.seed.js (60+ curated topics), mark-existing-verified
 │   ├── services/
 │   │   ├── email.service.js          # Nodemailer — verification & reset
 │   │   ├── formatEngine.service.js   # Debate format rules (Oxford, LD, Parl.)
@@ -211,6 +212,7 @@ debateforge/
 │       │   ├── LandingPage.jsx
 │       │   ├── LoginPage.jsx
 │       │   ├── RegisterPage.jsx
+│       │   ├── VerifyEmailOTPPage.jsx
 │       │   ├── ForgotPasswordPage.jsx
 │       │   ├── ResetPasswordPage.jsx
 │       │   ├── VerifyEmailPage.jsx

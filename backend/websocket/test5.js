@@ -1,0 +1,15 @@
+console.log('socket.io...');
+require('socket.io');
+console.log('models...');
+require('../models');
+console.log('llm.service...');
+require('../services/llm.service');
+console.log('formatEngine...');
+require('../services/formatEngine.service');
+console.log('axios...');
+require('axios');
+console.log('redis...');
+require('../config/redis');
+console.log('debate...');
+require('../controllers/debate.controller');
+console.log('DONE');
