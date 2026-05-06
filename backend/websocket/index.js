@@ -9,6 +9,7 @@ const axios      = require('axios');
 const redisClient = require('../config/redis');
 const { SCORE_THRESHOLDS, MAX_ROUNDS } = require('../config/constants');
 const { finalizeDebateStats } = require('../controllers/debate.controller');
+const initMultiplayerWS = require('./multiplayer');
 
 // Export immediately to prevent CommonJS circular dependency issues
 module.exports = initWebSocket;
@@ -147,6 +148,9 @@ function initWebSocket(server) {
     pingTimeout: 30000,      // Disconnect idle sockets faster
     pingInterval: 15000,
   });
+
+  /* ── Initialize multiplayer namespace ── */
+  initMultiplayerWS(io);
 
   /* ── JWT auth middleware ── */
   io.use((socket, next) => {

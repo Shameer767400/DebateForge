@@ -17,6 +17,7 @@ const debateRoutes = require('./routes/debates');
 const profileRoutes = require('./routes/profile');
 const topicRoutes = require('./routes/topics');
 const pushRoutes = require('./routes/push.routes');
+const roomRoutes = require('./routes/room.routes');
 const { scheduleNotificationJobs } = require('./jobs/notifications.job');
 const secLogger = require('./services/security-logger.service');
 
@@ -265,6 +266,8 @@ app.use('/api/topics/propose', topicProposalLimiter);
 app.use('/api/topics', topicRoutes);
 
 app.use('/api/push', pushRoutes);
+
+app.use('/api/rooms', roomRoutes);
 
 app.get('/health', (req, res) => {
   res.json({

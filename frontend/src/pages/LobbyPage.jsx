@@ -207,7 +207,24 @@ export default function LobbyPage() {
       {/* ── Header ── */}
       <header className="lobby-header">
         <h1 className="lobby-heading">Choose Your Debate</h1>
-        <div className="lobby-user">
+        <div className="lobby-user" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Link
+            to="/multiplayer"
+            style={{
+              textDecoration: 'none',
+              padding: '0.5rem 1rem',
+              background: 'linear-gradient(135deg, rgba(0,170,255,0.2), rgba(0,255,135,0.2))',
+              border: '1px solid rgba(0,170,255,0.3)',
+              borderRadius: '8px',
+              color: '#00aaff',
+              fontSize: '0.8rem',
+              fontFamily: 'var(--font-ui)',
+              fontWeight: 700,
+              transition: 'all 0.2s',
+            }}
+          >
+            ⚔️ Multiplayer
+          </Link>
           <Link to="/profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="lobby-elo">{user?.eloRating ?? 1000}</span>
             <span className="lobby-username">{user?.username ?? 'Debater'}</span>
