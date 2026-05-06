@@ -73,6 +73,7 @@ async function persistReportCard(userId, judgeResponse) {
 function sanitizeJudgeResponse(judgeResponse, fallbackFeedback = '') {
   const areasToImprove = normalizeList(judgeResponse?.areasToImprove);
   const grammarMistakes = normalizeList(judgeResponse?.grammarMistakes);
+  const fallacies = normalizeList(judgeResponse?.fallacies);
   const userWeaknesses = String(judgeResponse?.userWeaknesses || '').trim();
   const reportCardHeadline = String(
     judgeResponse?.reportCardHeadline ||
@@ -90,6 +91,7 @@ function sanitizeJudgeResponse(judgeResponse, fallbackFeedback = '') {
     userWeaknesses: userWeaknesses || (areasToImprove[0] || 'Your rebuttals and clarity still need more discipline.'),
     areasToImprove,
     grammarMistakes,
+    fallacies,
     reportCardHeadline,
     improvementSummary: buildImprovementSummary(areasToImprove, grammarMistakes),
   };
@@ -359,7 +361,14 @@ function initWebSocket(server) {
         }
 
         if (debate.arguments.length >= 2) {
-          await runJudgeScoring(socket, session, debateId);
+          let isForfeit = false;
+          // Determine if user ended debate before completing required rounds/phases
+          if (session.format === 'freeform' && session.round <= MAX_ROUNDS) {
+            isForfeit = true;
+          } else if (session.format !== 'freeform' && session.phaseIndex !== -1) {
+            isForfeit = true;
+          }
+          await runJudgeScoring(socket, session, debateId, isForfeit);
           await redisClient.del(`session:${debateId}`);
           return;
         }
@@ -599,13 +608,24 @@ async function processTranscript(socket, session, debateId, transcript) {
 /* ═══════════════════════════════════════════════════════════════
    runJudgeScoring — AI judge evaluates the full debate (Addition 6)
 ═══════════════════════════════════════════════════════════════ */
-async function runJudgeScoring(socket, session, debateId) {
+async function runJudgeScoring(socket, session, debateId, isForfeit = false) {
   try {
     const debate = await Debate.findById(debateId);
     if (!debate) return;
 
+    // Extract fallacies from the debate arguments identified by ML
+    const userFallacies = debate.arguments
+      .filter(a => a.speaker === 'user' && a.fallacy && a.fallacy.detected && a.fallacy.type)
+      .map(a => a.fallacy.type.replace(/_/g, ' '));
+    const uniqueFallacies = [...new Set(userFallacies)];
+
+    let forfeitContext = '';
+    if (isForfeit) {
+      forfeitContext = `\n\nCRITICAL CONTEXT: The user FORFEITED the debate by ending it early before all rounds were completed. Therefore, you MUST declare the "ai" as the winner and heavily penalize the user's score for quitting early.`;
+    }
+
     const judgePrompt = `You are an impartial debate judge.
-Review this complete debate transcript and score both sides.
+Review this complete debate transcript and score both sides.${forfeitContext}
 
 TOPIC: ${session.topic}
 USER POSITION: ${session.userSide}
@@ -625,6 +645,7 @@ Score each debater 0-100 on:
 
 Provide a strict but constructive report card for the user.
 Identify their strongest points, their weakest habits, grammatical mistakes, and the exact things they must improve next time.
+The following fallacies were identified by our ML model during the debate: ${uniqueFallacies.length ? uniqueFallacies.join(', ') : 'None detected'}. You MUST incorporate these into your critique and include them in the JSON output under 'fallacies' if they appear in the transcript.
 Do not soften recurring weaknesses. If the same weakness appears multiple times, stress that they must fix it.
 
 Respond ONLY in this JSON format:
@@ -632,12 +653,13 @@ Respond ONLY in this JSON format:
   "reportCardHeadline": "Your clearest weakness tonight was weak rebuttal targeting.",
   "userScore": 72,
   "aiScore": 68,
-  "winner": "user",
+  "winner": ${isForfeit ? '"ai"' : '"user"'},
   "feedback": "The user demonstrated stronger evidence use...",
   "userStrengths": "Clear structure, good use of statistics...",
   "userWeaknesses": "Could improve rebuttal directness...",
   "areasToImprove": ["Rebuttals need more evidence", "Avoid ad hominem attacks"],
-  "grammarMistakes": ["'their' instead of 'there'", "missing commas in compound sentences"]
+  "grammarMistakes": ["'their' instead of 'there'", "missing commas in compound sentences"],
+  "fallacies": ["hasty generalization", "ad hominem"]
 }`;
 
     // Use the LLM to get judge response
@@ -666,6 +688,7 @@ Respond ONLY in this JSON format:
         userWeaknesses: 'Room for improvement',
         areasToImprove: [],
         grammarMistakes: [],
+        fallacies: [],
       };
     }
 

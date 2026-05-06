@@ -140,6 +140,8 @@ ${judgeVerdict.improvementSummary ? `<div class="section"><div class="section-ti
 
 ${grammarItems ? `<div class="section"><div class="section-title">📝 Grammar & Vocabulary</div><ul>${grammarItems}</ul></div>` : ''}
 
+${judgeVerdict.fallacies && judgeVerdict.fallacies.length > 0 ? `<div class="section"><div class="section-title">🚨 Fallacies Made</div><ul>${judgeVerdict.fallacies.map(f => `<li>${f}</li>`).join('')}</ul></div>` : ''}
+
 ${focusItems ? `<div class="section"><div class="section-title">📌 Recurring Weaknesses</div><ul>${focusItems}</ul></div>` : ''}
 
 ${argRows ? `<div class="section"><div class="section-title">Your Arguments This Debate</div>${argRows}</div>` : ''}
