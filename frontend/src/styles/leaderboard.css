@@ -10,6 +10,34 @@
   margin: 0 auto;
 }
 
+/* ── Nav ── */
+.lb-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lb-nav-links {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.lb-nav-link {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.lb-nav-link:hover {
+  color: var(--accent-user);
+}
+
 /* ── Header ── */
 .lb-header {
   display: flex;

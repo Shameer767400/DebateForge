@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import '../styles/theme.css';
@@ -89,6 +90,9 @@ export default function LeaderboardPage() {
   if (loading) {
     return (
       <div className="lb-page">
+        <nav className="lb-nav">
+          <Link to="/lobby" className="retro-back-link">← Back to Lobby</Link>
+        </nav>
         <header className="lb-header">
           <h1 className="lb-title">🏆 Global Leaderboard</h1>
         </header>
@@ -103,6 +107,16 @@ export default function LeaderboardPage() {
 
   return (
     <div className="lb-page">
+
+      {/* ── NAV ── */}
+      <nav className="lb-nav">
+        <Link to="/lobby" className="retro-back-link">← Back to Lobby</Link>
+        <div className="lb-nav-links">
+          <Link to="/dashboard" className="lb-nav-link">Dashboard</Link>
+          <Link to="/profile" className="lb-nav-link">Profile</Link>
+          <Link to="/history" className="lb-nav-link">History</Link>
+        </div>
+      </nav>
 
       {/* ── HEADER ── */}
       <header className="lb-header">
