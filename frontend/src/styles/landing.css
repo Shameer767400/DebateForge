@@ -130,7 +130,7 @@
   gap: 4rem;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 120px 48px 80px;
+  padding: 60px 48px 80px;
 }
 
 .lp-hero-content {
@@ -763,7 +763,7 @@
   .lp-hero {
     flex-direction: column;
     text-align: center;
-    padding: 110px 32px 60px;
+    padding: 60px 32px 60px;
     gap: 60px;
     min-height: auto;
   }
@@ -788,7 +788,7 @@
 }
 
 @media (max-width: 480px) {
-  .lp-hero { padding: 100px 20px 40px; }
+  .lp-hero { padding: 40px 20px 40px; }
   .lp-hero-actions { flex-direction: column; width: 100%; }
   .lp-btn-primary, .lp-btn-secondary { width: 100%; justify-content: center; }
   .lp-nav-signin { display: none; }

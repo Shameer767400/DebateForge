@@ -99,23 +99,6 @@ export default function LandingPage() {
       {/* Particle canvas background */}
       <canvas ref={canvasRef} className="lp-canvas" />
 
-      {/* ══════════ NAVBAR ══════════ */}
-      <nav className="lp-nav">
-        <div className="lp-nav-logo">
-          <span className="lp-nav-logo-icon">⚔</span>
-          <span className="lp-nav-logo-text">DebateForge</span>
-        </div>
-        <div className="lp-nav-links">
-          <a href="#features" className="lp-nav-link">Features</a>
-          <a href="#how" className="lp-nav-link">How It Works</a>
-          <a href="#social" className="lp-nav-link">Community</a>
-        </div>
-        <div className="lp-nav-actions">
-          <button className="lp-nav-signin" onClick={() => navigate('/login')}>Sign In</button>
-          <button className="lp-nav-cta" onClick={() => navigate('/register')}>Get Started Free</button>
-        </div>
-      </nav>
-
       {/* ══════════ HERO ══════════ */}
       <section className="lp-hero" id="top">
         <div className="lp-hero-content">
