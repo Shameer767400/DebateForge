@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
           <p className="auth-switch" style={{ marginTop: '8px' }}>
-            <Link to="/login" className="auth-link">← Back to Login</Link>
+            <Link to="/login" className="retro-back-link">← Back to Login</Link>
           </p>
         </div>
       </div>

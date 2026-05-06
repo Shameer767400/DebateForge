@@ -157,3 +157,22 @@
   }
 }
 
+/* ── Retro Terminal Back Link ── */
+.retro-back-link {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  color: var(--accent-user);
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  margin-bottom: 24px;
+}
+
+.retro-back-link:hover {
+  text-shadow: 0 0 8px var(--accent-user);
+  opacity: 0.8;
+}
+

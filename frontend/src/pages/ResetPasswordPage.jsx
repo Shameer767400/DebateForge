@@ -121,7 +121,7 @@ export default function ResetPasswordPage() {
         </form>
 
         <p className="auth-switch">
-          <Link to="/login" className="auth-link">← Back to Login</Link>
+          <Link to="/login" className="retro-back-link">← Back to Login</Link>
         </p>
       </div>
     </div>

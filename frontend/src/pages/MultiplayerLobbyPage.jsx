@@ -91,7 +91,7 @@ export default function MultiplayerLobbyPage() {
         <h1>⚔️ Multiplayer Debates</h1>
         <p>Create a room, invite friends, and debate in real-time with live AI moderation</p>
         <div style={{ marginTop: '1rem' }}>
-          <Link to="/lobby" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textDecoration: 'none' }}>
+          <Link to="/lobby" className="retro-back-link">
             ← Back to Solo Lobby
           </Link>
         </div>

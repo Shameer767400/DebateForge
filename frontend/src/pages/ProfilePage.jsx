@@ -187,7 +187,7 @@ export default function ProfilePage() {
     <div className="prof-page">
       {/* ── Nav ── */}
       <nav className="prof-nav">
-        <Link to="/lobby" className="prof-nav-back">← Back to Lobby</Link>
+        <Link to="/lobby" className="retro-back-link">← Back to Lobby</Link>
         <div className="prof-nav-links">
           <Link to="/dashboard" className="prof-nav-link">Dashboard</Link>
           <Link to="/leaderboard" className="prof-nav-link">Leaderboard</Link>

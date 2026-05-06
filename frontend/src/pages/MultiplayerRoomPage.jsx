@@ -339,7 +339,7 @@ export default function MultiplayerRoomPage() {
         <div className="mp-room-header-meta">
           <span className={`mp-status-badge mp-status-badge--${status}`}>{status.replace('_', ' ')}</span>
           {connected && <span style={{ color: 'var(--accent-user)', fontSize: '0.7rem' }}>● Live</span>}
-          <Link to="/multiplayer" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textDecoration: 'none' }}>
+          <Link to="/multiplayer" className="retro-back-link">
             ← Leave
           </Link>
         </div>

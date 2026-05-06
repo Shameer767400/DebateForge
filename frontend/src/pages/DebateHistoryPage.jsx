@@ -200,7 +200,7 @@ export default function DebateHistoryPage() {
 
       {/* ── Nav ── */}
       <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-        <Link to="/lobby" style={{ color: 'var(--accent-user)', textDecoration: 'none', fontSize: '0.9rem' }}>
+        <Link to="/lobby" className="retro-back-link">
           ← Back to Lobby
         </Link>
         <div style={{ display: 'flex', gap: '16px' }}>
