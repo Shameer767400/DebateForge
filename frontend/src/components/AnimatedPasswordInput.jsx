@@ -48,6 +48,7 @@ const CharSpan = ({ char, index, total, animState, revealed }) => {
 export default function AnimatedPasswordInput({ value, onChange, className = '', id, placeholder, ...props }) {
   const [revealed, setRevealed] = useState(false);
   const [animState, setAnimState] = useState('none');
+  const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef(null);
 
   const toggleReveal = (e) => {
@@ -72,12 +73,13 @@ export default function AnimatedPasswordInput({ value, onChange, className = '',
         className={`char-display ${className}`}
         onClick={() => inputRef.current?.focus()}
       >
-        {value.length === 0 && placeholder && (
+        {value.length === 0 && placeholder && !isFocused && (
           <span className="char-placeholder">{placeholder}</span>
         )}
         {value.split('').map((char, i) => (
           <CharSpan key={i} char={char} index={i} total={value.length} animState={animState} revealed={revealed} />
         ))}
+        {isFocused && <span className="fake-cursor">|</span>}
       </div>
       <input
         ref={inputRef}
@@ -86,6 +88,8 @@ export default function AnimatedPasswordInput({ value, onChange, className = '',
         type="text"
         value={value}
         onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         spellCheck="false"
         autoCapitalize="off"
         autoCorrect="off"
