@@ -319,15 +319,16 @@ export default function DebateRoomPage() {
         const token = data.text ?? data.chunk ?? '';
         setPhase('ai_speaking');
         setMessages((prev) => {
-          const hasPending = prev.some((m) => m.id === 'pending-ai');
+          const hasPending = prev.some((m) => m.isStreaming);
           if (hasPending) {
             return prev.map((m) =>
-              m.id === 'pending-ai' ? { ...m, text: m.text + token } : m
+              m.isStreaming ? { ...m, text: m.text + token } : m
             );
           }
+          // First chunk — assign a stable id immediately so the key never changes
           return [
             ...prev,
-            { id: 'pending-ai', speaker: 'ai', text: token, scores: null },
+            { id: `ai-${Date.now()}`, speaker: 'ai', text: token, scores: null, isStreaming: true },
           ];
         });
         break;
@@ -337,17 +338,17 @@ export default function DebateRoomPage() {
       case 'ai_audio_chunk':
         break;
 
-      /* AI finished its turn — swap pending stub → final message, advance round */
+      /* AI finished its turn — flip isStreaming off (id stays the same, key unchanged) */
       case 'ai_turn_complete':
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === 'pending-ai'
-              ? { ...m, id: `ai-${Date.now()}`, text: data.fullText ?? m.text }
+            m.isStreaming
+              ? { ...m, isStreaming: false, text: data.fullText ?? m.text }
               : m
           )
         );
         setRound(data.round ?? ((r) => r + 1));
-        setPhase('user_turn'); // resets timer via the timer useEffect
+        setPhase('user_turn');
         playDing();
         break;
 
@@ -652,7 +653,7 @@ export default function DebateRoomPage() {
                 </div>
                 <div className="msg-body">
                   <div className={`msg-bubble msg-bubble--${msg.speaker}`}>
-                    {msg.speaker === 'ai' && msg.id !== 'pending-ai' ? (
+                    {msg.speaker === 'ai' && !msg.isStreaming ? (
                       <StreamText text={msg.text} />
                     ) : (
                       msg.text
