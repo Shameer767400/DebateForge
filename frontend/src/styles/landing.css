@@ -20,19 +20,6 @@
   opacity: 0.6;
 }
 
-/* ── Anime.js split-char styles ── */
-.lp-anime-chars {
-  display: inline-block;
-  overflow: visible;
-}
-
-/* Each char injected by splitText gets this treatment */
-.lp-anime-chars .char {
-  display: inline-block;
-  will-change: transform, opacity;
-  line-height: 1.1;
-}
-
 /* ── Navbar ── */
 .lp-nav {
   position: fixed;

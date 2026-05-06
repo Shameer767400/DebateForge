@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { animate, stagger, splitText } from 'animejs';
 import '../styles/landing.css';
 
 const FEATURES = [
@@ -95,37 +94,6 @@ export default function LandingPage() {
     return () => window.removeEventListener('mousemove', handler);
   }, []);
 
-  /* ── Anime.js character animation ── */
-  useEffect(() => {
-    // Small timeout to let the DOM settle after mount
-    const timer = setTimeout(() => {
-      try {
-        // Animate hero accent title characters
-        const accentEl = document.querySelector('.lp-anime-chars');
-        if (!accentEl) return;
-        const { chars } = splitText(accentEl, { words: false, chars: true });
-        animate(chars, {
-          y: [
-            { to: '-2.75rem', ease: 'outExpo', duration: 600 },
-            { to: 0, ease: 'outBounce', duration: 800, delay: 100 },
-          ],
-          rotate: {
-            from: '-1turn',
-            delay: 0,
-          },
-          delay: stagger(50),
-          ease: 'inOutCirc',
-          loopDelay: 1000,
-          loop: true,
-        });
-      } catch (err) {
-        // Silently skip if animejs fails (e.g. SSR / old build)
-        console.warn('[Anime.js] animation skipped:', err.message);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <div className="lp-page" ref={pageRef}>
       {/* Particle canvas background */}
@@ -142,7 +110,7 @@ export default function LandingPage() {
           <h1 className="lp-hero-title landing-reveal">
             Debate Smarter.
             <br />
-            <span className="lp-hero-accent lp-anime-chars">Win Every Room.</span>
+            <span className="lp-hero-accent">Win Every Room.</span>
           </h1>
 
           <p className="lp-hero-sub landing-reveal">

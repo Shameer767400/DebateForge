@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const AuthContext = createContext(null);
@@ -7,6 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const isAuthenticated = !!token && !!user;
 
@@ -50,6 +52,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('debateforge_token');
     setToken(null);
     setUser(null);
+    navigate('/');
   };
 
   const value = {

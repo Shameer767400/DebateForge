@@ -76,7 +76,6 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
   };
 
   const handleAvatarUpload = async (e) => {
