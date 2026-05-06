@@ -180,64 +180,64 @@ function rateLimitHandler(endpoint) {
   };
 }
 
-// 5a. Global limiter: 200 requests per 15 minutes per IP
+// 5a. Global limiter: 1000 requests per 15 minutes per IP
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('global'),
 }));
 
-// 5b. Auth routes: 50 attempts per 15 min (increased for testing)
+// 5b. Auth routes: 200 attempts per 15 min
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('auth'),
 });
 
-// 5c. Account creation: 20 registrations per hour per IP (increased for testing)
+// 5c. Account creation: 100 registrations per hour per IP
 const registrationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 20,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('registration'),
 });
 
-// 5d. Password reset: 3 requests per 15 min
+// 5d. Password reset: 20 requests per 15 min
 const passwordResetLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 3,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('password-reset'),
 });
 
-// 5e. Debate creation (AI generation): 10 per hour per IP
+// 5e. Debate creation (AI generation): 50 per hour per IP
 const debateCreationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 10,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('debate-creation'),
 });
 
-// 5f. Topic proposal: 5 per hour per IP
+// 5f. Topic proposal: 30 per hour per IP
 const topicProposalLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('topic-proposal'),
 });
 
-// 5g. Profile upload: 10 per hour
+// 5g. Profile upload: 30 per hour
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 10,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('avatar-upload'),

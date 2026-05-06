@@ -99,11 +99,11 @@ function sanitizeJudgeResponse(judgeResponse, fallbackFeedback = '') {
 
 /* ── WebSocket rate limiter ── */
 const WS_RATE_LIMITS = {
-  join_debate:        { max: 5,  windowMs: 60000 },   // 5 joins per min
-  audio_chunk:        { max: 120, windowMs: 60000 },   // 120 chunks per min (2/sec)
-  audio_end:          { max: 10, windowMs: 60000 },    // 10 per min
-  transcript_direct:  { max: 10, windowMs: 60000 },    // 10 per min
-  end_debate:         { max: 5,  windowMs: 60000 },    // 5 per min
+  join_debate:        { max: 20,  windowMs: 60000 },   // 20 joins per min
+  audio_chunk:        { max: 600, windowMs: 60000 },   // 600 chunks per min (10/sec)
+  audio_end:          { max: 60, windowMs: 60000 },    // 60 per min
+  transcript_direct:  { max: 60, windowMs: 60000 },    // 60 per min
+  end_debate:         { max: 20, windowMs: 60000 },    // 20 per min
 };
 
 function wsRateLimiter(socket, eventName) {
