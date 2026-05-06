@@ -30,12 +30,12 @@ export default function LandingPage() {
   const canvasRef = useRef(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  /* ── Particle canvas ── */
+  /* ── Advanced background canvas ── */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let animId;
+    let animId, t = 0;
 
     const resize = () => {
       canvas.width = window.innerWidth;
@@ -44,37 +44,154 @@ export default function LandingPage() {
     resize();
     window.addEventListener('resize', resize);
 
-    const particles = Array.from({ length: 60 }, () => ({
+    /* ── Particles (network nodes) ── */
+    const COUNT = 80;
+    const particles = Array.from({ length: COUNT }, () => ({
       x: Math.random() * window.innerWidth,
       y: Math.random() * window.innerHeight,
-      r: Math.random() * 1.5 + 0.4,
-      vx: (Math.random() - 0.5) * 0.3,
-      vy: (Math.random() - 0.5) * 0.3,
-      alpha: Math.random() * 0.5 + 0.1,
-      color: Math.random() > 0.6 ? '#00ff87' : Math.random() > 0.5 ? '#00aaff' : '#ff3366',
+      r: Math.random() * 1.8 + 0.5,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      alpha: Math.random() * 0.6 + 0.2,
+      hue: [140, 200, 340][Math.floor(Math.random() * 3)], // green / blue / pink
     }));
 
+    /* ── Shooting stars ── */
+    const MAX_STARS = 4;
+    const stars = [];
+    const spawnStar = () => {
+      if (stars.length >= MAX_STARS) return;
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height * 0.5,
+        len: Math.random() * 160 + 80,
+        speed: Math.random() * 8 + 6,
+        alpha: 1,
+        angle: Math.PI / 5 + (Math.random() - 0.5) * 0.3,
+        hue: [140, 200][Math.floor(Math.random() * 2)],
+      });
+    };
+    setInterval(spawnStar, 2200);
+
+    /* ── Aurora blobs (CSS-like but canvas) ── */
+    const blobs = [
+      { x: 0.15, y: 0.1,  r: 0.30, hue: 140, speed: 0.00018 },
+      { x: 0.80, y: 0.85, r: 0.28, hue: 200, speed: 0.00022 },
+      { x: 0.50, y: 0.55, r: 0.22, hue: 340, speed: 0.00014 },
+    ];
+
+    const CONNECT_DIST = 130;
+
     const draw = () => {
+      t++;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      /* ─ 1. Aurora blobs ─ */
+      blobs.forEach(b => {
+        const cx = (b.x + Math.sin(t * b.speed * 1.3) * 0.07) * canvas.width;
+        const cy = (b.y + Math.cos(t * b.speed) * 0.06) * canvas.height;
+        const rx = b.r * canvas.width;
+
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+        grad.addColorStop(0,   `hsla(${b.hue},100%,55%,0.055)`);
+        grad.addColorStop(0.5, `hsla(${b.hue},100%,45%,0.025)`);
+        grad.addColorStop(1,   `hsla(${b.hue},100%,35%,0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, rx * 0.65, t * b.speed * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      /* ─ 2. Animated grid ─ */
+      const gridSize = 60;
+      const offsetX = (t * 0.15) % gridSize;
+      const offsetY = (t * 0.10) % gridSize;
+      ctx.strokeStyle = 'rgba(255,255,255,0.018)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (let x = -gridSize + offsetX; x < canvas.width + gridSize; x += gridSize) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+      }
+      for (let y = -gridSize + offsetY; y < canvas.height + gridSize; y += gridSize) {
+        ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+      }
+      ctx.stroke();
+
+      /* ─ 3. Particle network ─ */
       particles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
+        p.x += p.vx; p.y += p.vy;
         if (p.x < 0) p.x = canvas.width;
         if (p.x > canvas.width) p.x = 0;
         if (p.y < 0) p.y = canvas.height;
         if (p.y > canvas.height) p.y = 0;
+      });
+
+      // Draw connections
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < CONNECT_DIST) {
+            const alpha = (1 - dist / CONNECT_DIST) * 0.18;
+            const hue = particles[i].hue;
+            ctx.beginPath();
+            ctx.strokeStyle = `hsla(${hue},100%,65%,${alpha})`;
+            ctx.lineWidth = 0.6;
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw nodes
+      particles.forEach(p => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = `hsla(${p.hue},100%,70%,${p.alpha})`;
+        ctx.fill();
+        // Glow
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue},100%,60%,${p.alpha * 0.08})`;
         ctx.fill();
       });
-      ctx.globalAlpha = 1;
+
+      /* ─ 4. Shooting stars ─ */
+      for (let i = stars.length - 1; i >= 0; i--) {
+        const s = stars[i];
+        const tx = s.x + Math.cos(s.angle) * s.len;
+        const ty = s.y + Math.sin(s.angle) * s.len;
+
+        const grad = ctx.createLinearGradient(s.x, s.y, tx, ty);
+        grad.addColorStop(0,   `hsla(${s.hue},100%,80%,0)`);
+        grad.addColorStop(0.7, `hsla(${s.hue},100%,80%,${s.alpha * 0.8})`);
+        grad.addColorStop(1,   `hsla(${s.hue},100%,90%,${s.alpha})`);
+
+        ctx.beginPath();
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+
+        s.x += Math.cos(s.angle) * s.speed;
+        s.y += Math.sin(s.angle) * s.speed;
+        s.alpha -= 0.012;
+
+        if (s.alpha <= 0 || s.x > canvas.width || s.y > canvas.height) {
+          stars.splice(i, 1);
+        }
+      }
+
       animId = requestAnimationFrame(draw);
     };
+
     draw();
     return () => { cancelAnimationFrame(animId); window.removeEventListener('resize', resize); };
   }, []);
+
 
   /* ── Scroll reveal ── */
   useEffect(() => {
