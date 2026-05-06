@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -405,11 +405,9 @@ export default function DashboardPage() {
       <section className="dash-section">
         <div className="dash-section-header">
           <h2 className="dash-section-title">Recent Debates</h2>
-          {history.length > 10 && (
-            <button className="dash-view-all" onClick={() => alert('Full history coming soon!')}>
-              View All
-            </button>
-          )}
+          <Link to="/history" className="dash-view-all" style={{ textDecoration: 'none' }}>
+            View All →
+          </Link>
         </div>
 
         {loading ? (
@@ -433,28 +431,33 @@ export default function DashboardPage() {
               <tbody>
                 {history.slice(0, 10).map((d) => {
                   const id = d._id ?? d.id ?? Math.random();
+                  const isWin = d.winner === 'user';
+                  const isLoss = d.winner === 'ai';
                   return (
                     <tr
                       key={id}
                       className="debate-row"
-                      onClick={() => alert('Replay coming soon!')}
+                      onClick={() => navigate('/history')}
+                      title="View in History"
                     >
                       <td className="td-topic">
-                        {d.topic?.title ?? d.topicTitle ?? '—'}
+                        {d.topicSnapshot ?? d.topic?.title ?? '—'}
                       </td>
                       <td className="td-date">
-                        {d.createdAt
-                          ? new Date(d.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        {(d.startedAt || d.createdAt)
+                          ? new Date(d.startedAt ?? d.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                           : '—'}
                       </td>
                       <td className="td-side">
-                        <span className={`side-tag side-tag--${d.side?.toLowerCase()}`}>
-                          {d.side ?? '—'}
+                        <span className={`side-tag side-tag--${(d.userSide ?? '').toLowerCase()}`}>
+                          {d.userSide ?? '—'}
                         </span>
                       </td>
-                      <td><ResultPill result={d.result} /></td>
+                      <td>
+                        <ResultPill result={isWin ? 'win' : isLoss ? 'loss' : d.winner === 'draw' ? 'draw' : undefined} />
+                      </td>
                       <td className="td-score">
-                        {d.scores?.avg ?? d.avgScore ?? '—'}
+                        {d.userFinalScore ?? '—'}
                       </td>
                     </tr>
                   );

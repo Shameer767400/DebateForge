@@ -276,6 +276,18 @@
   background: rgba(0, 255, 135, 0.2);
 }
 
+.judge-btn--download {
+  background: rgba(0, 170, 255, 0.12);
+  color: #00aaff;
+  border: 1px solid rgba(0, 170, 255, 0.3);
+}
+
+.judge-btn--download:hover {
+  background: rgba(0, 170, 255, 0.22);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 170, 255, 0.25);
+}
+
 /* ══════════════════════════════
    RESPONSIVE — Judge Verdict
    ══════════════════════════════ */

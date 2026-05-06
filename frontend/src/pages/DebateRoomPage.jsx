@@ -11,6 +11,152 @@ import '../styles/debate.css';
 import '../styles/lobby-format.css';
 import '../styles/judge-verdict.css';
 
+/* ═══════════════════════════════════════════════════════
+   generateReportCardPDF — builds and downloads an HTML
+   report card rendered as a printable document.
+═══════════════════════════════════════════════════════ */
+function generateReportCardPDF(judgeVerdict, debateInfo, messages) {
+  if (!judgeVerdict) return;
+
+  const date = new Date().toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const topic = debateInfo?.topicSnapshot || 'Custom Topic';
+  const format = (debateInfo?.format || 'freeform').replace(/_/g, ' ');
+  const side = debateInfo?.userSide || '—';
+  const difficulty = debateInfo?.difficulty || '—';
+
+  const winnerLabel =
+    judgeVerdict.winner === 'user' ? '🏆 YOU WIN' :
+    judgeVerdict.winner === 'ai'   ? '🤖 AI WINS' : '🤝 DRAW';
+  const winnerColor =
+    judgeVerdict.winner === 'user' ? '#00ff87' :
+    judgeVerdict.winner === 'ai'   ? '#ff3366' : '#ffcc00';
+
+  // Build argument rows
+  const argRows = (messages || [])
+    .filter(m => m.speaker === 'user')
+    .map((m, i) => `
+      <div class="arg-row">
+        <div class="arg-label">Round ${i + 1} — You</div>
+        <div class="arg-content">${m.text || ''}</div>
+        ${m.scores ? `<div class="arg-scores">Logic: ${m.scores.logic ?? '—'} &nbsp;|&nbsp; Evidence: ${m.scores.evidence ?? '—'} &nbsp;|&nbsp; Clarity: ${m.scores.clarity ?? '—'}</div>` : ''}
+      </div>
+    `).join('');
+
+  // Build improve list
+  const improveItems = (judgeVerdict.areasToImprove || [])
+    .map(a => `<li>${a}</li>`).join('');
+  const grammarItems = (judgeVerdict.grammarMistakes || [])
+    .map(g => `<li>${g}</li>`).join('');
+  const focusItems = (judgeVerdict.savedFocusAreas || [])
+    .slice(0, 6).map(f => `<li>${f}</li>`).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DebateForge Report Card — ${topic.slice(0, 40)}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0a0a0f;
+    color: #e8e8f0;
+    padding: 40px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .header {
+    text-align: center;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  .logo { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg,#00ff87,#00aaff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .date { font-size: 0.8rem; color: rgba(255,255,255,0.4); margin-top: 6px; }
+  .topic { font-size: 1.2rem; font-weight: 700; margin-top: 12px; color: #fff; }
+  .meta { display: flex; gap: 20px; justify-content: center; margin-top: 8px; }
+  .meta span { font-size: 0.75rem; color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.06); padding: 3px 10px; border-radius: 20px; }
+  .winner-box { text-align: center; padding: 20px; margin-bottom: 24px; background: rgba(255,255,255,0.04); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); }
+  .winner-label { font-size: 2.2rem; font-weight: 800; color: ${winnerColor}; }
+  .scores-row { display: flex; gap: 20px; justify-content: center; margin-top: 12px; }
+  .score-box { text-align: center; }
+  .score-num { font-size: 2.4rem; font-weight: 800; }
+  .score-num--user { color: #00ff87; }
+  .score-num--ai { color: #ff3366; }
+  .score-lbl { font-size: 0.7rem; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px; }
+  .vs { font-size: 1rem; color: rgba(255,255,255,0.2); align-self: center; }
+  .section { margin-bottom: 24px; }
+  .section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,0.4); margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px; }
+  .text-block { font-size: 0.88rem; line-height: 1.6; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.03); border-radius: 10px; padding: 14px; border: 1px solid rgba(255,255,255,0.07); }
+  .headline { background: rgba(255,149,0,0.12); border: 1px solid rgba(255,149,0,0.25); border-radius: 10px; padding: 12px; color: #ffd39a; font-size: 0.9rem; font-weight: 600; margin-bottom: 20px; text-align: center; }
+  .strengths { background: rgba(0,255,135,0.06); border: 1px solid rgba(0,255,135,0.15); border-radius: 10px; padding: 12px; color: #a0ffd4; font-size: 0.85rem; line-height: 1.5; }
+  .weaknesses { background: rgba(255,80,0,0.06); border: 1px solid rgba(255,80,0,0.18); border-radius: 10px; padding: 12px; color: #ffb490; font-size: 0.85rem; line-height: 1.5; }
+  ul { padding-left: 20px; margin-top: 8px; }
+  li { font-size: 0.84rem; color: rgba(255,255,255,0.65); margin-bottom: 4px; line-height: 1.5; }
+  .arg-row { background: rgba(0,255,135,0.04); border: 1px solid rgba(0,255,135,0.1); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .arg-label { font-size: 0.7rem; font-weight: 700; color: #00ff87; margin-bottom: 6px; }
+  .arg-content { font-size: 0.84rem; color: rgba(255,255,255,0.75); line-height: 1.5; }
+  .arg-scores { font-size: 0.7rem; color: rgba(255,255,255,0.35); margin-top: 6px; }
+  .footer { text-align: center; font-size: 0.7rem; color: rgba(255,255,255,0.2); margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 16px; }
+  @media print { body { background: #fff; color: #111; } .logo { -webkit-text-fill-color: #0066cc; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">⚔ DebateForge</div>
+  <div class="date">Report Card — ${date}</div>
+  <div class="topic">${topic}</div>
+  <div class="meta">
+    <span>Side: ${side}</span>
+    <span>Format: ${format}</span>
+    <span>Difficulty: ${difficulty}</span>
+  </div>
+</div>
+
+${judgeVerdict.reportCardHeadline ? `<div class="headline">${judgeVerdict.reportCardHeadline}</div>` : ''}
+
+<div class="winner-box">
+  <div class="winner-label">${winnerLabel}</div>
+  <div class="scores-row">
+    <div class="score-box"><div class="score-num score-num--user">${judgeVerdict.userScore}</div><div class="score-lbl">You</div></div>
+    <div class="vs">VS</div>
+    <div class="score-box"><div class="score-num score-num--ai">${judgeVerdict.aiScore}</div><div class="score-lbl">AI</div></div>
+  </div>
+</div>
+
+${judgeVerdict.feedback ? `<div class="section"><div class="section-title">Judge's Feedback</div><div class="text-block">${judgeVerdict.feedback}</div></div>` : ''}
+
+${judgeVerdict.userStrengths ? `<div class="section"><div class="section-title">✅ Your Strengths</div><div class="strengths">${judgeVerdict.userStrengths}</div></div>` : ''}
+
+${judgeVerdict.userWeaknesses ? `<div class="section"><div class="section-title">⚠️ Main Weakness</div><div class="weaknesses">${judgeVerdict.userWeaknesses}</div></div>` : ''}
+
+${improveItems ? `<div class="section"><div class="section-title">📈 Areas To Improve</div><ul>${improveItems}</ul></div>` : ''}
+
+${judgeVerdict.improvementSummary ? `<div class="section"><div class="section-title">🎯 Next Debate Focus</div><div class="text-block">${judgeVerdict.improvementSummary}</div></div>` : ''}
+
+${grammarItems ? `<div class="section"><div class="section-title">📝 Grammar & Vocabulary</div><ul>${grammarItems}</ul></div>` : ''}
+
+${focusItems ? `<div class="section"><div class="section-title">📌 Recurring Weaknesses</div><ul>${focusItems}</ul></div>` : ''}
+
+${argRows ? `<div class="section"><div class="section-title">Your Arguments This Debate</div>${argRows}</div>` : ''}
+
+<div class="footer">Generated by DebateForge · ${new Date().toISOString()}</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `debateforge-report-${topic.slice(0, 30).replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /* ── Sound helpers (Web Audio API — no files needed) ── */
 function playDing() {
   try {
@@ -377,6 +523,12 @@ export default function DebateRoomPage() {
   // isAISpeaking: trust both phase state AND the hook's AudioContext flag
   const isAISpeaking = phase === 'ai_speaking' || hookIsAISpeaking;
   const isEnded      = phase === 'ended';
+
+  /* ── handleDownloadReport ── */
+  const handleDownloadReport = useCallback(() => {
+    generateReportCardPDF(judgeVerdict, debateInfo, messages);
+    toast.success('📥 Report card downloaded!');
+  }, [judgeVerdict, debateInfo, messages, toast]);
 
   /* ── Share result handler ── */
   const handleShare = useCallback(() => {
@@ -847,6 +999,13 @@ export default function DebateRoomPage() {
                 onClick={() => navigate('/dashboard')}
               >
                 Dashboard
+              </button>
+              <button
+                className="judge-btn judge-btn--download"
+                onClick={handleDownloadReport}
+                title="Download full report card as HTML"
+              >
+                📥 Report Card
               </button>
               <button
                 className="judge-btn judge-btn--share"
