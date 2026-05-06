@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
+import Navbar from './components/Navbar';
 import PageLoader from './components/PageLoader';
 import ErrorBoundary from './components/ErrorBoundary';
 import ToastContainer from './components/ToastContainer';
@@ -31,6 +32,7 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <ToastContainer />
+            <Navbar />
             <PageLoader>
               <Suspense fallback={null}>
                 <Routes>
