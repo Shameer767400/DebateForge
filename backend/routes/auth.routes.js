@@ -8,8 +8,8 @@ const {
   changePassword,
   forgotPassword,
   resetPassword,
-  verifyEmail,
-  resendVerification,
+  verifyEmailOTP,
+  resendVerificationOTP,
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 
@@ -20,12 +20,12 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
-router.get('/verify-email/:token', verifyEmail);
+router.post('/verify-email-otp', verifyEmailOTP);
 
 /* ── Protected routes ── */
 router.get('/me', protect, getMe);
 router.post('/refresh', protect, refresh);
 router.post('/change-password', protect, changePassword);
-router.post('/resend-verification', protect, resendVerification);
+router.post('/resend-verification-otp', protect, resendVerificationOTP);
 
 module.exports = router;

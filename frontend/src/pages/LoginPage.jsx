@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
   const { login } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    // Add a small delay to prevent flickering for fast responses
+    setTimeout(() => setShowLoading(true), 100);
 
     try {
       const res = await axios.post(
@@ -34,20 +37,35 @@ export default function LoginPage() {
       setError(msg);
       toast.error(msg);
     } finally {
-      setLoading(false);
+      // Add delay to ensure smooth transition
+      setTimeout(() => {
+        setLoading(false);
+        setShowLoading(false);
+      }, 300);
     }
   };
 
   return (
     <div className="df-center">
-      <div className="auth-card">
+      <div className="auth-card" style={{ position: 'relative' }}>
+        {showLoading && (
+          <div className="auth-loading-overlay active">
+            <div className="loading-content">
+              <div className="auth-simple-spinner"></div>
+              <div className="loading-text">Signing in...</div>
+            </div>
+          </div>
+        )}
         <div className="auth-logo">
           <span className="auth-logo-icon">⚔</span>
           <h1 className="auth-title">DebateForge</h1>
           <p className="auth-subtitle">Sharpen your arguments</p>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form 
+          className={`auth-form ${loading ? 'loading' : ''}`}
+          onSubmit={handleSubmit}
+        >
           <div className="auth-field">
             <label className="auth-label" htmlFor="email">
               Email
@@ -88,21 +106,17 @@ export default function LoginPage() {
           </div>
 
           <button
-            className="auth-submit"
+            className={`auth-submit ${loading ? 'loading' : ''}`}
             type="submit"
             disabled={loading}
           >
-            {loading ? (
-              <span className="auth-btn-loading" style={{ gap: '12px' }}>
-                <div className="df-spinner sm">
-                  <div className="df-spinner-core" />
-                  <div className="df-spinner-orbit" />
-                </div>
-                Signing in…
-              </span>
-            ) : (
-              'Sign In'
-            )}
+            <div className="button-content">
+              Sign In
+            </div>
+            <div className="loading-content">
+              <div className="auth-simple-spinner"></div>
+              <span className="loading-text">Signing in…</span>
+            </div>
           </button>
         </form>
 

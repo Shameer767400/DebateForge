@@ -4,7 +4,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PageLoader from './components/PageLoader';
 import ErrorBoundary from './components/ErrorBoundary';
 import ToastContainer from './components/ToastContainer';
-import EmailVerificationBanner from './components/EmailVerificationBanner';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 
@@ -14,6 +13,7 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
+const VerifyEmailOTPPage = lazy(() => import('./pages/VerifyEmailOTPPage'));
 const LobbyPage = lazy(() => import('./pages/LobbyPage'));
 const DebateRoomPage = lazy(() => import('./pages/DebateRoomPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -29,7 +29,6 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <ToastContainer />
-            <EmailVerificationBanner />
             <PageLoader>
               <Suspense fallback={null}>
                 <Routes>
@@ -39,6 +38,7 @@ function App() {
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                   <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
                   <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+                  <Route path="/verify-email-otp" element={<VerifyEmailOTPPage />} />
                   <Route
                     path="/lobby"
                     element={

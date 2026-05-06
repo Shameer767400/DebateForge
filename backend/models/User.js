@@ -25,13 +25,17 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
-    /* ── Email verification ── */
+    /* ── Email verification with OTP ── */
     emailVerified: {
       type: Boolean,
       default: false,
     },
-    emailVerificationToken: {
+    emailVerificationOTP: {
       type: String,
+      default: null,
+    },
+    emailVerificationOTPExpires: {
+      type: Date,
       default: null,
     },
     /* ── Password reset ── */
@@ -168,11 +172,12 @@ userSchema.methods.createPasswordResetToken = function createPasswordResetToken(
   return rawToken;
 };
 
-/* ── Generate email verification token ── */
-userSchema.methods.createEmailVerificationToken = function createEmailVerificationToken() {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  this.emailVerificationToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-  return rawToken;
+/* ── Generate 6-digit OTP for email verification ── */
+userSchema.methods.createEmailVerificationOTP = function createEmailVerificationOTP() {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+  this.emailVerificationOTP = otp;
+  this.emailVerificationOTPExpires = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
+  return otp;
 };
 
 /* ── Check if account is currently locked ── */
@@ -185,7 +190,8 @@ userSchema.methods.toSafeObject = function toSafeObject() {
   delete obj.passwordHash;
   delete obj.passwordResetToken;
   delete obj.passwordResetExpires;
-  delete obj.emailVerificationToken;
+  delete obj.emailVerificationOTP;
+  delete obj.emailVerificationOTPExpires;
   delete obj.loginAttempts;
   delete obj.lockUntil;
   return obj;

@@ -111,8 +111,34 @@ async function register(req, res) {
       $or: [{ email }, { username }],
     });
 
+    console.log(`🔍 Checking existing user for email: ${email}, username: ${username}`);
     if (existingUser) {
-      return res.status(409).json({ error: 'Username or email already taken' });
+      console.log(`📋 Found existing user:`, {
+        username: existingUser.username,
+        email: existingUser.email,
+        emailVerified: existingUser.emailVerified,
+        id: existingUser._id
+      });
+      
+      // If username exists, always block
+      if (existingUser.username === username) {
+        console.log(`❌ Username already taken: ${username}`);
+        return res.status(409).json({ error: 'Username already taken' });
+      }
+      
+      // If email exists but is not verified, allow re-registration by deleting the old account
+      if (existingUser.email === email && !existingUser.emailVerified) {
+        console.log(`🗑️ Deleting unverified account for email: ${email}`);
+        await User.deleteOne({ _id: existingUser._id });
+        console.log(`✅ Successfully deleted unverified account`);
+      } 
+      // If email exists and is verified, block
+      else if (existingUser.email === email && existingUser.emailVerified) {
+        console.log(`❌ Email already registered and verified: ${email}`);
+        return res.status(409).json({ error: 'Email already registered and verified' });
+      }
+    } else {
+      console.log(`✅ No existing user found, proceeding with registration`);
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -124,12 +150,19 @@ async function register(req, res) {
       emailVerified: false,
     });
 
-    // Generate email verification token
-    const verificationToken = user.createEmailVerificationToken();
+    // Generate email verification OTP
+    console.log('\n🔐 ══════════════════════════════════════');
+    console.log(`   📧 Generating OTP for: ${email}`);
+    const verificationOTP = user.createEmailVerificationOTP();
+    console.log(`   🔢 Generated OTP: ${verificationOTP}`);
+    console.log(`   ⏰ Expires at: ${new Date(user.emailVerificationOTPExpires).toISOString()}`);
+    console.log('══════════════════════════════════════\n');
+    
     await user.save();
 
-    // Send verification email (non-blocking — don't let email failure block registration)
-    sendVerificationEmail(email, verificationToken).catch((err) => {
+    // Send verification email with OTP (non-blocking — don't let email failure block registration)
+    console.log('📧 Triggering email send...');
+    sendVerificationEmail(email, verificationOTP).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to send verification email:', err.message);
     });
@@ -405,40 +438,61 @@ async function resetPassword(req, res) {
 }
 
 /* ═══════════════════════════════════════════
-   GET /api/auth/verify-email/:token (public)
+   POST /api/auth/verify-email-otp (public)
 ═══════════════════════════════════════════ */
-async function verifyEmail(req, res) {
+async function verifyEmailOTP(req, res) {
   try {
-    const { token } = req.params;
+    const { email, otp } = req.body;
 
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and OTP are required' });
+    }
 
-    const user = await User.findOne({ emailVerificationToken: hashedToken });
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    if (!/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ error: 'OTP must be 6 digits' });
+    }
+
+    const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ error: 'Invalid verification token' });
+      return res.status(400).json({ error: 'Invalid email or OTP' });
     }
 
     if (user.emailVerified) {
       return res.status(200).json({ message: 'Email already verified' });
     }
 
+    // Check if OTP matches and is not expired
+    if (user.emailVerificationOTP !== otp || !user.emailVerificationOTPExpires || user.emailVerificationOTPExpires < Date.now()) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    // Verify email and clear OTP
     user.emailVerified = true;
-    user.emailVerificationToken = null;
+    user.emailVerificationOTP = null;
+    user.emailVerificationOTPExpires = null;
     await user.save();
+
+    console.log('\n✅ ══════════════════════════════════════');
+    console.log(`   📧 Email verified successfully: ${email}`);
+    console.log('══════════════════════════════════════\n');
 
     return res.status(200).json({ message: 'Email verified successfully!' });
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('Error in verifyEmail controller:', error);
+    console.error('Error in verifyEmailOTP controller:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
 /* ═══════════════════════════════════════════
-   POST /api/auth/resend-verification (protected)
+   POST /api/auth/resend-verification-otp (protected)
 ═══════════════════════════════════════════ */
-async function resendVerification(req, res) {
+async function resendVerificationOTP(req, res) {
   try {
     const user = await User.findById(req.user.id);
 
@@ -450,15 +504,15 @@ async function resendVerification(req, res) {
       return res.status(400).json({ message: 'Email already verified' });
     }
 
-    const verificationToken = user.createEmailVerificationToken();
+    const verificationOTP = user.createEmailVerificationOTP();
     await user.save();
 
-    await sendVerificationEmail(user.email, verificationToken);
+    await sendVerificationEmail(user.email, verificationOTP);
 
-    return res.status(200).json({ message: 'Verification email sent' });
+    return res.status(200).json({ message: 'Verification OTP sent' });
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('Error in resendVerification controller:', error);
+    console.error('Error in resendVerificationOTP controller:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -471,6 +525,6 @@ module.exports = {
   changePassword,
   forgotPassword,
   resetPassword,
-  verifyEmail,
-  resendVerification,
+  verifyEmailOTP,
+  resendVerificationOTP,
 };

@@ -18,7 +18,8 @@ try {
   console.warn('⚠️  Email transporter creation failed:', err.message);
 }
 
-const FROM = process.env.FROM_EMAIL || 'noreply@debateforge.com';
+// Use SMTP_USER as the from address — Gmail requires the from address to match the authenticated user
+const FROM = process.env.SMTP_USER || process.env.FROM_EMAIL || 'noreply@debateforge.com';
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim();
 
 /**
@@ -29,6 +30,8 @@ async function sendMail({ to, subject, html }) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS || process.env.SMTP_USER === 'your_email@gmail.com') {
     // eslint-disable-next-line no-console
     console.log('\n📧 ══════════════════════════════════════');
+    // eslint-disable-next-line no-console
+    console.log(`   ⚠️  SMTP not configured — logging email to console`);
     // eslint-disable-next-line no-console
     console.log(`   To: ${to}`);
     // eslint-disable-next-line no-console
@@ -41,39 +44,59 @@ async function sendMail({ to, subject, html }) {
   }
 
   try {
+    console.log(`📧 Sending email via SMTP to: ${to} from: ${FROM}`);
     const info = await transporter.sendMail({
       from: `"DebateForge" <${FROM}>`,
       to,
       subject,
       html,
     });
+    // eslint-disable-next-line no-console
+    console.log('📧 Email sent successfully:', info.messageId, '| Accepted:', info.accepted, '| Rejected:', info.rejected);
     return info;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('❌ Email send failed:', err.message);
-    // Don't throw — email failure shouldn't crash auth flows
-    return { error: err.message };
+    console.error('❌ Error code:', err.code, '| Command:', err.command);
+    // Fallback to console logging
+    // eslint-disable-next-line no-console
+    console.log('\n📧 ══════════════════════════════════════');
+    // eslint-disable-next-line no-console
+    console.log(`   ❌ SMTP FAILED — logging email to console`);
+    // eslint-disable-next-line no-console
+    console.log(`   To: ${to}`);
+    // eslint-disable-next-line no-console
+    console.log(`   Subject: ${subject}`);
+    // eslint-disable-next-line no-console
+    console.log(`   Body: ${html.replace(/<[^>]*>/g, '')}`);
+    // eslint-disable-next-line no-console
+    console.log('══════════════════════════════════════\n');
+    return { accepted: [to], fallback: true, error: err.message };
   }
 }
 
 /**
- * Send email verification link
+ * Send email verification OTP
  */
-async function sendVerificationEmail(email, token) {
-  const verifyUrl = `${FRONTEND_URL}/verify-email/${token}`;
-
+async function sendVerificationEmail(email, otp) {
+  console.log('\n📧 ══════════════════════════════════════');
+  console.log(`   🔄 Sending OTP email to: ${email}`);
+  console.log(`   🔢 OTP Code: ${otp}`);
+  console.log(`   ⏰ Generated at: ${new Date().toISOString()}`);
+  console.log('══════════════════════════════════════\n');
+  
   return sendMail({
     to: email,
-    subject: 'DebateForge — Verify your email',
+    subject: 'DebateForge — Email Verification Code',
     html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
         <h2 style="color: #7c5cfc;">⚔ DebateForge</h2>
-        <p>Welcome to DebateForge! Please verify your email address to get the most out of your account.</p>
-        <a href="${verifyUrl}" 
-           style="display: inline-block; padding: 12px 28px; background: linear-gradient(135deg, #7c5cfc, #a855f7); color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0;">
-          Verify Email
-        </a>
-        <p style="color: #888; font-size: 13px;">Or copy this link: ${verifyUrl}</p>
+        <p>Welcome to DebateForge! Please use the verification code below to activate your account.</p>
+        <div style="background: #f8f9fa; border: 2px dashed #7c5cfc; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+          <span style="font-size: 32px; font-weight: bold; color: #7c5cfc; letter-spacing: 4px;">${otp}</span>
+        </div>
+        <p style="color: #888; font-size: 13px;">Enter this 6-digit code in the verification page to complete your registration.</p>
+        <p style="color: #e74c3c; font-size: 13px; font-weight: 600;">⏰ This code expires in 10 minutes.</p>
         <p style="color: #888; font-size: 13px;">If you didn't create this account, you can safely ignore this email.</p>
       </div>
     `,

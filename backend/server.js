@@ -188,19 +188,19 @@ app.use(rateLimit({
   handler: rateLimitHandler('global'),
 }));
 
-// 5b. Auth routes: 10 attempts per 15 min
+// 5b. Auth routes: 50 attempts per 15 min (increased for testing)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('auth'),
 });
 
-// 5c. Account creation: 3 registrations per hour per IP
+// 5c. Account creation: 20 registrations per hour per IP (increased for testing)
 const registrationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 3,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('registration'),

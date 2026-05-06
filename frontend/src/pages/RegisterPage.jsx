@@ -13,9 +13,30 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
   const { login } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+
+  // Password validation states
+  const [passwordValidation, setPasswordValidation] = useState({
+    minLength: false,
+    hasUppercase: false,
+    hasNumber: false,
+    hasSpecial: false,
+  });
+
+  // Password validation functions
+  const checkPasswordValidation = (pwd) => {
+    const validation = {
+      minLength: pwd.length >= 8,
+      hasUppercase: /[A-Z]/.test(pwd),
+      hasNumber: /\d/.test(pwd),
+      hasSpecial: /[!@#$%^&*()_+\-=[\]{};':"\|,.<>/?]/.test(pwd),
+    };
+    setPasswordValidation(validation);
+    return validation;
+  };
 
   const validate = () => {
     if (username.length < 3 || username.length > 30) {
@@ -24,7 +45,7 @@ export default function RegisterPage() {
     if (password.length < 8) {
       return 'Password must be at least 8 characters.';
     }
-    if (!/(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])/.test(password)) {
+    if (!/(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\|,.<>/?])/.test(password)) {
       return 'Password needs an uppercase letter, a number, and a special character.';
     }
     if (password !== confirmPassword) {
@@ -44,35 +65,52 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
+    // Add a small delay to prevent flickering for fast responses
+    setTimeout(() => setShowLoading(true), 100);
 
     try {
       const res = await axios.post(
         '/api/auth/register',
         { username, email, password },
-        { baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001' }
+        { baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001' }
       );
       login(res.data.token, res.data.user);
-      toast.success('Account created! Welcome to the arena.');
-      navigate('/lobby');
+      toast.success('Account created! Please check your email for a verification code.');
+      navigate('/verify-email-otp?email=' + encodeURIComponent(email));
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Registration failed. Please try again.';
       setError(msg);
       toast.error(msg);
     } finally {
-      setLoading(false);
+      // Add delay to ensure smooth transition
+      setTimeout(() => {
+        setLoading(false);
+        setShowLoading(false);
+      }, 300);
     }
   };
 
   return (
     <div className="df-center">
-      <div className="auth-card">
+      <div className="auth-card" style={{ position: 'relative' }}>
+        {showLoading && (
+          <div className="auth-loading-overlay active">
+            <div className="loading-content">
+              <div className="auth-simple-spinner"></div>
+              <div className="loading-text">Creating account...</div>
+            </div>
+          </div>
+        )}
         <div className="auth-logo">
           <span className="auth-logo-icon">⚔</span>
           <h1 className="auth-title">DebateForge</h1>
           <p className="auth-subtitle">Create your account</p>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form 
+          className={`auth-form ${loading ? 'loading' : ''}`}
+          onSubmit={handleSubmit}
+        >
           {/* Honeypot fields — hidden from real users, bots auto-fill them */}
           <div style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }} aria-hidden="true">
             <input type="text" name="website" tabIndex={-1} autoComplete="off" />
@@ -122,12 +160,24 @@ export default function RegisterPage() {
               className="auth-input"
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                checkPasswordValidation(e.target.value);
+              }}
               required
               minLength={8}
               autoComplete="new-password"
             />
-            <span className="auth-hint">Min 8 chars · 1 uppercase · 1 number · 1 special</span>
+            <span 
+              className={`auth-hint ${
+                passwordValidation.minLength && 
+                passwordValidation.hasUppercase && 
+                passwordValidation.hasNumber && 
+                passwordValidation.hasSpecial ? 'auth-hint-valid' : ''
+              }`}
+            >
+              Min 8 chars · 1 uppercase · 1 number · 1 special
+            </span>
           </div>
 
           <div className="auth-field">
@@ -148,21 +198,17 @@ export default function RegisterPage() {
           {error && <p className="auth-error">{error}</p>}
 
           <button
-            className="auth-submit"
+            className={`auth-submit ${loading ? 'loading' : ''}`}
             type="submit"
             disabled={loading}
           >
-            {loading ? (
-              <span className="auth-btn-loading" style={{ gap: '12px' }}>
-                <div className="df-spinner sm">
-                  <div className="df-spinner-core" />
-                  <div className="df-spinner-orbit" />
-                </div>
-                Creating account…
-              </span>
-            ) : (
-              'Create Account'
-            )}
+            <div className="button-content">
+              Create Account
+            </div>
+            <div className="loading-content">
+              <div className="auth-simple-spinner"></div>
+              <span className="loading-text">Creating account…</span>
+            </div>
           </button>
         </form>
 

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 export default function EmailVerificationBanner() {
   const { user, token } = useAuth();
+  const navigate = useNavigate();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -14,10 +16,10 @@ export default function EmailVerificationBanner() {
     setSending(true);
     try {
       await axios.post(
-        '/api/auth/resend-verification',
+        '/api/auth/resend-verification-otp',
         {},
         {
-          baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001',
+          baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001',
           headers: { Authorization: `Bearer ${token}` },
         }
       );
@@ -29,23 +31,35 @@ export default function EmailVerificationBanner() {
     }
   };
 
+  const handleVerifyNow = () => {
+    navigate('/verify-email-otp?email=' + encodeURIComponent(user.email));
+  };
+
   return (
     <div style={styles.banner}>
       <span style={styles.icon}>📧</span>
       <span style={styles.text}>
-        Please verify your email address.
+        Please verify your email address to access all features.
       </span>
-      {sent ? (
-        <span style={styles.sent}>Verification email sent ✓</span>
-      ) : (
+      <div style={styles.buttonContainer}>
         <button
-          style={styles.button}
-          onClick={handleResend}
-          disabled={sending}
+          style={{...styles.button, ...styles.verifyButton}}
+          onClick={handleVerifyNow}
         >
-          {sending ? 'Sending…' : 'Resend Email'}
+          Verify Now
         </button>
-      )}
+        {sent ? (
+          <span style={styles.sent}>OTP sent ✓</span>
+        ) : (
+          <button
+            style={styles.button}
+            onClick={handleResend}
+            disabled={sending}
+          >
+            {sending ? 'Sending…' : 'Resend OTP'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -69,6 +83,11 @@ const styles = {
   text: {
     flex: 1,
   },
+  buttonContainer: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+  },
   button: {
     padding: '5px 14px',
     fontSize: '0.78rem',
@@ -79,6 +98,9 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     transition: 'opacity 0.2s',
+  },
+  verifyButton: {
+    background: '#4ade80',
   },
   sent: {
     fontSize: '0.78rem',
