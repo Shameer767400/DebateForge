@@ -28,6 +28,75 @@ html, body {
   opacity: 0.6;
 }
 
+/* ── Custom cursor ── */
+.lp-page, .lp-page * {
+  cursor: none !important;
+}
+
+/* Inner dot — snaps instantly */
+.lp-cursor-dot {
+  position: fixed;
+  top: 0; left: 0;
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #00ff87;
+  box-shadow: 0 0 8px #00ff87, 0 0 16px rgba(0,255,135,0.6);
+  pointer-events: none;
+  z-index: 9999;
+  will-change: transform;
+  transition: width 0.2s, height 0.2s, margin 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.lp-cursor-dot--hover {
+  width: 10px; height: 10px;
+  margin: -5px 0 0 -5px;
+  background: #fff;
+  box-shadow: 0 0 12px #00ff87, 0 0 28px rgba(0,255,135,0.5);
+}
+
+/* Outer ring — lerps with lag */
+.lp-cursor-ring {
+  position: fixed;
+  top: 0; left: 0;
+  width: 36px; height: 36px;
+  margin: -18px 0 0 -18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,255,135,0.55);
+  pointer-events: none;
+  z-index: 9998;
+  will-change: transform;
+  transition: width 0.25s cubic-bezier(0.22,1,0.36,1),
+              height 0.25s cubic-bezier(0.22,1,0.36,1),
+              margin 0.25s cubic-bezier(0.22,1,0.36,1),
+              border-color 0.25s,
+              background 0.25s;
+}
+
+.lp-cursor-ring--hover {
+  width: 56px; height: 56px;
+  margin: -28px 0 0 -28px;
+  border-color: rgba(0,255,135,0.9);
+  background: rgba(0,255,135,0.05);
+}
+
+/* Click ripple burst */
+.lp-cursor-ripple {
+  position: fixed;
+  width: 0; height: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,255,135,0.8);
+  pointer-events: none;
+  z-index: 9997;
+  transform: translate(-50%, -50%);
+  animation: cursorRipple 0.65s ease-out forwards;
+}
+
+@keyframes cursorRipple {
+  0%   { width: 0;     height: 0;     opacity: 1; }
+  100% { width: 80px;  height: 80px;  opacity: 0; }
+}
+
 /* ── Navbar ── */
 .lp-nav {
   position: fixed;

@@ -28,6 +28,8 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const pageRef = useRef(null);
   const canvasRef = useRef(null);
+  const cursorDotRef = useRef(null);
+  const cursorRingRef = useRef(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   /* ── Advanced background canvas ── */
@@ -211,8 +213,72 @@ export default function LandingPage() {
     return () => window.removeEventListener('mousemove', handler);
   }, []);
 
+  /* ── Custom cursor animation ── */
+  useEffect(() => {
+    const dot  = cursorDotRef.current;
+    const ring = cursorRingRef.current;
+    if (!dot || !ring) return;
+
+    let mx = window.innerWidth / 2, my = window.innerHeight / 2;
+    let rx = mx, ry = my;
+    let isHovering = false;
+    let animId;
+
+    const onMove = (e) => {
+      mx = e.clientX;
+      my = e.clientY;
+      dot.style.transform = `translate(${mx}px, ${my}px)`;
+    };
+
+    const onEnter = () => {
+      isHovering = true;
+      ring.classList.add('lp-cursor-ring--hover');
+      dot.classList.add('lp-cursor-dot--hover');
+    };
+    const onLeave = () => {
+      isHovering = false;
+      ring.classList.remove('lp-cursor-ring--hover');
+      dot.classList.remove('lp-cursor-dot--hover');
+    };
+
+    const onClick = (e) => {
+      const ripple = document.createElement('div');
+      ripple.className = 'lp-cursor-ripple';
+      ripple.style.left = `${e.clientX}px`;
+      ripple.style.top  = `${e.clientY}px`;
+      document.body.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 700);
+    };
+
+    const animate = () => {
+      // Ring lerps toward mouse
+      rx += (mx - rx) * 0.12;
+      ry += (my - ry) * 0.12;
+      ring.style.transform = `translate(${rx}px, ${ry}px)`;
+      animId = requestAnimationFrame(animate);
+    };
+    animate();
+
+    // Attach hover listeners to all interactive elements
+    const interactives = document.querySelectorAll('a, button, [role="button"]');
+    interactives.forEach(el => { el.addEventListener('mouseenter', onEnter); el.addEventListener('mouseleave', onLeave); });
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('click', onClick);
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('click', onClick);
+      interactives.forEach(el => { el.removeEventListener('mouseenter', onEnter); el.removeEventListener('mouseleave', onLeave); });
+    };
+  }, []);
+
   return (
     <div className="lp-page" ref={pageRef}>
+      {/* Custom cursor */}
+      <div ref={cursorDotRef}  className="lp-cursor-dot" />
+      <div ref={cursorRingRef} className="lp-cursor-ring" />
+
       {/* Particle canvas background */}
       <canvas ref={canvasRef} className="lp-canvas" />
 
