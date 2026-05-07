@@ -212,8 +212,122 @@ function trimHistory(history, maxTurns = 10) {
   return (history || []).slice(-maxTurns);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Gemini Translation — translates Ollama's English debate output
+   into the user's selected language.
+   ═══════════════════════════════════════════════════════════════ */
+let _geminiModel = null;
+
+function getGeminiModel() {
+  if (_geminiModel) return _geminiModel;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    _geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    return _geminiModel;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[GEMINI] Failed to initialize:', e.message);
+    return null;
+  }
+}
+
+/**
+ * Translate text to a target language using Gemini (primary) or Ollama (fallback).
+ * Returns the translated text, or the original if all translation methods fail.
+ *
+ * @param {string} text      — English text to translate
+ * @param {string} langCode  — ISO 639-1 code (e.g. 'te', 'hi', 'ta')
+ * @returns {Promise<string>}
+ */
+async function translateText(text, langCode) {
+  if (!text || !langCode || langCode === 'en') return text;
+
+  const langName = LANGUAGE_NAMES[langCode] || langCode;
+
+  const translationPrompt = `Translate the following debate argument into ${langName}.
+
+RULES:
+- Translate the ENTIRE text into ${langName}. Every single word must be in ${langName}.
+- Do NOT keep any English words, phrases, or sentences.
+- Do NOT add any commentary, notes, or explanations.
+- Preserve the argumentative tone and rhetorical style.
+- Output ONLY the translated text, nothing else.
+
+TEXT TO TRANSLATE:
+${text}`;
+
+  /* ── Attempt 1: Gemini API ── */
+  const model = getGeminiModel();
+  if (model) {
+    try {
+      const result = await Promise.race([
+        model.generateContent(translationPrompt),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini translation timed out')), 15000)),
+      ]);
+
+      const translated = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (translated && translated.trim().length > 0) {
+        // eslint-disable-next-line no-console
+        console.log(`[GEMINI] Translated ${text.length} chars → ${langName} (${translated.trim().length} chars)`);
+        return translated.trim();
+      }
+    } catch (e) {
+      const is429 = e.message?.includes('429') || e.message?.includes('quota');
+      // eslint-disable-next-line no-console
+      console.warn(`[GEMINI] Translation failed${is429 ? ' (quota exceeded)' : ''}: ${e.message?.slice(0, 120)}`);
+      // Fall through to Ollama
+    }
+  }
+
+  /* ── Attempt 2: Ollama local translation ── */
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[OLLAMA] Attempting translation to ${langName}...`);
+    const response = await axios.post(
+      `${OLLAMA_URL}/api/chat`,
+      {
+        model: OLLAMA_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a translator. You ONLY output translated text. No explanations.`,
+          },
+          {
+            role: 'user',
+            content: translationPrompt,
+          },
+        ],
+        stream: false,
+        options: {
+          temperature: 0.3,
+          num_predict: 500,
+        },
+      },
+      { timeout: 45000 }
+    );
+
+    const ollamaTranslated = response.data?.message?.content;
+    if (ollamaTranslated && ollamaTranslated.trim().length > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[OLLAMA] Translated ${text.length} chars → ${langName} (${ollamaTranslated.trim().length} chars)`);
+      return ollamaTranslated.trim();
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error(`[OLLAMA] Translation also failed:`, e.message?.slice(0, 120));
+  }
+
+  // All translation methods failed — return original English
+  return text;
+}
+
 module.exports = {
   streamDebateResponse,
   buildSystemPrompt,
   trimHistory,
+  translateText,
+  LANGUAGE_NAMES,
 };

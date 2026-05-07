@@ -388,6 +388,11 @@ export default function DebateRoomPage() {
       case 'ai_audio_chunk':
         break;
 
+      /* Gemini is translating the AI response to the user's selected language */
+      case 'ai_translating':
+        setPhase('ai_speaking'); // keep the AI speaking indicator active
+        break;
+
       /* AI finished its turn — flip isStreaming off (id stays the same, key unchanged) */
       case 'ai_turn_complete':
         setMessages((prev) =>

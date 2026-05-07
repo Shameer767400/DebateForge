@@ -13,6 +13,7 @@ const SERVER_EVENTS = [
   'ai_thinking',
   'ai_text_chunk',
   'ai_audio_chunk',
+  'ai_translating',
   'ai_turn_complete',
   'debate_ended',
   'phase_update',

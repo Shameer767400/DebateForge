@@ -3,7 +3,7 @@
 const { Server } = require('socket.io');
 const jwt        = require('jsonwebtoken');
 const { Debate, User } = require('../models');
-const { streamDebateResponse, buildSystemPrompt, trimHistory } = require('../services/llm.service');
+const { streamDebateResponse, buildSystemPrompt, trimHistory, translateText, LANGUAGE_NAMES } = require('../services/llm.service');
 const DebateFormatEngine = require('../services/formatEngine.service');
 const axios      = require('axios');
 const redisClient = require('../config/redis');
@@ -715,11 +715,29 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
 
-    /* ── 11. Signal turn complete ── */
+    /* ── 11. Translate to user's selected language if non-English ── */
+    const targetLang = normalizeLangIso(session.preferredLang) || normalizeLangIso(session.detectedLanguage);
+    let finalText = (cleanAiText || fullAiText).trim();
+
+    if (targetLang && targetLang !== 'en') {
+      socket.emit('ai_translating', { language: LANGUAGE_NAMES[targetLang] || targetLang });
+      try {
+        const translated = await translateText(finalText, targetLang);
+        if (translated && translated !== finalText) {
+          finalText = translated;
+          // Also send the translated text for TTS playback in target language
+          streamTTSToSocket(socket, translated).catch(console.error); // eslint-disable-line no-console
+        }
+      } catch (e) {
+        console.error('[WS] Translation failed, sending English:', e.message); // eslint-disable-line no-console
+      }
+    }
+
+    /* ── 12. Signal turn complete ── */
     socket.emit('ai_turn_complete', {
-      fullText: cleanAiText || fullAiText,
+      fullText: finalText,
       round: session.round,
-      detectedLanguage: session.detectedLanguage || 'en',
+      detectedLanguage: targetLang || session.detectedLanguage || 'en',
     });
 
     /* ── 12. Auto-end after MAX_ROUNDS (freeform only) ── */
