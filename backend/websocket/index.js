@@ -375,14 +375,15 @@ function initWebSocket(server) {
           await redisClient.del(`session:${debateId}`);
           return;
         }
-
-        const avgScore = debate.getAverageScore();
-        const winner =
-          avgScore >= SCORE_THRESHOLDS.WIN  ? 'user' :
-          avgScore >= SCORE_THRESHOLDS.DRAW ? 'draw' : 'ai';
-
+        /* Too few arguments for a proper judge evaluation — instant forfeit */
+        const winner = 'ai';
         const result = await finalizeDebateStats(socket.user.id, debateId, winner, 0, tzOffset);
-        socket.emit('debate_ended', { winner, userFinalScore: result.avgScore });
+        socket.emit('debate_ended', {
+          winner,
+          userFinalScore: result.avgScore,
+          forfeit: true,
+          message: 'You forfeited by leaving too early. Complete all rounds to get a fair judgment!',
+        });
         await redisClient.del(`session:${debateId}`);
       } catch (e) {
         socket.emit('error', { message: e.message });
@@ -751,7 +752,7 @@ async function transcribeAudio(audioBuffer, topic) {
   }
 
   const response = await callMLService('/transcription/transcribe', form);
-  return { text: response.text || '' };
+  return { text: response.text || '', language: response.language || 'en' };
 }
 
 /* ═══════════════════════════════════════════════════════════════
