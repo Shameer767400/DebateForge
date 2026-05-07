@@ -3,11 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { useTranslation } from '../context/TranslationContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
 import Confetti from '../components/Confetti';
 import StreakCelebration from '../components/StreakCelebration';
-import LanguageSelector from '../components/LanguageSelector';
 import TranslatedBubble from '../components/TranslatedBubble';
 import '../styles/theme.css';
 import '../styles/debate.css';
@@ -272,7 +270,7 @@ export default function DebateRoomPage() {
   const [streakFreezeUsed, setStreakFreezeUsed] = useState(false);
 
   const toast = useToast();
-  const { preferredLang } = useTranslation();
+  const preferredLang = 'en';
 
   /* ── refs ── */
   const chatBottomRef = useRef(null);
@@ -655,7 +653,6 @@ export default function DebateRoomPage() {
             </span>
             <span className="debate-round">Round {round}</span>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <LanguageSelector onLanguageChange={(lang) => setLanguage(lang)} />
 
               <select 
                 value={selectedVoiceURI} 
