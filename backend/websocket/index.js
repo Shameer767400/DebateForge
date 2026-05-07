@@ -341,7 +341,7 @@ function initWebSocket(server) {
     /* ────────────────────────────────────────
        end_debate — manual end by user
     ─────────────────────────────────────── */
-    socket.on('end_debate', async ({ debateId }) => {
+    socket.on('end_debate', async ({ debateId, tzOffsetMinutes }) => {
       if (!wsRateLimiter(socket, 'end_debate')) return;
       try {
         const sessionRaw = await redisClient.get(`session:${debateId}`);
@@ -352,6 +352,9 @@ function initWebSocket(server) {
         if (session.userId !== socket.user.id) {
           return socket.emit('error', { message: 'Unauthorized' });
         }
+
+        /* Store user timezone offset for streak calculation */
+        const tzOffset = typeof tzOffsetMinutes === 'number' ? tzOffsetMinutes : 0;
 
         /* ── Ownership check on debate document ── */
         const debate = await Debate.findOne({ _id: debateId, userId: socket.user.id });
@@ -368,7 +371,7 @@ function initWebSocket(server) {
           } else if (session.format !== 'freeform' && session.phaseIndex !== -1) {
             isForfeit = true;
           }
-          await runJudgeScoring(socket, session, debateId, isForfeit);
+          await runJudgeScoring(socket, session, debateId, isForfeit, tzOffset);
           await redisClient.del(`session:${debateId}`);
           return;
         }
@@ -378,7 +381,7 @@ function initWebSocket(server) {
           avgScore >= SCORE_THRESHOLDS.WIN  ? 'user' :
           avgScore >= SCORE_THRESHOLDS.DRAW ? 'draw' : 'ai';
 
-        const result = await finalizeDebateStats(socket.user.id, debateId, winner, 0);
+        const result = await finalizeDebateStats(socket.user.id, debateId, winner, 0, tzOffset);
         socket.emit('debate_ended', { winner, userFinalScore: result.avgScore });
         await redisClient.del(`session:${debateId}`);
       } catch (e) {
@@ -566,7 +569,7 @@ async function processTranscript(socket, session, debateId, transcript) {
 
           if (nextInfo.phaseKey === 'judging') {
             // Trigger AI judge scoring
-            await runJudgeScoring(socket, session, debateId);
+            await runJudgeScoring(socket, session, debateId, false, session.tzOffset || 0);
           } else {
             socket.emit('phase_update', {
               phase:       nextInfo.phaseKey,
@@ -590,7 +593,7 @@ async function processTranscript(socket, session, debateId, transcript) {
     /* ── 12. Auto-end after MAX_ROUNDS (freeform only) ── */
     if (fmt === 'freeform' && session.round > MAX_ROUNDS) {
       // Instead of calculating scores locally, use the unified LLM judge for the Report Card
-      await runJudgeScoring(socket, session, debateId);
+      await runJudgeScoring(socket, session, debateId, false, session.tzOffset || 0);
       await redisClient.del(`session:${debateId}`);
     }
   } catch (e) {
@@ -608,7 +611,7 @@ async function processTranscript(socket, session, debateId, transcript) {
 /* ═══════════════════════════════════════════════════════════════
    runJudgeScoring — AI judge evaluates the full debate (Addition 6)
 ═══════════════════════════════════════════════════════════════ */
-async function runJudgeScoring(socket, session, debateId, isForfeit = false) {
+async function runJudgeScoring(socket, session, debateId, isForfeit = false, tzOffset = 0) {
   try {
     const debate = await Debate.findById(debateId);
     if (!debate) return;
@@ -702,7 +705,7 @@ Respond ONLY in this JSON format:
     });
     
     // Process final stats (wins, streaks, etc.)
-    const statsResult = await finalizeDebateStats(session.userId, debateId, judgeResponse.winner, 0);
+    const statsResult = await finalizeDebateStats(session.userId, debateId, judgeResponse.winner, 0, tzOffset);
     const streakResult = statsResult?.streakResult || {};
 
     // Emit judge results to client

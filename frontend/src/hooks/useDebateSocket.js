@@ -368,7 +368,10 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
   }, [debateId, sendText]);
 
   const endDebate = useCallback(() => {
-    socketRef.current?.emit('end_debate', { debateId });
+    socketRef.current?.emit('end_debate', {
+      debateId,
+      tzOffsetMinutes: -new Date().getTimezoneOffset(), // e.g. +330 for IST
+    });
   }, [debateId]);
 
   /* ─────────────────────────────────────────────

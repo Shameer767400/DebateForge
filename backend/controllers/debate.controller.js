@@ -177,7 +177,7 @@ async function checkAchievements(userId, user, winner) {
   }
 }
 
-async function finalizeDebateStats(userId, debateId, winner, durationSecs = 0) {
+async function finalizeDebateStats(userId, debateId, winner, durationSecs = 0, tzOffsetMinutes = 0) {
   const debate = await Debate.findOne({ _id: debateId, userId });
   if (!debate) throw new Error('Debate not found');
 
@@ -227,9 +227,9 @@ async function finalizeDebateStats(userId, debateId, winner, durationSecs = 0) {
 
   await checkAchievements(userId, user, winner);
 
-  // Update streak
+  // Update streak — pass user's timezone offset so dates match their local calendar
   const freshUser = await User.findById(userId);
-  const streakResult = updateStreak(freshUser);
+  const streakResult = updateStreak(freshUser, tzOffsetMinutes);
   freshUser.markModified('streak');
   await freshUser.save();
 
@@ -238,10 +238,11 @@ async function finalizeDebateStats(userId, debateId, winner, durationSecs = 0) {
 
 async function endDebate(req, res) {
   try {
-    const { winner, durationSecs } = req.body;
+    const { winner, durationSecs, tzOffsetMinutes } = req.body;
     const debateId = req.params.id;
+    const tzOffset = typeof tzOffsetMinutes === 'number' ? tzOffsetMinutes : 0;
 
-    const result = await finalizeDebateStats(req.user.id, debateId, winner, durationSecs);
+    const result = await finalizeDebateStats(req.user.id, debateId, winner, durationSecs, tzOffset);
 
     return res.status(200).json({
       winner,
