@@ -102,6 +102,7 @@ Do NOT use English unless the user switches back to English.`
 4. End EVERY response with either a question OR a direct challenge to the user
 5. From round 3 onwards, exploit the user's documented fallacy weaknesses
 6. Escalate rhetorical intensity each round
+7. CRITICAL: Each response MUST be DIFFERENT from all your previous responses. Never start with the same phrase twice.
 
 === DIFFICULTY BEHAVIOR ===
 beginner:       Simple vocabulary, gentle challenges
@@ -118,34 +119,37 @@ No labels, stage directions, or meta-commentary.`;
 async function* streamOllama(session, userArgument) {
   const history = (session.conversationHistory || []).slice(-10);
 
-  const messages = [
-    { role: 'system', content: buildSystemPrompt(session) },
-    ...history.map(m => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-    })),
-    { role: 'user', content: userArgument },
-  ];
-
-  if (session.round % 2 === 0 && session.weaknessSummary) {
-    messages.splice(-1, 0, {
-      role: 'system',
-      content: `REMINDER: ${session.weaknessSummary} Steer toward this now.`,
-    });
-  }
-
   try {
+    // Build a summary of what we've already said to prevent repetition
+    const previousAiReplies = history
+      .filter(m => m.role === 'assistant')
+      .map(m => m.content)
+      .slice(-3);
+
+    const systemPrompt = buildSystemPrompt(session) +
+      (previousAiReplies.length > 0
+        ? `\n\n=== YOUR PREVIOUS RESPONSES (DO NOT REPEAT THESE) ===\n${previousAiReplies.map((r, i) => `Round ${i + 1}: ${r.slice(0, 100)}...`).join('\n')}`
+        : '');
+
     const response = await axios.post(
       `${OLLAMA_URL}/api/chat`,
       {
         model: OLLAMA_MODEL,
-        messages,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...history.map(m => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+          { role: 'user', content: userArgument },
+        ],
         stream: true,
         options: {
-          temperature: 0.85,
-          num_predict: 180,
-          top_p: 0.9,
-          repeat_penalty: 1.1,
+          temperature: 0.9,
+          num_predict: 220,
+          top_p: 0.92,
+          repeat_penalty: 1.25,
+          seed: Math.floor(Math.random() * 2147483647), // random seed = unique response each call
         },
       },
       {
