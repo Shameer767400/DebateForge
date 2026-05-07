@@ -64,10 +64,15 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   const sentenceBufRef   = useRef('');     // Buffer for incoming text chunks
   const isPlayingRef     = useRef(false);  // guard against concurrent plays
   const isRecordingRef   = useRef(false);  // track if a recording is actually active
+  const usedMediaRecorderRef = useRef(false); // true when this recording session used MediaRecorder
+  const detectedLanguageRef  = useRef(preferredLang || 'en'); // updated on transcript_final
+  const tzOffsetMinutesRef   = useRef(-new Date().getTimezoneOffset()); // offset minutes: local = UTC + tzOffsetMinutes
   const onEventRef       = useRef(onEvent);
   const selectedVoiceURIRef = useRef(selectedVoiceURI);
   const liveTranscriptRef = useRef('');
   const preferredLangRef = useRef(preferredLang || 'en');
+  const voiceEnabledRef = useRef(true);
+  const ttsLanguageOverrideRef = useRef('auto'); // 'auto' or iso 639-1 language code
 
   /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
@@ -77,11 +82,73 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   /* ─────────────────────────────────────────────
      Audio playback helpers
   ───────────────────────────────────────────── */
+
+  function normalizeLangIso(lang) {
+    const raw = String(lang || '').trim();
+    if (!raw) return 'en';
+    // Speech providers often return BCP-47; we store iso-639-1 where possible.
+    // e.g. en-US -> en, pt-BR -> pt
+    return raw.split('-')[0].toLowerCase();
+  }
+
+  function speechRecognitionLangFromIso(iso) {
+    const code = normalizeLangIso(iso);
+    // Common app languages: map to best-effort BCP-47 tags.
+    const map = {
+      en: 'en-US',
+      hi: 'hi-IN',
+      ta: 'ta-IN',
+      te: 'te-IN',
+      kn: 'kn-IN',
+      ml: 'ml-IN',
+      mr: 'mr-IN',
+      bn: 'bn-IN',
+      gu: 'gu-IN',
+      pa: 'pa-IN',
+      ur: 'ur-PK',
+      fr: 'fr-FR',
+      de: 'de-DE',
+      es: 'es-ES',
+      pt: 'pt-PT',
+      it: 'it-IT',
+      nl: 'nl-NL',
+      ru: 'ru-RU',
+      ja: 'ja-JP',
+      ko: 'ko-KR',
+      zh: 'zh-CN',
+      ar: 'ar-SA',
+      tr: 'tr-TR',
+      pl: 'pl-PL',
+      sv: 'sv-SE',
+      da: 'da-DK',
+    };
+    return map[code] || iso || 'en-US';
+  }
+
+  function pickVoiceForLang(voices, targetIso) {
+    const target = normalizeLangIso(targetIso);
+    if (!Array.isArray(voices) || voices.length === 0) return null;
+
+    // Prefer exact voice.lang match
+    let v = voices.find((x) => normalizeLangIso(x.lang) === target);
+    if (v) return v;
+
+    // Prefer prefix match (e.g. pt-BR starts with pt)
+    v = voices.find((x) => normalizeLangIso(x.lang).startsWith(target));
+    if (v) return v;
+
+    // Fallback: any voice in same language family prefix
+    v = voices.find((x) => (x.lang || '').toLowerCase().startsWith(target));
+    if (v) return v;
+
+    return null;
+  }
+
   /* Warm up voices for Chrome/Safari */
   useEffect(() => {
     const synth = window.speechSynthesis;
     const updateVoices = () => {
-      const voices = synth.getVoices().filter(v => v.lang.startsWith('en'));
+      const voices = synth.getVoices().filter(v => v.lang);
       setAvailableVoices(voices);
     };
 
@@ -96,27 +163,31 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    if (!voiceEnabledRef.current) return;
+
     const synth = window.speechSynthesis;
     const utterance = new SpeechSynthesisUtterance(trimmed);
     
     const voices = synth.getVoices();
-    
+
+    const detectedLangIso = normalizeLangIso(detectedLanguageRef.current);
+    const overrideLangIso = ttsLanguageOverrideRef.current !== 'auto'
+      ? normalizeLangIso(ttsLanguageOverrideRef.current)
+      : null;
+    const langIso = overrideLangIso || detectedLangIso || 'en';
+
+    utterance.lang = speechRecognitionLangFromIso(langIso);
+
     let preferredVoice = null;
     if (selectedVoiceURIRef.current) {
-      preferredVoice = voices.find(v => v.voiceURI === selectedVoiceURIRef.current);
+      preferredVoice = voices.find((v) => v.voiceURI === selectedVoiceURIRef.current) || null;
     }
-    
     if (!preferredVoice) {
-      preferredVoice = voices.find(v => v.name === 'Alex') || 
-                       voices.find(v => v.name.includes('Samantha')) ||
-                       voices.find(v => v.name.includes('Daniel')) ||
-                       voices.find(v => v.name.includes('Google US English')) ||
-                       voices.find(v => v.lang === 'en-US');
+      preferredVoice = pickVoiceForLang(voices, langIso);
     }
-    
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
+    // Last resort: use any voice if none match.
+    preferredVoice = preferredVoice || voices[0] || null;
+    if (preferredVoice) utterance.voice = preferredVoice;
 
     utterance.rate = 1.0; 
     utterance.pitch = 1.0;
@@ -133,7 +204,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     // but clearing here would cancel the previous sentence of the SAME response.
     // Calling resume() un-sticks the audio context without dropping sentences.
     synth.resume();
-    console.log(`[TTS] Speaking (${preferredVoice?.name || 'default'}):`, trimmed.substring(0, 30) + '...');
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[TTS] Speaking (${preferredVoice?.name || 'default'} / ${langIso})`);
+    }
     synth.speak(utterance);
   }, []);
 
@@ -168,7 +241,11 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
 
     socket.on('connect', () => {
       setConnected(true);
-      socket.emit('join_debate', { debateId, preferredLang: preferredLangRef.current });
+      socket.emit('join_debate', {
+        debateId,
+        preferredLang: preferredLangRef.current,
+        tzOffsetMinutes: tzOffsetMinutesRef.current,
+      });
     });
 
     socket.on('disconnect', (reason) => {
@@ -181,6 +258,11 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     /* subscribe to all server events */
     SERVER_EVENTS.forEach((event) => {
       socket.on(event, (data) => {
+        if (event === 'transcript_final') {
+          const lang = data?.language;
+          if (lang) detectedLanguageRef.current = lang;
+        }
+
         /* Browser-based TTS (Web Speech API) 
            We speak incoming text chunks as they form sentences. */
         if (event === 'ai_text_chunk') {
@@ -220,7 +302,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     const recognition       = new SR();
     recognition.continuous      = true;
     recognition.interimResults  = true;
-    recognition.lang            = 'en-US';
+    recognition.lang            = speechRecognitionLangFromIso(preferredLangRef.current);
 
     recognition.onresult = (e) => {
       const transcript = Array.from(e.results)
@@ -243,6 +325,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   /** PRIMARY path: MediaRecorder + parallel SpeechRecognition */
   const startRecordingWithMediaRecorder = useCallback(async () => {
     isRecordingRef.current = true;
+    usedMediaRecorderRef.current = true;
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
 
@@ -276,13 +359,14 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   /** FALLBACK path: SpeechRecognition only → emit transcript_direct on final result */
   const startRecordingFallback = useCallback(() => {
     isRecordingRef.current = true;
+    usedMediaRecorderRef.current = false;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
 
     const recognition       = new SR();
     recognition.continuous      = true;
     recognition.interimResults  = true;
-    recognition.lang            = 'en-US';
+    recognition.lang            = speechRecognitionLangFromIso(preferredLangRef.current);
 
     recognition.onresult = (e) => {
       let interim = '';
@@ -291,11 +375,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
         if (result.isFinal) final   += result[0].transcript;
         else                 interim += result[0].transcript;
       }
-      setLiveTranscript(interim || final);
-
-      if (final && socketRef.current) {
-        socketRef.current.emit('transcript_direct', { debateId, text: final });
-      }
+      const next = interim || final;
+      setLiveTranscript(next);
+      liveTranscriptRef.current = next;
     };
 
     recognition.onerror = (e) => {
@@ -357,12 +439,19 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     /* Wait briefly for the final transcript to catch up, then send */
     setTimeout(() => {
       const finalTranscript = liveTranscriptRef.current?.trim();
-      if (finalTranscript) {
-        console.log('[useDebateSocket] Sending client-side transcript:', finalTranscript);
+
+      // Priority: if MediaRecorder was used, always use server transcription
+      // (so we get reliable language detection).
+      if (usedMediaRecorderRef.current) {
+        socketRef.current?.emit('audio_end', { debateId });
+      } else if (finalTranscript) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[useDebateSocket] Sending transcript_direct (length):', finalTranscript.length);
+        }
         sendText(finalTranscript);
       } else if (wasRecording) {
-        // Fallback to backend audio processing ONLY if client failed to get text
-        socketRef.current?.emit('audio_end', { debateId });
+        // Trigger server-side error handling for transcript_direct fallback.
+        socketRef.current?.emit('transcript_direct', { debateId, text: '' });
       }
       setLiveTranscript('');
       liveTranscriptRef.current = '';
@@ -371,7 +460,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   }, [debateId, sendText]);
 
   const endDebate = useCallback(() => {
-    socketRef.current?.emit('end_debate', { debateId });
+    socketRef.current?.emit('end_debate', { debateId, tzOffsetMinutes: tzOffsetMinutesRef.current });
   }, [debateId]);
 
   /** Notify server of language change mid-debate */
@@ -379,6 +468,16 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     preferredLangRef.current = lang;
     socketRef.current?.emit('set_language', { debateId, lang });
   }, [debateId]);
+
+  /** Allow callers to toggle voice output without forcing a socket reconnect. */
+  const setVoiceEnabled = useCallback((enabled) => {
+    voiceEnabledRef.current = !!enabled;
+  }, []);
+
+  /** Allow callers to override detected TTS language (iso639-1 code or 'auto'). */
+  const setTtsLanguageOverride = useCallback((langOrAuto) => {
+    ttsLanguageOverrideRef.current = langOrAuto === 'auto' ? 'auto' : (langOrAuto || 'en');
+  }, []);
 
   /* ─────────────────────────────────────────────
      Cleanup on unmount
@@ -400,6 +499,8 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     endDebate,
     sendText,
     setLanguage,
+    setVoiceEnabled,
+    setTtsLanguageOverride,
     liveTranscript,
     isAISpeaking,
     audioSupported,

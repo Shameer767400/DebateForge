@@ -145,14 +145,24 @@ export default function DashboardPage() {
 
   /* ── weekly activity (last 7 days from debate history) ── */
   const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  function toLocalYMD(dateLike) {
+    const d = new Date(dateLike);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   const today = new Date();
   const activityDots = weekDays.map((label, i) => {
     const day = new Date(today);
     day.setDate(today.getDate() - (6 - i));
-    const dayStr = day.toISOString().slice(0, 10);
+    const dayStr = toLocalYMD(day);
     const isActive = history.some((d) => {
-      const debateDate = (d.startedAt || d.createdAt || '').slice(0, 10);
-      return debateDate === dayStr;
+      const debateDate = d.startedAt || d.createdAt;
+      if (!debateDate) return false;
+      return toLocalYMD(debateDate) === dayStr;
     });
     const isToday = i === 6;
     return { label, isActive, isToday };

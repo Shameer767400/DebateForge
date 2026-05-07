@@ -141,6 +141,8 @@
   font-family: var(--font-debate);
   font-size: 0.9rem;
   line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .msg-bubble--user {

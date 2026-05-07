@@ -22,9 +22,12 @@
   border-radius: 20px;
   padding: 40px;
   max-width: 560px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   width: 90vw;
   text-align: center;
   animation: judgeCardSlideUp 0.5s ease 0.2s both;
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes judgeCardSlideUp {
@@ -247,6 +250,8 @@
 
 .judge-list li {
   margin-bottom: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Buttons */

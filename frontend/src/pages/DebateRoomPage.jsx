@@ -6,7 +6,6 @@ import { useToast } from '../context/ToastContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
 import Confetti from '../components/Confetti';
 import StreakCelebration from '../components/StreakCelebration';
-import TranslatedBubble from '../components/TranslatedBubble';
 import '../styles/theme.css';
 import '../styles/debate.css';
 import '../styles/lobby-format.css';
@@ -211,34 +210,24 @@ function timerColor(t) {
   return 'var(--accent-ai)';
 }
 
-/* ── Synced text reveal component ──
-   Reveals text at a steady pace (~50ms per char ≈ natural speech speed).
-   Uses a ref for target length to avoid stale closures.
-   ONE interval runs for the component's entire lifetime — never restarts.
-   When caught up to the buffer, it simply waits for more text. */
-function SyncedText({ text, speed = 50 }) {
-  const [revealed, setRevealed] = useState(0);
-  const targetLenRef = useRef(0);
-
-  // Keep target length always current (no stale closure)
-  targetLenRef.current = text.length;
-
+/* ── Streaming text component ── */
+function StreamText({ text }) {
+  const [visible, setVisible] = useState('');
   useEffect(() => {
-    const timer = setInterval(() => {
-      setRevealed((prev) => {
-        // If caught up, just wait — don't advance
-        if (prev >= targetLenRef.current) return prev;
-        return prev + 1;
-      });
-    }, speed);
-    return () => clearInterval(timer);
-  }, [speed]); // single interval for the entire lifetime
-
-  return <>{text.slice(0, revealed)}</>;
+    let i = 0;
+    setVisible('');
+    const iv = setInterval(() => {
+      i++;
+      setVisible(text.slice(0, i));
+      if (i >= text.length) clearInterval(iv);
+    }, 18);
+    return () => clearInterval(iv);
+  }, [text]);
+  return <>{visible}</>;
 }
 
 /* ─────────────────────────────────────────
-   MAIN PAGE
+  MAIN PAGE
 ───────────────────────────────────────── */
 export default function DebateRoomPage() {
   const { id: debateId } = useParams();
@@ -262,6 +251,8 @@ export default function DebateRoomPage() {
   const [showConfetti,   setShowConfetti]   = useState(false);
   const [textInput,      setTextInput]      = useState('');
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [ttsLanguage, setTtsLanguage] = useState('auto'); // 'auto' or iso 639-1
   // Addition 6: Format/phase state
   const [phaseInfo,      setPhaseInfo]      = useState(null);
   const [judgeVerdict,   setJudgeVerdict]   = useState(null);
@@ -270,7 +261,36 @@ export default function DebateRoomPage() {
   const [streakFreezeUsed, setStreakFreezeUsed] = useState(false);
 
   const toast = useToast();
-  const preferredLang = 'en';
+
+  const browserPreferredLang = (typeof navigator !== 'undefined' && navigator.language)
+    ? navigator.language.split('-')[0].toLowerCase()
+    : 'en';
+
+  const TTS_LANG_OPTIONS = [
+    { value: 'auto', label: 'Auto (detected)' },
+    { value: 'en', label: 'English' },
+    { value: 'hi', label: 'Hindi' },
+    { value: 'ta', label: 'Tamil' },
+    { value: 'te', label: 'Telugu' },
+    { value: 'kn', label: 'Kannada' },
+    { value: 'ml', label: 'Malayalam' },
+    { value: 'mr', label: 'Marathi' },
+    { value: 'bn', label: 'Bengali' },
+    { value: 'gu', label: 'Gujarati' },
+    { value: 'pa', label: 'Punjabi' },
+    { value: 'ur', label: 'Urdu' },
+    { value: 'fr', label: 'French' },
+    { value: 'de', label: 'German' },
+    { value: 'es', label: 'Spanish' },
+    { value: 'pt', label: 'Portuguese' },
+    { value: 'it', label: 'Italian' },
+    { value: 'nl', label: 'Dutch' },
+    { value: 'ru', label: 'Russian' },
+    { value: 'ja', label: 'Japanese' },
+    { value: 'ko', label: 'Korean' },
+    { value: 'zh', label: 'Chinese' },
+    { value: 'ar', label: 'Arabic' },
+  ];
 
   /* ── refs ── */
   const chatBottomRef = useRef(null);
@@ -331,13 +351,13 @@ export default function DebateRoomPage() {
         const token = data.text ?? data.chunk ?? '';
         setPhase('ai_speaking');
         setMessages((prev) => {
-          const streamingMsg = prev.find((m) => m.isStreaming);
-          if (streamingMsg) {
+          const hasPending = prev.some((m) => m.isStreaming);
+          if (hasPending) {
             return prev.map((m) =>
               m.isStreaming ? { ...m, text: m.text + token } : m
             );
           }
-          // First chunk — create message with a STABLE id (never changes)
+          // First chunk — assign a stable id immediately so the key never changes
           return [
             ...prev,
             { id: `ai-${Date.now()}`, speaker: 'ai', text: token, scores: null, isStreaming: true },
@@ -350,13 +370,12 @@ export default function DebateRoomPage() {
       case 'ai_audio_chunk':
         break;
 
-      /* AI finished its turn — keep the SAME id so React preserves SyncedText.
-         Only flip isStreaming to false so SyncedText continues its reveal. */
+      /* AI finished its turn — flip isStreaming off (id stays the same, key unchanged) */
       case 'ai_turn_complete':
         setMessages((prev) =>
           prev.map((m) =>
             m.isStreaming
-              ? { ...m, text: data.fullText ?? m.text, isStreaming: false }
+              ? { ...m, isStreaming: false, text: data.fullText ?? m.text }
               : m
           )
         );
@@ -367,11 +386,7 @@ export default function DebateRoomPage() {
 
       /* Legacy Debate over — still set phase to 'ended' to disable inputs */
       case 'debate_ended':
-        setEndResult(data);
         setPhase('ended');
-        if (data?.forfeit) {
-          toast.warning(data.message || 'You forfeited the debate. AI wins!');
-        }
         break;
 
       case 'debate_joined':
@@ -405,30 +420,6 @@ export default function DebateRoomPage() {
         }
         break;
 
-      /* Translation events — attach translation to the most recent matching message */
-      case 'ai_translation':
-        setMessages((prev) => {
-          // Find the last AI message that doesn't have a translation yet
-          const reversed = [...prev].reverse();
-          const target = reversed.find((m) => m.speaker === 'ai' && !m.translation);
-          if (!target) return prev;
-          return prev.map((m) =>
-            m.id === target.id ? { ...m, translation: data } : m
-          );
-        });
-        break;
-
-      case 'user_translation':
-        setMessages((prev) => {
-          const reversed = [...prev].reverse();
-          const target = reversed.find((m) => m.speaker === 'user' && !m.translation);
-          if (!target) return prev;
-          return prev.map((m) =>
-            m.id === target.id ? { ...m, translation: data } : m
-          );
-        });
-        break;
-
       case 'error':
         console.error('[DebateRoom] socket error:', data);
         // Reset to user_turn so UI doesn't freeze on backend errors
@@ -446,11 +437,32 @@ export default function DebateRoomPage() {
     stopRecording,
     endDebate,
     sendText,
-    setLanguage,
     liveTranscript,
     isAISpeaking: hookIsAISpeaking,
     availableVoices,
-  } = useDebateSocket(debateId, { onEvent: handleEvent, selectedVoiceURI, preferredLang });
+    setVoiceEnabled: setHookVoiceEnabled,
+    setTtsLanguageOverride,
+    setLanguage,
+  } = useDebateSocket(debateId, {
+    onEvent: handleEvent,
+    selectedVoiceURI,
+    preferredLang: ttsLanguage === 'auto' ? browserPreferredLang : ttsLanguage,
+  });
+
+  useEffect(() => {
+    setHookVoiceEnabled(voiceEnabled);
+  }, [voiceEnabled, setHookVoiceEnabled]);
+
+  useEffect(() => {
+    setTtsLanguageOverride(ttsLanguage);
+  }, [ttsLanguage, setTtsLanguageOverride]);
+
+  // If user manually selects a language, force the backend to respond in that language.
+  useEffect(() => {
+    if (!connected) return;
+    if (ttsLanguage === 'auto') return;
+    setLanguage(ttsLanguage);
+  }, [connected, ttsLanguage, setLanguage]);
 
   /* Keep stopRecording accessible inside the timer callback without stale closure */
   useEffect(() => { stopRecRef.current = stopRecording; }, [stopRecording]);
@@ -600,24 +612,36 @@ export default function DebateRoomPage() {
 
         {/* ──── PHASE PROGRESS BAR (Addition 6) ──── */}
         {phaseInfo && phaseInfo.phases && (
-          <div className="phase-progress">
-            {phaseInfo.phases.map((p, i) => (
-              <div key={i} className="phase-step">
-                {i > 0 && (
-                  <div className={`phase-connector ${i < phaseInfo.phaseNumber ? 'phase-connector--done' : ''}`} />
-                )}
-                <div className={`phase-dot ${
-                  i + 1 === phaseInfo.phaseNumber ? 'phase-dot--active' :
-                  i + 1 < phaseInfo.phaseNumber ? 'phase-dot--done' : ''
-                }`}>
-                  {i + 1 < phaseInfo.phaseNumber ? '✓' : i + 1}
+          <>
+            <div className="phase-progress phase-progress--full">
+              {phaseInfo.phases.map((p, i) => (
+                <div key={i} className="phase-step">
+                  {i > 0 && (
+                    <div
+                      className={`phase-connector ${i < phaseInfo.phaseNumber ? 'phase-connector--done' : ''}`}
+                    />
+                  )}
+                  <div
+                    className={`phase-dot ${
+                      i + 1 === phaseInfo.phaseNumber ? 'phase-dot--active' :
+                      i + 1 < phaseInfo.phaseNumber ? 'phase-dot--done' : ''
+                    }`}
+                  >
+                    {i + 1 < phaseInfo.phaseNumber ? '✓' : i + 1}
+                  </div>
+                  <span
+                    className={`phase-label ${i + 1 === phaseInfo.phaseNumber ? 'phase-label--active' : ''}`}
+                  >
+                    {p.name}
+                  </span>
                 </div>
-                <span className={`phase-label ${i + 1 === phaseInfo.phaseNumber ? 'phase-label--active' : ''}`}>
-                  {p.name}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            <div className="phase-progress phase-progress--compact" aria-live="polite">
+              Phase {phaseInfo.phaseNumber} / {phaseInfo.totalPhases}: {phaseInfo.phases?.[phaseInfo.phaseNumber - 1]?.name || phaseInfo.phaseName}
+            </div>
+          </>
         )}
 
         {/* ──── PHASE INSTRUCTION BANNER ──── */}
@@ -653,7 +677,6 @@ export default function DebateRoomPage() {
             </span>
             <span className="debate-round">Round {round}</span>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-
               <select 
                 value={selectedVoiceURI} 
                 onChange={(e) => setSelectedVoiceURI(e.target.value)}
@@ -669,6 +692,37 @@ export default function DebateRoomPage() {
                 <option value="">Default AI Voice</option>
                 {availableVoices.map(v => (
                   <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>
+                ))}
+              </select>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={voiceEnabled}
+                  onChange={(e) => setVoiceEnabled(e.target.checked)}
+                  disabled={phase !== 'user_turn' || judgeVerdict}
+                  aria-label="Use voice"
+                />
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  Use voice
+                </span>
+              </label>
+
+              <select
+                value={ttsLanguage}
+                onChange={(e) => setTtsLanguage(e.target.value)}
+                disabled={phase !== 'user_turn' || judgeVerdict}
+                style={{
+                  background: 'var(--surface-color)',
+                  color: 'var(--text-color)',
+                  border: '1px solid var(--border-color)',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.85rem',
+                }}
+              >
+                {TTS_LANG_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
 
@@ -695,18 +749,13 @@ export default function DebateRoomPage() {
                   {msg.speaker === 'user' ? '🎤' : '🤖'}
                 </div>
                 <div className="msg-body">
-                  <TranslatedBubble
-                    speaker={msg.speaker}
-                    text={msg.text}
-                    translation={msg.translation || null}
-                    isStreaming={msg.isStreaming}
-                  >
-                    {msg.speaker === 'ai' ? (
-                      <SyncedText text={msg.text} speed={50} />
+                  <div className={`msg-bubble msg-bubble--${msg.speaker}`}>
+                    {msg.speaker === 'ai' && !msg.isStreaming ? (
+                      <StreamText text={msg.text} />
                     ) : (
                       msg.text
                     )}
-                  </TranslatedBubble>
+                  </div>
                   {msg.scores && (
                     <div className="msg-scores">
                       <span className="score-pill score-pill--logic">
@@ -760,7 +809,7 @@ export default function DebateRoomPage() {
                   isProcessing || isAISpeaking ? 'mic-btn--processing' : '',
                 ].join(' ')}
                 onClick={handleMicToggle}
-                disabled={isProcessing || isAISpeaking || isEnded}
+                disabled={!voiceEnabled || isProcessing || isAISpeaking || isEnded}
                 aria-label={isRecording ? 'Tap to Submit' : 'Tap to Speak'}
               >
                 {isProcessing ? (
@@ -773,7 +822,7 @@ export default function DebateRoomPage() {
                 {isRecording  ? 'Tap to Submit'     :
                  isProcessing ? 'Processing…'       :
                  isAISpeaking ? 'AI Speaking…'      :
-                                'Tap to Speak'}
+                  !voiceEnabled ? 'Voice off' : 'Tap to Speak'}
               </span>
             </div>
 
@@ -1013,16 +1062,6 @@ export default function DebateRoomPage() {
                 <ul className="judge-list judge-list--grammar">
                   {judgeVerdict.grammarMistakes.map((item, i) => (
                     <li key={i}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {judgeVerdict.fallacies && judgeVerdict.fallacies.length > 0 && (
-              <div className="judge-fallacies">
-                <div className="judge-fallacies-title">🚨 Logical Fallacies</div>
-                <ul className="judge-list judge-list--fallacies">
-                  {judgeVerdict.fallacies.map((item, i) => (
-                    <li key={i}>{typeof item === 'string' ? item : item.type || JSON.stringify(item)}</li>
                   ))}
                 </ul>
               </div>

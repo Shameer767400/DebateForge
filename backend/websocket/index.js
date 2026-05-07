@@ -103,6 +103,7 @@ const WS_RATE_LIMITS = {
   audio_chunk:        { max: 600, windowMs: 60000 },   // 600 chunks per min (10/sec)
   audio_end:          { max: 60, windowMs: 60000 },    // 60 per min
   transcript_direct:  { max: 60, windowMs: 60000 },    // 60 per min
+  set_language:       { max: 60, windowMs: 60000 },    // 60 per min
   end_debate:         { max: 20, windowMs: 60000 },    // 20 per min
 };
 
@@ -185,10 +186,17 @@ function initWebSocket(server) {
     // eslint-disable-next-line no-console
     console.log(`[WS] User connected: ${socket.user.username}`);
 
+    function normalizeLangIso(lang) {
+      const raw = String(lang || '').trim();
+      if (!raw) return 'en';
+      // BCP-47 -> iso-639-1 (en-US -> en)
+      return raw.split('-')[0].toLowerCase();
+    }
+
     /* ────────────────────────────────────────
        join_debate
     ─────────────────────────────────────── */
-    socket.on('join_debate', async ({ debateId }) => {
+    socket.on('join_debate', async ({ debateId, tzOffsetMinutes, preferredLang } = {}) => {
       if (!wsRateLimiter(socket, 'join_debate')) return;
       console.log(`[WS] INCOMING: join_debate for debateId: ${debateId} from user: ${socket.user.username}`);
       try {
@@ -206,6 +214,8 @@ function initWebSocket(server) {
         const targetImprovements = user.targetImprovements || [];
         const grammarMistakes    = user.grammarMistakes || [];
         const aiPosition         = debate.userSide === 'for' ? 'against' : 'for';
+        const tzOffset           = typeof tzOffsetMinutes === 'number' ? tzOffsetMinutes : 0;
+        const preferredLangIso  = normalizeLangIso(preferredLang || 'en');
 
         /* ── Fetch coaching plan from ML memory service ── */
         let coachingPlan = null;
@@ -237,6 +247,10 @@ function initWebSocket(server) {
           format:              debateFormat,
           phaseIndex:          0,
           roundsInPhase:       0,
+          tzOffset, // minutes, where local = UTC + tzOffsetMinutes
+          preferredLang: preferredLangIso,
+          // Seed detectedLanguage so transcript_direct fallback can keep AI/TTS in sync.
+          detectedLanguage: preferredLangIso,
         };
 
         await redisClient.setex(
@@ -269,6 +283,30 @@ function initWebSocket(server) {
         }
       } catch (e) {
         console.error(`[WS] ERROR in join_debate:`, e);
+        socket.emit('error', { message: e.message });
+      }
+    });
+
+    /* ────────────────────────────────────────
+       set_language — client UI override
+    ─────────────────────────────────────── */
+    socket.on('set_language', async ({ debateId, lang } = {}) => {
+      if (!wsRateLimiter(socket, 'set_language')) return;
+      try {
+        const sessionRaw = await redisClient.get(`session:${debateId}`);
+        if (!sessionRaw) return socket.emit('error', { message: 'Session expired' });
+
+        const session = JSON.parse(sessionRaw);
+        if (session.userId !== socket.user.id) {
+          return socket.emit('error', { message: 'Unauthorized' });
+        }
+
+        const iso = normalizeLangIso(lang || 'en');
+        session.preferredLang = iso;
+        session.detectedLanguage = iso;
+
+        await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
+      } catch (e) {
         socket.emit('error', { message: e.message });
       }
     });
@@ -334,7 +372,16 @@ function initWebSocket(server) {
         return socket.emit('error', { message: 'Unauthorized' });
       }
 
-      socket.emit('transcript_final', { text });
+      if (!String(text || '').trim()) {
+        return socket.emit('error', { message: 'Could not transcribe. Please try again.' });
+      }
+
+      const detectedLanguage = normalizeLangIso(
+        session.detectedLanguage || session.preferredLang || 'en'
+      );
+      session.detectedLanguage = detectedLanguage;
+
+      socket.emit('transcript_final', { text, language: detectedLanguage });
       await processTranscript(socket, session, debateId, text);
     });
 

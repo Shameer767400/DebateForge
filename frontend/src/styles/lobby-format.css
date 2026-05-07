@@ -157,6 +157,14 @@
   overflow-x: auto;
 }
 
+.phase-progress--compact {
+  display: none;
+}
+
+.phase-progress--full {
+  display: flex;
+}
+
 .phase-step {
   display: flex;
   align-items: center;
@@ -224,6 +232,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .phase-banner-phase {
@@ -291,6 +300,16 @@
     padding: 8px 12px;
   }
 
+  .phase-progress--full {
+    display: none;
+  }
+
+  .phase-progress--compact {
+    display: flex;
+    overflow-x: hidden;
+    white-space: normal;
+  }
+
   .phase-dot {
     width: 22px;
     height: 22px;
@@ -310,6 +329,7 @@
   .phase-banner {
     padding: 8px 14px;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .phase-banner-phase {

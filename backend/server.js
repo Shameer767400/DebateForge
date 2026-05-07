@@ -180,19 +180,19 @@ function rateLimitHandler(endpoint) {
   };
 }
 
-// 5a. Global limiter: 1000 requests per 15 minutes per IP
+// 5a. Global limiter: 2000 requests per 15 minutes per IP
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('global'),
 }));
 
-// 5b. Auth routes: 200 attempts per 15 min
+// 5b. Auth routes: 500 attempts per 15 min
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler('auth'),
