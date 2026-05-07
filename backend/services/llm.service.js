@@ -7,6 +7,18 @@ const OLLAMA_MODEL  = process.env.OLLAMA_MODEL || 'llama3';
 /* ── Wait helper ── */
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* ── ISO 639-1 language code → human-readable name ── */
+const LANGUAGE_NAMES = {
+  en: 'English', hi: 'Hindi', ta: 'Tamil', te: 'Telugu', kn: 'Kannada', ml: 'Malayalam',
+  mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', ur: 'Urdu',
+  fr: 'French', de: 'German', es: 'Spanish', pt: 'Portuguese', it: 'Italian',
+  nl: 'Dutch', ru: 'Russian', ja: 'Japanese', ko: 'Korean', zh: 'Chinese',
+  ar: 'Arabic', tr: 'Turkish', pl: 'Polish', sv: 'Swedish', da: 'Danish',
+  fi: 'Finnish', no: 'Norwegian', el: 'Greek', th: 'Thai', vi: 'Vietnamese',
+  id: 'Indonesian', ms: 'Malay', ro: 'Romanian', uk: 'Ukrainian', cs: 'Czech',
+  hu: 'Hungarian', he: 'Hebrew', sw: 'Swahili',
+};
+
 function formatFallacyProfile(profile) {
   if (!profile || Object.keys(profile).length === 0) return 'No history yet';
   return Object.entries(profile)
@@ -77,6 +89,12 @@ Keep reminding them about recurring weaknesses when relevant.
 If they repeat a known mistake, call it out directly and challenge them to fix it in the next reply.
 Even when they improve, acknowledge it briefly and immediately push them to sustain that improvement.
 ${coachingSection}
+${session.detectedLanguage && session.detectedLanguage !== 'en'
+  ? `=== LANGUAGE ===
+The user is speaking in ${LANGUAGE_NAMES[session.detectedLanguage] || session.detectedLanguage}. 
+You MUST respond entirely in ${LANGUAGE_NAMES[session.detectedLanguage] || session.detectedLanguage}. 
+Do NOT use English unless the user switches back to English.`
+  : ''}
 === STRICT RULES ===
 1. NEVER agree with the user. Never concede your position.
 2. Maximum 4 sentences per response (this is spoken word)

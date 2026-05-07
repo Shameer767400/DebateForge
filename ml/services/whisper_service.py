@@ -31,7 +31,7 @@ def get_whisper_model():
 
 
 async def _transcribe_local(audio_bytes: bytes, topic: str = "") -> dict:
-    """Transcribe audio using local Whisper model. No API key needed."""
+    """Transcribe audio using local Whisper model. Auto-detects language."""
     start = time.time()
 
     try:
@@ -42,15 +42,17 @@ async def _transcribe_local(audio_bytes: bytes, topic: str = "") -> dict:
 
         model = get_whisper_model()
 
+        # language=None lets Whisper auto-detect the spoken language
         result = model.transcribe(
             tmp_path,
-            language="en",
+            language=None,
             initial_prompt=f"Formal debate about: {topic}" if topic else None,
             fp16=False,  # Set True if you have a GPU
         )
 
         os.unlink(tmp_path)
         text = result["text"].strip()
+        detected_lang = result.get("language", "en")  # e.g. 'hi', 'fr', 'en'
 
         # Remove filler words
         text = re.sub(
@@ -62,10 +64,11 @@ async def _transcribe_local(audio_bytes: bytes, topic: str = "") -> dict:
 
         elapsed = round((time.time() - start) * 1000)
         words = len(text.split())
-        logging.info(f"[WHISPER LOCAL] {words} words in {elapsed}ms")
+        logging.info(f"[WHISPER LOCAL] {words} words in {elapsed}ms | lang={detected_lang}")
 
         return {
             "text": text,
+            "language": detected_lang,
             "duration_ms": elapsed,
             "word_count": words,
             "success": True,
@@ -79,6 +82,7 @@ async def _transcribe_local(audio_bytes: bytes, topic: str = "") -> dict:
             pass
         return {
             "text": "",
+            "language": "en",
             "duration_ms": 0,
             "word_count": 0,
             "success": False,
@@ -87,7 +91,7 @@ async def _transcribe_local(audio_bytes: bytes, topic: str = "") -> dict:
 
 
 async def _transcribe_gemini(audio_bytes: bytes, topic: str = "") -> dict:
-    """Transcribe using Google Gemini API (original implementation)."""
+    """Transcribe using Google Gemini API with language detection."""
     start = time.time()
 
     try:
@@ -96,13 +100,32 @@ async def _transcribe_gemini(audio_bytes: bytes, topic: str = "") -> dict:
         audio_part = {"mime_type": "audio/webm", "data": audio_bytes}
 
         prompt = (
-            f"Transcribe this audio. Context: This is a formal debate argument about: {topic}"
+            f"Transcribe this audio. Context: This is a formal debate argument about: {topic}. "
+            "Also detect the spoken language. "
+            "Respond in this exact format:\n"
+            "LANG: <iso-639-1 code>\n"
+            "TEXT: <transcribed text>"
             if topic
-            else "Transcribe this audio."
+            else "Transcribe this audio. Also detect the spoken language. "
+                 "Respond in this exact format:\n"
+                 "LANG: <iso-639-1 code>\n"
+                 "TEXT: <transcribed text>"
         )
 
         response = await model.generate_content_async([prompt, audio_part])
-        text = response.text.strip()
+        raw_text = response.text.strip()
+
+        # Parse LANG: and TEXT: from response
+        detected_lang = "en"
+        text = raw_text
+        if "LANG:" in raw_text and "TEXT:" in raw_text:
+            import re as _re
+            lang_match = _re.search(r'LANG:\s*(\w{2,3})', raw_text)
+            text_match = _re.search(r'TEXT:\s*(.+)', raw_text, _re.DOTALL)
+            if lang_match:
+                detected_lang = lang_match.group(1).lower()
+            if text_match:
+                text = text_match.group(1).strip()
 
         # Clean filler words
         text = re.sub(
@@ -114,10 +137,11 @@ async def _transcribe_gemini(audio_bytes: bytes, topic: str = "") -> dict:
 
         elapsed = round((time.time() - start) * 1000)
         words = len(text.split())
-        logging.info(f"[GEMINI-TRANSCRIPTION] {words} words transcribed in {elapsed}ms")
+        logging.info(f"[GEMINI-TRANSCRIPTION] {words} words transcribed in {elapsed}ms | lang={detected_lang}")
 
         return {
             "text": text,
+            "language": detected_lang,
             "duration_ms": elapsed,
             "word_count": words,
             "success": True,
@@ -127,6 +151,7 @@ async def _transcribe_gemini(audio_bytes: bytes, topic: str = "") -> dict:
         logging.error(f"[GEMINI-TRANSCRIPTION] Error: {e}")
         return {
             "text": "",
+            "language": "en",
             "duration_ms": 0,
             "word_count": 0,
             "success": False,

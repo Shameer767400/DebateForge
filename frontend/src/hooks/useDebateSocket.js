@@ -65,6 +65,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
   const onEventRef       = useRef(onEvent);
   const selectedVoiceURIRef = useRef(selectedVoiceURI);
   const liveTranscriptRef = useRef('');
+  const detectedLanguageRef = useRef('en'); // Detected spoken language from STT
 
   /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
@@ -73,11 +74,11 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
   /* ─────────────────────────────────────────────
      Audio playback helpers
   ───────────────────────────────────────────── */
-  /* Warm up voices for Chrome/Safari */
+  /* Warm up voices for Chrome/Safari — load ALL languages for multi-lingual support */
   useEffect(() => {
     const synth = window.speechSynthesis;
     const updateVoices = () => {
-      const voices = synth.getVoices().filter(v => v.lang.startsWith('en'));
+      const voices = synth.getVoices();
       setAvailableVoices(voices);
     };
 
@@ -87,7 +88,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
     updateVoices();
   }, []);
 
-  /** Speak a single sentence using Web Speech API */
+  /** Speak a single sentence using Web Speech API — picks voice matching detected language */
   const speakSentence = useCallback((text) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -96,23 +97,47 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
     const utterance = new SpeechSynthesisUtterance(trimmed);
     
     const voices = synth.getVoices();
+    const lang = detectedLanguageRef.current || 'en';
+    
+    /* ISO 639-1 → BCP 47 mapping for common languages */
+    const LANG_BCP47 = {
+      en: 'en-US', hi: 'hi-IN', ta: 'ta-IN', te: 'te-IN', kn: 'kn-IN', ml: 'ml-IN',
+      mr: 'mr-IN', bn: 'bn-IN', gu: 'gu-IN', pa: 'pa-IN', ur: 'ur-PK',
+      fr: 'fr-FR', de: 'de-DE', es: 'es-ES', pt: 'pt-BR', it: 'it-IT',
+      nl: 'nl-NL', ru: 'ru-RU', ja: 'ja-JP', ko: 'ko-KR', zh: 'zh-CN',
+      ar: 'ar-SA', tr: 'tr-TR', pl: 'pl-PL', sv: 'sv-SE',
+    };
+    const bcp47 = LANG_BCP47[lang] || `${lang}-${lang.toUpperCase()}`;
     
     let preferredVoice = null;
+
+    /* 1. User-selected voice override (from settings) */
     if (selectedVoiceURIRef.current) {
       preferredVoice = voices.find(v => v.voiceURI === selectedVoiceURIRef.current);
     }
     
+    /* 2. If no override or English, find best voice for detected language */
     if (!preferredVoice) {
-      preferredVoice = voices.find(v => v.name === 'Alex') || 
-                       voices.find(v => v.name.includes('Samantha')) ||
-                       voices.find(v => v.name.includes('Daniel')) ||
-                       voices.find(v => v.name.includes('Google US English')) ||
-                       voices.find(v => v.lang === 'en-US');
+      // Try exact BCP 47 match first (e.g. hi-IN)
+      preferredVoice = voices.find(v => v.lang === bcp47);
+      // Fallback: any voice starting with the ISO code (e.g. hi)
+      if (!preferredVoice) {
+        preferredVoice = voices.find(v => v.lang.startsWith(lang));
+      }
+      // Final fallback for English
+      if (!preferredVoice && lang === 'en') {
+        preferredVoice = voices.find(v => v.name === 'Alex') || 
+                         voices.find(v => v.name.includes('Samantha')) ||
+                         voices.find(v => v.name.includes('Daniel')) ||
+                         voices.find(v => v.name.includes('Google US English')) ||
+                         voices.find(v => v.lang === 'en-US');
+      }
     }
     
     if (preferredVoice) {
       utterance.voice = preferredVoice;
     }
+    utterance.lang = bcp47; // Set the language even if no matching voice found
 
     utterance.rate = 1.0; 
     utterance.pitch = 1.0;
@@ -124,12 +149,8 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
     };
     utterance.onerror = (e) => console.error('[TTS Error]:', e);
 
-    // Safari/Chrome bug: sometimes the speech queue gets invisibly stuck.
-    // If we are starting a fresh response, we should probably ensure the queue is clear,
-    // but clearing here would cancel the previous sentence of the SAME response.
-    // Calling resume() un-sticks the audio context without dropping sentences.
     synth.resume();
-    console.log(`[TTS] Speaking (${preferredVoice?.name || 'default'}):`, trimmed.substring(0, 30) + '...');
+    console.log(`[TTS] Speaking (${preferredVoice?.name || 'default'}, lang=${bcp47}):`, trimmed.substring(0, 30) + '...');
     synth.speak(utterance);
   }, []);
 
@@ -177,6 +198,11 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
     /* subscribe to all server events */
     SERVER_EVENTS.forEach((event) => {
       socket.on(event, (data) => {
+        /* Capture detected language from STT for TTS voice selection */
+        if (event === 'transcript_final' && data.language) {
+          detectedLanguageRef.current = data.language;
+        }
+
         /* Browser-based TTS (Web Speech API) 
            We speak incoming text chunks as they form sentences. */
         if (event === 'ai_text_chunk') {
@@ -185,6 +211,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI } = {}) {
 
         /* Flush any remaining text when the turn is done */
         if (event === 'ai_turn_complete') {
+          if (data.detectedLanguage) {
+            detectedLanguageRef.current = data.detectedLanguage;
+          }
           if (sentenceBufRef.current.trim()) {
             speakSentence(sentenceBufRef.current);
             sentenceBufRef.current = '';

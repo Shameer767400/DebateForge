@@ -415,9 +415,11 @@ async function processTurn(socket, session, debateId) {
     session.audioBuffer = [];  // clear to save Redis space
 
     let transcript = '';
+    let detectedLanguage = 'en';
     if (audioBuffer.length > 1000) {
       const result = await transcribeAudio(audioBuffer, session.topic);
       transcript   = result.text;
+      detectedLanguage = result.language || 'en';
     }
 
     if (!transcript.trim()) {
@@ -425,7 +427,10 @@ async function processTurn(socket, session, debateId) {
       return;
     }
 
-    socket.emit('transcript_final', { text: transcript });
+    /* Store detected language on session for AI response language */
+    session.detectedLanguage = detectedLanguage;
+
+    socket.emit('transcript_final', { text: transcript, language: detectedLanguage });
     await processTranscript(socket, session, debateId, transcript);
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -588,7 +593,11 @@ async function processTranscript(socket, session, debateId, transcript) {
     await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
 
     /* ── 11. Signal turn complete ── */
-    socket.emit('ai_turn_complete', { fullText: fullAiText, round: session.round });
+    socket.emit('ai_turn_complete', {
+      fullText: fullAiText,
+      round: session.round,
+      detectedLanguage: session.detectedLanguage || 'en',
+    });
 
     /* ── 12. Auto-end after MAX_ROUNDS (freeform only) ── */
     if (fmt === 'freeform' && session.round > MAX_ROUNDS) {
