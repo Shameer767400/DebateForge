@@ -143,8 +143,13 @@ export default function DashboardPage() {
   const elo          = profile?.elo ?? user?.elo ?? 1200;
   const streakData   = profile?.user?.streak || user?.streak || { current: 0, longest: 0, freezeUsed: false };
 
-  /* ── weekly activity (last 7 days from debate history) ── */
-  const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  /* ── weekly activity (last 7 live local days from debate history) ── */
+  const weekdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  const dateTitleFormatter = new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  });
 
   function toLocalYMD(dateLike) {
     const d = new Date(dateLike);
@@ -155,7 +160,7 @@ export default function DashboardPage() {
   }
 
   const today = new Date();
-  const activityDots = weekDays.map((label, i) => {
+  const activityDots = Array.from({ length: 7 }, (_, i) => {
     const day = new Date(today);
     day.setDate(today.getDate() - (6 - i));
     const dayStr = toLocalYMD(day);
@@ -165,7 +170,12 @@ export default function DashboardPage() {
       return toLocalYMD(debateDate) === dayStr;
     });
     const isToday = i === 6;
-    return { label, isActive, isToday };
+    return {
+      label: weekdayFormatter.format(day),
+      title: dateTitleFormatter.format(day),
+      isActive,
+      isToday,
+    };
   });
 
   /* ── score trend data (last 20) ── */
@@ -252,7 +262,7 @@ export default function DashboardPage() {
                 <div
                   key={i}
                   className={`activity-dot ${dot.isActive ? 'activity-dot--active' : ''} ${dot.isToday ? 'activity-dot--today' : ''}`}
-                  title={dot.isActive ? 'Debated this day' : 'No debate'}
+                  title={`${dot.title}${dot.isActive ? ' • Debated' : ' • No debate'}${dot.isToday ? ' • Today' : ''}`}
                 >
                   {dot.label}
                 </div>

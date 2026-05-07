@@ -188,9 +188,26 @@ function initWebSocket(server) {
 
     function normalizeLangIso(lang) {
       const raw = String(lang || '').trim();
-      if (!raw) return 'en';
+      if (!raw) return null;
       // BCP-47 -> iso-639-1 (en-US -> en)
       return raw.split('-')[0].toLowerCase();
+    }
+
+    function detectLanguageFromText(text) {
+      const raw = String(text || '').trim();
+      if (!raw) return 'en';
+
+      if (/[\u0C00-\u0C7F]/.test(raw)) return 'te'; // Telugu
+      if (/[\u0B80-\u0BFF]/.test(raw)) return 'ta'; // Tamil
+      if (/[\u0C80-\u0CFF]/.test(raw)) return 'kn'; // Kannada
+      if (/[\u0D00-\u0D7F]/.test(raw)) return 'ml'; // Malayalam
+      if (/[\u0900-\u097F]/.test(raw)) return 'hi'; // Devanagari → Hindi/Marathi fallback
+      if (/[\u0980-\u09FF]/.test(raw)) return 'bn'; // Bengali
+      if (/[\u0A80-\u0AFF]/.test(raw)) return 'gu'; // Gujarati
+      if (/[\u0A00-\u0A7F]/.test(raw)) return 'pa'; // Gurmukhi Punjabi
+      if (/[\u0600-\u06FF]/.test(raw)) return 'ur'; // Arabic script → Urdu fallback
+
+      return 'en';
     }
 
     /* ────────────────────────────────────────
@@ -215,7 +232,7 @@ function initWebSocket(server) {
         const grammarMistakes    = user.grammarMistakes || [];
         const aiPosition         = debate.userSide === 'for' ? 'against' : 'for';
         const tzOffset           = typeof tzOffsetMinutes === 'number' ? tzOffsetMinutes : 0;
-        const preferredLangIso  = normalizeLangIso(preferredLang || 'en');
+        const preferredLangIso  = normalizeLangIso(preferredLang);
 
         /* ── Fetch coaching plan from ML memory service ── */
         let coachingPlan = null;
@@ -249,7 +266,8 @@ function initWebSocket(server) {
           roundsInPhase:       0,
           tzOffset, // minutes, where local = UTC + tzOffsetMinutes
           preferredLang: preferredLangIso,
-          // Seed detectedLanguage so transcript_direct fallback can keep AI/TTS in sync.
+          // In auto mode we intentionally leave this null until the user's actual
+          // audio/text is processed, otherwise "auto" just turns into browser English.
           detectedLanguage: preferredLangIso,
         };
 
@@ -301,7 +319,7 @@ function initWebSocket(server) {
           return socket.emit('error', { message: 'Unauthorized' });
         }
 
-        const iso = normalizeLangIso(lang || 'en');
+        const iso = normalizeLangIso(lang) || 'en';
         session.preferredLang = iso;
         session.detectedLanguage = iso;
 
@@ -328,7 +346,7 @@ function initWebSocket(server) {
     /* ────────────────────────────────────────
        audio_end — transcribe + process turn
     ─────────────────────────────────────── */
-    socket.on('audio_end', async ({ debateId }) => {
+    socket.on('audio_end', async ({ debateId, transcriptFallback } = {}) => {
       if (!wsRateLimiter(socket, 'audio_end')) return;
       console.log(`[WS] INCOMING: audio_end for debate: ${debateId}`);
       const sessionRaw = await redisClient.get(`session:${debateId}`);
@@ -351,7 +369,7 @@ function initWebSocket(server) {
       }
       
       session.audioBuffer = chunks;
-      await processTurn(socket, session, debateId);
+      await processTurn(socket, session, debateId, String(transcriptFallback || '').trim());
     });
 
     /* ────────────────────────────────────────
@@ -376,9 +394,11 @@ function initWebSocket(server) {
         return socket.emit('error', { message: 'Could not transcribe. Please try again.' });
       }
 
-      const detectedLanguage = normalizeLangIso(
-        session.detectedLanguage || session.preferredLang || 'en'
-      );
+      const detectedLanguage =
+        (session.preferredLang ? normalizeLangIso(session.preferredLang) : null) ||
+        detectLanguageFromText(text) ||
+        normalizeLangIso(session.detectedLanguage) ||
+        'en';
       session.detectedLanguage = detectedLanguage;
 
       socket.emit('transcript_final', { text, language: detectedLanguage });
@@ -455,7 +475,7 @@ function initWebSocket(server) {
 /* ═══════════════════════════════════════════════════════════════
    processTurn — transcribe audio then hand off to processTranscript
 ═══════════════════════════════════════════════════════════════ */
-async function processTurn(socket, session, debateId) {
+async function processTurn(socket, session, debateId, transcriptFallback = '') {
   try {
     /* Reconstruct audio blob from stored chunks */
     const storedChunks = session.audioBuffer.map((b) => Buffer.from(b));
@@ -463,11 +483,17 @@ async function processTurn(socket, session, debateId) {
     session.audioBuffer = [];  // clear to save Redis space
 
     let transcript = '';
-    let detectedLanguage = 'en';
+    let detectedLanguage = session.detectedLanguage || session.preferredLang || 'en';
     if (audioBuffer.length > 1000) {
       const result = await transcribeAudio(audioBuffer, session.topic);
       transcript   = result.text;
       detectedLanguage = result.language || 'en';
+    }
+
+    if (!transcript.trim() && transcriptFallback) {
+      transcript = transcriptFallback;
+      detectedLanguage = detectLanguageFromText(transcriptFallback);
+      console.log(`[WS] Using transcript fallback for debate ${debateId} | lang=${detectedLanguage}`);
     }
 
     if (!transcript.trim()) {

@@ -70,14 +70,42 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   const onEventRef       = useRef(onEvent);
   const selectedVoiceURIRef = useRef(selectedVoiceURI);
   const liveTranscriptRef = useRef('');
-  const preferredLangRef = useRef(preferredLang || 'en');
+  const preferredLangRef = useRef(preferredLang || null);
   const voiceEnabledRef = useRef(true);
   const ttsLanguageOverrideRef = useRef('auto'); // 'auto' or iso 639-1 language code
 
   /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
   useEffect(() => { selectedVoiceURIRef.current = selectedVoiceURI; }, [selectedVoiceURI]);
-  useEffect(() => { preferredLangRef.current = preferredLang || 'en'; }, [preferredLang]);
+  useEffect(() => { preferredLangRef.current = preferredLang || null; }, [preferredLang]);
+
+  function resolveSocketUrl() {
+    const wsUrl = String(process.env.REACT_APP_WS_URL || '').trim();
+    const apiUrl = String(process.env.REACT_APP_API_URL || '').trim();
+
+    if (typeof window === 'undefined') {
+      return wsUrl || apiUrl || '';
+    }
+
+    const pageUrl = new URL(window.location.href);
+    const wsTarget = wsUrl ? new URL(wsUrl, window.location.href) : null;
+    const apiTarget = apiUrl ? new URL(apiUrl, window.location.href) : null;
+
+    const isLocalPage = ['localhost', '127.0.0.1'].includes(pageUrl.hostname);
+    const usesSeparateLocalBackend = [wsTarget, apiTarget].some(
+      (target) =>
+        target &&
+        ['localhost', '127.0.0.1'].includes(target.hostname) &&
+        target.origin !== pageUrl.origin
+    );
+
+    // In local dev, prefer same-origin so Vite can proxy /socket.io reliably.
+    if (isLocalPage && usesSeparateLocalBackend) {
+      return pageUrl.origin;
+    }
+
+    return wsUrl || apiUrl || pageUrl.origin;
+  }
 
   /* ─────────────────────────────────────────────
      Audio playback helpers
@@ -230,8 +258,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   useEffect(() => {
     if (!debateId) return;
 
-    const socket = io(process.env.REACT_APP_WS_URL || process.env.REACT_APP_API_URL || '', {
-      transports: ['websocket'],
+    const socket = io(resolveSocketUrl(), {
+      path: '/socket.io',
+      transports: ['polling', 'websocket'],
       auth: {
         token: localStorage.getItem('debateforge_token') || localStorage.getItem('token'),
       },
@@ -253,6 +282,14 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
         console.log('[useDebateSocket] disconnected:', reason);
       }
       setConnected(false);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('[useDebateSocket] connect_error:', err?.message || err);
+      setConnected(false);
+      onEventRef.current?.('error', {
+        message: `Socket connection failed: ${err?.message || 'unknown error'}`,
+      });
     });
 
     /* subscribe to all server events */
@@ -302,7 +339,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     const recognition       = new SR();
     recognition.continuous      = true;
     recognition.interimResults  = true;
-    recognition.lang            = speechRecognitionLangFromIso(preferredLangRef.current);
+    if (preferredLangRef.current) {
+      recognition.lang = speechRecognitionLangFromIso(preferredLangRef.current);
+    }
 
     recognition.onresult = (e) => {
       const transcript = Array.from(e.results)
@@ -366,7 +405,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     const recognition       = new SR();
     recognition.continuous      = true;
     recognition.interimResults  = true;
-    recognition.lang            = speechRecognitionLangFromIso(preferredLangRef.current);
+    if (preferredLangRef.current) {
+      recognition.lang = speechRecognitionLangFromIso(preferredLangRef.current);
+    }
 
     recognition.onresult = (e) => {
       let interim = '';
@@ -419,11 +460,8 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     const wasRecording = isRecordingRef.current;
     isRecordingRef.current = false;
 
-    /* Stop MediaRecorder */
-    if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
-      mediaRecRef.current.stop();
-      mediaRecRef.current = null;
-    }
+    const recorder = mediaRecRef.current;
+    const finalTranscript = liveTranscriptRef.current?.trim();
 
     /* Release mic stream */
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -435,20 +473,32 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       recognitionRef.current = null;
     }
 
-    /* Signal server that audio is done — only if we were actually recording */
-    /* Wait briefly for the final transcript to catch up, then send */
-    setTimeout(() => {
-      const finalTranscript = liveTranscriptRef.current?.trim();
+    // MediaRecorder emits its final blob asynchronously after stop().
+    // Emitting audio_end too early causes the backend to see an empty buffer,
+    // which makes the AI never take its turn.
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.onstop = () => {
+        socketRef.current?.emit('audio_end', {
+          debateId,
+          transcriptFallback: finalTranscript || '',
+        });
+      };
+      recorder.stop();
+      mediaRecRef.current = null;
+      setLiveTranscript('');
+      liveTranscriptRef.current = '';
+      return;
+    }
 
-      // Priority: if MediaRecorder was used, always use server transcription
-      // (so we get reliable language detection).
-      if (usedMediaRecorderRef.current) {
-        socketRef.current?.emit('audio_end', { debateId });
-      } else if (finalTranscript) {
+    /* SpeechRecognition-only fallback: wait briefly for the final transcript */
+    setTimeout(() => {
+      const delayedTranscript = liveTranscriptRef.current?.trim();
+
+      if (delayedTranscript) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[useDebateSocket] Sending transcript_direct (length):', finalTranscript.length);
+          console.log('[useDebateSocket] Sending transcript_direct (length):', delayedTranscript.length);
         }
-        sendText(finalTranscript);
+        sendText(delayedTranscript);
       } else if (wasRecording) {
         // Trigger server-side error handling for transcript_direct fallback.
         socketRef.current?.emit('transcript_direct', { debateId, text: '' });

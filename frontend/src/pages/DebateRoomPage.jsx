@@ -422,13 +422,14 @@ export default function DebateRoomPage() {
 
       case 'error':
         console.error('[DebateRoom] socket error:', data);
+        if (data?.message) toast.error(data.message);
         // Reset to user_turn so UI doesn't freeze on backend errors
         setPhase((prev) => (prev === 'processing' || prev === 'ai_speaking') ? 'user_turn' : prev);
         break;
       default:
         break;
     }
-  }, []);
+  }, [toast]);
 
   /* ── Hook: WebSocket + MediaRecorder + AudioContext ── */
   const {
@@ -446,7 +447,7 @@ export default function DebateRoomPage() {
   } = useDebateSocket(debateId, {
     onEvent: handleEvent,
     selectedVoiceURI,
-    preferredLang: ttsLanguage === 'auto' ? browserPreferredLang : ttsLanguage,
+    preferredLang: ttsLanguage === 'auto' ? null : ttsLanguage,
   });
 
   useEffect(() => {
