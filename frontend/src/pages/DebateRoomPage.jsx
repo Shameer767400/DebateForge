@@ -213,16 +213,31 @@ function timerColor(t) {
 /* ── Streaming text component ── */
 function StreamText({ text }) {
   const [visible, setVisible] = useState('');
+  const prevTextRef = useRef('');
+
   useEffect(() => {
-    let i = 0;
-    setVisible('');
+    // If the new text starts with what we've already revealed, continue from there
+    // This prevents the "jump" when ai_turn_complete replaces streaming text with fullText
+    const startFrom = text.startsWith(prevTextRef.current) ? prevTextRef.current.length : 0;
+    if (startFrom >= text.length) {
+      setVisible(text);
+      prevTextRef.current = text;
+      return;
+    }
+
+    let i = startFrom;
+    if (startFrom > 0) setVisible(text.slice(0, startFrom));
+
     const iv = setInterval(() => {
       i++;
-      setVisible(text.slice(0, i));
+      const next = text.slice(0, i);
+      setVisible(next);
+      prevTextRef.current = next;
       if (i >= text.length) clearInterval(iv);
     }, 18);
     return () => clearInterval(iv);
   }, [text]);
+
   return <>{visible}</>;
 }
 

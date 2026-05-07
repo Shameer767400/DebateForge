@@ -73,6 +73,8 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   const preferredLangRef = useRef(preferredLang || null);
   const voiceEnabledRef = useRef(true);
   const ttsLanguageOverrideRef = useRef('auto'); // 'auto' or iso 639-1 language code
+  const connectCountRef = useRef(0); // tracks reconnections
+  const lastErrorTimeRef = useRef(0); // debounce error events
 
   /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
@@ -269,7 +271,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      connectCountRef.current += 1;
       setConnected(true);
+      // Always (re)join on connect — handles both initial join and reconnections
       socket.emit('join_debate', {
         debateId,
         preferredLang: preferredLangRef.current,
@@ -314,7 +318,12 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
           }
         }
 
-        /* Propagate every event to caller */
+        /* Propagate every event to caller (debounce errors) */
+        if (event === 'error') {
+          const now = Date.now();
+          if (now - lastErrorTimeRef.current < 3000) return; // suppress flood
+          lastErrorTimeRef.current = now;
+        }
         onEventRef.current?.(event, data);
       });
     });

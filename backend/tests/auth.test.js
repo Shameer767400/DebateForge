@@ -6,16 +6,17 @@ const { User } = require('../models');
 process.env.JWT_SECRET = 'test-secret-key';
 
 describe('Auth Endpoints', () => {
+  const withUA = (req) => req.set('User-Agent', 'Mozilla/5.0 JestTest');
   
   describe('POST /api/auth/register', () => {
     it('should register a new user successfully', async () => {
-      const res = await request(app)
+      const res = await withUA(request(app)
         .post('/api/auth/register')
         .send({
           username: 'testuser',
           email: 'test@example.com',
-          password: 'securepassword123'
-        });
+          password: 'SecurePass1!'
+        }));
 
       expect(res.statusCode).toEqual(201);
       expect(res.body).toHaveProperty('token');
@@ -29,68 +30,69 @@ describe('Auth Endpoints', () => {
     });
 
     it('should fail if email is already taken', async () => {
-      // Create user first
+      // Create verified user first (controller only allows replacement of unverified accounts)
       await User.create({
         username: 'existinguser',
         email: 'test@example.com',
-        passwordHash: 'hashedpassword'
+        passwordHash: 'hashedpassword',
+        emailVerified: true,
       });
 
-      const res = await request(app)
+      const res = await withUA(request(app)
         .post('/api/auth/register')
         .send({
           username: 'newuser',
           email: 'test@example.com',
-          password: 'password123'
-        });
+          password: 'SecurePass1!'
+        }));
 
       expect(res.statusCode).toEqual(409);
-      expect(res.body.error).toMatch(/already taken/i);
+      expect(res.body.error).toMatch(/already registered and verified/i);
     });
 
     it('should fail if password is too short', async () => {
-      const res = await request(app)
+      const res = await withUA(request(app)
         .post('/api/auth/register')
         .send({
           username: 'testu',
           email: 'test2@example.com',
           password: 'short' // less than 8 chars
-        });
+        }));
 
       expect(res.statusCode).toEqual(400);
-      expect(res.body.error).toMatch(/8 characters long/i);
+      expect(res.body.error).toMatch(/at least 8 characters/i);
     });
   });
 
   describe('POST /api/auth/login', () => {
     beforeEach(async () => {
       // Register a user to login with
-      await request(app).post('/api/auth/register').send({
+      await withUA(request(app).post('/api/auth/register')).send({
         username: 'loginuser',
         email: 'login@example.com',
-        password: 'loginpassword1'
+        password: 'LoginPass1!'
       });
     });
 
     it('should login successfully with correct credentials', async () => {
-      const res = await request(app)
+      const res = await withUA(request(app)
         .post('/api/auth/login')
         .send({
           email: 'login@example.com',
-          password: 'loginpassword1'
-        });
+          password: 'LoginPass1!'
+        }));
 
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('token');
  expect(res.body.user.username).toBe('loginuser');
     });
     it('should fail login with wrong password', async () => {
-      const res = await request(app)
+      const res = await withUA(request(app)
         .post('/api/auth/login')
         .send({
           email: 'login@example.com',
           password: 'wrongpassword'
-        });
+        }));
 
 
       expect(res.statusCode).toEqual(401);

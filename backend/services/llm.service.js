@@ -169,8 +169,13 @@ async function* streamOllama(session, userArgument) {
       }
     }
   } catch (e) {
+    const isConnRefused = e.code === 'ECONNREFUSED' || e.message?.includes('ECONNREFUSED');
     // eslint-disable-next-line no-console
-    console.error('[OLLAMA] Error:', e.message);
+    console.error(`[OLLAMA] ${isConnRefused ? 'Connection refused — is Ollama running?' : 'Error:'} ${e.message}`);
+    if (isConnRefused) {
+      // Don't yield fallback text — let the caller know the service is down
+      throw new Error('AI_SERVICE_OFFLINE');
+    }
     yield "That's an interesting point, but I must strongly disagree. " +
           "Your argument lacks the empirical foundation needed to be convincing. " +
           "Can you provide specific evidence to support that claim?";
@@ -184,6 +189,9 @@ async function* streamDebateResponse(session, userArgument) {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(`[LLM] Ollama failed:`, err?.message);
+    if (err.message === 'AI_SERVICE_OFFLINE') {
+      throw new Error('AI service is offline. Please start Ollama (`ollama serve`) and try again.');
+    }
     throw new Error('Local AI failed to respond. Ensure Ollama is running and the llama3 model is installed (`ollama run llama3`).');
   }
 }

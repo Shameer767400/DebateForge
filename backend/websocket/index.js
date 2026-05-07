@@ -32,6 +32,30 @@ function normalizeList(items, limit = 25) {
   return cleaned;
 }
 
+function normalizeLangIso(lang) {
+  const raw = String(lang || '').trim();
+  if (!raw) return 'en';
+  // BCP-47 -> iso-639-1 (en-US -> en)
+  return raw.split('-')[0].toLowerCase();
+}
+
+function detectLanguageFromText(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return 'en';
+
+  if (/[\u0C00-\u0C7F]/.test(raw)) return 'te'; // Telugu
+  if (/[\u0B80-\u0BFF]/.test(raw)) return 'ta'; // Tamil
+  if (/[\u0C80-\u0CFF]/.test(raw)) return 'kn'; // Kannada
+  if (/[\u0D00-\u0D7F]/.test(raw)) return 'ml'; // Malayalam
+  if (/[\u0900-\u097F]/.test(raw)) return 'hi'; // Devanagari → Hindi/Marathi fallback
+  if (/[\u0980-\u09FF]/.test(raw)) return 'bn'; // Bengali
+  if (/[\u0A80-\u0AFF]/.test(raw)) return 'gu'; // Gujarati
+  if (/[\u0A00-\u0A7F]/.test(raw)) return 'pa'; // Gurmukhi Punjabi
+  if (/[\u0600-\u06FF]/.test(raw)) return 'ur'; // Arabic script → Urdu fallback
+
+  return 'en';
+}
+
 function buildImprovementSummary(areasToImprove, grammarMistakes) {
   const topAreas = areasToImprove.slice(0, 2);
   const topGrammar = grammarMistakes.slice(0, 2);
@@ -136,7 +160,7 @@ function wsRateLimiter(socket, eventName) {
 
 /* ── Track active connections per user ── */
 const userConnections = new Map(); // userId → Set<socketId>
-const MAX_CONNECTIONS_PER_USER = 2;
+const MAX_CONNECTIONS_PER_USER = 5;
 
 /* ─────────────────────────────────────────────────────────────
    Entry point — attach Socket.IO to the HTTP server
@@ -185,30 +209,7 @@ function initWebSocket(server) {
   io.on('connection', (socket) => {
     // eslint-disable-next-line no-console
     console.log(`[WS] User connected: ${socket.user.username}`);
-
-    function normalizeLangIso(lang) {
-      const raw = String(lang || '').trim();
-      if (!raw) return null;
-      // BCP-47 -> iso-639-1 (en-US -> en)
-      return raw.split('-')[0].toLowerCase();
-    }
-
-    function detectLanguageFromText(text) {
-      const raw = String(text || '').trim();
-      if (!raw) return 'en';
-
-      if (/[\u0C00-\u0C7F]/.test(raw)) return 'te'; // Telugu
-      if (/[\u0B80-\u0BFF]/.test(raw)) return 'ta'; // Tamil
-      if (/[\u0C80-\u0CFF]/.test(raw)) return 'kn'; // Kannada
-      if (/[\u0D00-\u0D7F]/.test(raw)) return 'ml'; // Malayalam
-      if (/[\u0900-\u097F]/.test(raw)) return 'hi'; // Devanagari → Hindi/Marathi fallback
-      if (/[\u0980-\u09FF]/.test(raw)) return 'bn'; // Bengali
-      if (/[\u0A80-\u0AFF]/.test(raw)) return 'gu'; // Gujarati
-      if (/[\u0A00-\u0A7F]/.test(raw)) return 'pa'; // Gurmukhi Punjabi
-      if (/[\u0600-\u06FF]/.test(raw)) return 'ur'; // Arabic script → Urdu fallback
-
-      return 'en';
-    }
+    socket._turnInFlight = false;
 
     /* ────────────────────────────────────────
        join_debate
@@ -348,6 +349,9 @@ function initWebSocket(server) {
     ─────────────────────────────────────── */
     socket.on('audio_end', async ({ debateId, transcriptFallback } = {}) => {
       if (!wsRateLimiter(socket, 'audio_end')) return;
+      if (socket._turnInFlight) {
+        return socket.emit('error', { message: 'Still processing your previous turn. Please wait.' });
+      }
       console.log(`[WS] INCOMING: audio_end for debate: ${debateId}`);
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
@@ -367,9 +371,14 @@ function initWebSocket(server) {
         console.log(`[WS] WARNING: audio_end received but socket buffer was empty`);
         return;
       }
-      
+
       session.audioBuffer = chunks;
-      await processTurn(socket, session, debateId, String(transcriptFallback || '').trim());
+      socket._turnInFlight = true;
+      try {
+        await processTurn(socket, session, debateId, String(transcriptFallback || '').trim());
+      } finally {
+        socket._turnInFlight = false;
+      }
     });
 
     /* ────────────────────────────────────────
@@ -377,6 +386,9 @@ function initWebSocket(server) {
     ─────────────────────────────────────── */
     socket.on('transcript_direct', async ({ debateId, text }) => {
       if (!wsRateLimiter(socket, 'transcript_direct')) return;
+      if (socket._turnInFlight) {
+        return socket.emit('error', { message: 'Still processing your previous turn. Please wait.' });
+      }
       console.log(`[WS] INCOMING: transcript_direct. Debate: ${debateId}, Text length: ${text?.length || 0}`);
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
@@ -402,7 +414,12 @@ function initWebSocket(server) {
       session.detectedLanguage = detectedLanguage;
 
       socket.emit('transcript_final', { text, language: detectedLanguage });
-      await processTranscript(socket, session, debateId, text);
+      socket._turnInFlight = true;
+      try {
+        await processTranscript(socket, session, debateId, text);
+      } finally {
+        socket._turnInFlight = false;
+      }
     });
 
     /* ────────────────────────────────────────
@@ -484,20 +501,27 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
 
     let transcript = '';
     let detectedLanguage = session.detectedLanguage || session.preferredLang || 'en';
+
+    /* Try ML transcription first; gracefully fall back to browser transcript */
     if (audioBuffer.length > 1000) {
-      const result = await transcribeAudio(audioBuffer, session.topic);
-      transcript   = result.text;
-      detectedLanguage = result.language || 'en';
+      try {
+        const result = await transcribeAudio(audioBuffer, session.topic);
+        transcript   = result.text;
+        detectedLanguage = result.language || 'en';
+      } catch (mlErr) {
+        // ML service is unreachable — fall through to transcriptFallback
+        console.warn(`[WS] ML transcription failed (${mlErr.message}), using browser fallback`);
+      }
     }
 
     if (!transcript.trim() && transcriptFallback) {
       transcript = transcriptFallback;
-      detectedLanguage = detectLanguageFromText(transcriptFallback);
+      detectedLanguage = detectLanguageFromText(transcriptFallback) || detectedLanguage;
       console.log(`[WS] Using transcript fallback for debate ${debateId} | lang=${detectedLanguage}`);
     }
 
     if (!transcript.trim()) {
-      socket.emit('error', { message: 'Could not transcribe audio. Please try again.' });
+      socket.emit('error', { message: 'Could not transcribe audio. Please speak louder or type your argument.' });
       return;
     }
 
@@ -569,20 +593,30 @@ async function processTranscript(socket, session, debateId, transcript) {
       session._phasePromptAddition = phasePrompt;
     }
 
-    /* ── 6. Stream GPT-4 + sentence-level TTS ── */
+    /* ── 6. Stream LLM + sentence-level TTS (with 45s timeout) ── */
     let fullAiText    = '';
     let sentenceBuffer = '';
+    let streamTimedOut = false;
 
-    for await (const chunk of streamDebateResponse(session, transcript)) {
-      fullAiText     += chunk;
-      sentenceBuffer += chunk;
-      socket.emit('ai_text_chunk', { text: chunk });
+    const streamTimeout = setTimeout(() => { streamTimedOut = true; }, 45000);
+    try {
+      for await (const chunk of streamDebateResponse(session, transcript)) {
+        if (streamTimedOut) {
+          console.warn('[WS] LLM stream exceeded 45s timeout, aborting');
+          break;
+        }
+        fullAiText     += chunk;
+        sentenceBuffer += chunk;
+        socket.emit('ai_text_chunk', { text: chunk });
 
-      /* Fire TTS as soon as we have a complete sentence */
-      if (/[.!?]$/.test(sentenceBuffer)) {
-        streamTTSToSocket(socket, sentenceBuffer).catch(console.error);  // eslint-disable-line no-console
-        sentenceBuffer = '';
+        /* Fire TTS as soon as we have a complete sentence */
+        if (/[.!?]$/.test(sentenceBuffer)) {
+          streamTTSToSocket(socket, sentenceBuffer).catch(console.error);  // eslint-disable-line no-console
+          sentenceBuffer = '';
+        }
       }
+    } finally {
+      clearTimeout(streamTimeout);
     }
 
     /* Flush any trailing text */
@@ -682,12 +716,15 @@ async function processTranscript(socket, session, debateId, transcript) {
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[WS] processTranscript error:', e);
-    const isQuota = e.message?.startsWith('QUOTA_EXHAUSTED');
-    socket.emit('error', {
-      message: isQuota
-        ? 'AI rate limit reached. Please wait 1–2 minutes and try again.'
-        : 'Error generating AI response.',
-    });
+    const isQuota   = e.message?.startsWith('QUOTA_EXHAUSTED');
+    const isOffline = e.message?.includes('AI service is offline') || e.message?.includes('AI_SERVICE_OFFLINE');
+    let userMessage = 'Error generating AI response. Please try again.';
+    if (isQuota) {
+      userMessage = 'AI rate limit reached. Please wait 1–2 minutes and try again.';
+    } else if (isOffline) {
+      userMessage = 'AI service is currently offline. Please ensure Ollama is running and try again.';
+    }
+    socket.emit('error', { message: userMessage });
   }
 }
 

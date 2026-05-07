@@ -44,3 +44,9 @@ frontend/test*.js
 
 
 
+render.yaml
+
+# Environment files
+backend/.env
+frontend/.env
+ml/.env
