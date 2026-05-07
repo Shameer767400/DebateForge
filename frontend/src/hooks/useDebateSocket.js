@@ -75,6 +75,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   const ttsLanguageOverrideRef = useRef('auto'); // 'auto' or iso 639-1 language code
   const connectCountRef = useRef(0); // tracks reconnections
   const lastErrorTimeRef = useRef(0); // debounce error events
+  const spokenUpToRef = useRef(0); // how many chars of AI text we've already spoken (prevent double-flush)
 
   /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
@@ -240,16 +241,27 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     synth.speak(utterance);
   }, []);
 
+  /** Strip Ollama meta-commentary parentheticals and clean text for TTS */
+  function sanitizeTTSText(raw) {
+    return raw
+      .replace(/\([^)]{0,200}\)/g, '')   // remove (Note: ...) style asides
+      .replace(/\[[^\]]{0,200}\]/g, '')   // remove [Note: ...] style asides
+      .replace(/\s{2,}/g, ' ')            // collapse multiple spaces
+      .trim();
+  }
+
   const handleAiTextChunk = useCallback((text) => {
     sentenceBufRef.current += text;
 
-    // Use a regex to find all complete sentences ending in . ! or ?
-    // followed by possible whitespace.
+    // Match complete sentences ending in . ! or ? followed by whitespace or end
     const sentences = sentenceBufRef.current.match(/[^.!?]+[.!?](\s|$)/g);
-    
+
     if (sentences) {
-      sentences.forEach(s => speakSentence(s));
-      // Remove spoken sentences from the buffer
+      sentences.forEach(s => {
+        const cleaned = sanitizeTTSText(s);
+        if (cleaned) speakSentence(cleaned);
+      });
+      // Remove spoken portion from buffer
       sentenceBufRef.current = sentenceBufRef.current.slice(sentences.join('').length);
     }
   }, [speakSentence]);
@@ -273,10 +285,12 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     socket.on('connect', () => {
       connectCountRef.current += 1;
       setConnected(true);
-      // Always (re)join on connect — handles both initial join and reconnections
+      // Always (re)join — handles both initial join and reconnections.
+      // Send the actual preferredLang (never null when user has selected one).
+      const langToSend = preferredLangRef.current || null;
       socket.emit('join_debate', {
         debateId,
-        preferredLang: preferredLangRef.current,
+        preferredLang: langToSend,
         tzOffsetMinutes: tzOffsetMinutesRef.current,
       });
     });
@@ -304,18 +318,27 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
           if (lang) detectedLanguageRef.current = lang;
         }
 
-        /* Browser-based TTS (Web Speech API) 
-           We speak incoming text chunks as they form sentences. */
-        if (event === 'ai_text_chunk') {
-          handleAiTextChunk(data.text);
+        /* Browser-based TTS — speak incoming text chunks as sentences form */
+        if (event === 'ai_thinking') {
+          // New AI turn starting — reset buffer and cancel any queued speech
+          sentenceBufRef.current = '';
+          spokenUpToRef.current = 0;
+          try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
         }
 
-        /* Flush any remaining text when the turn is done */
+        if (event === 'ai_text_chunk') {
+          handleAiTextChunk(data.text ?? data.chunk ?? '');
+        }
+
+        /* Flush any remaining text when the turn is done.
+           Only flush if there is genuinely unspoken text in the buffer. */
         if (event === 'ai_turn_complete') {
-          if (sentenceBufRef.current.trim()) {
-            speakSentence(sentenceBufRef.current);
-            sentenceBufRef.current = '';
+          const remaining = sanitizeTTSText(sentenceBufRef.current);
+          if (remaining) {
+            speakSentence(remaining);
           }
+          sentenceBufRef.current = '';
+          spokenUpToRef.current = 0;
         }
 
         /* Propagate every event to caller (debounce errors) */

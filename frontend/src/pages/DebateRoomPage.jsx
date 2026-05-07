@@ -275,6 +275,9 @@ export default function DebateRoomPage() {
   const [streakMilestone, setStreakMilestone] = useState(null);
   const [streakFreezeUsed, setStreakFreezeUsed] = useState(false);
 
+  /* Incrementing key used to guarantee the timer resets every new user_turn */
+  const [timerKey, setTimerKey] = useState(0);
+
   const toast = useToast();
 
   const browserPreferredLang = (typeof navigator !== 'undefined' && navigator.language)
@@ -396,6 +399,7 @@ export default function DebateRoomPage() {
         );
         setRound(data.round ?? ((r) => r + 1));
         setPhase('user_turn');
+        setTimerKey((k) => k + 1); // bump key → timer effect re-runs with fresh reset
         playDing();
         break;
 
@@ -478,7 +482,16 @@ export default function DebateRoomPage() {
     if (!connected) return;
     if (ttsLanguage === 'auto') return;
     setLanguage(ttsLanguage);
+    // Also update the hook's internal detectedLanguage ref so TTS uses it immediately
+    // (handled by setTtsLanguageOverride already)
   }, [connected, ttsLanguage, setLanguage]);
+
+  // When user first selects a non-auto language, emit set_language even before AI responds
+  useEffect(() => {
+    if (ttsLanguage !== 'auto') {
+      setTtsLanguageOverride(ttsLanguage);
+    }
+  }, [ttsLanguage, setTtsLanguageOverride]);
 
   /* Keep stopRecording accessible inside the timer callback without stale closure */
   useEffect(() => { stopRecRef.current = stopRecording; }, [stopRecording]);
@@ -526,27 +539,26 @@ export default function DebateRoomPage() {
   }, [messages, liveTranscript]);
 
   /* ── Countdown timer ──
-       - Resets to 60 every time phase becomes 'user_turn' or round changes
-       - Auto-calls stopRecording() when it hits 0 (in case user forgot)
-       - Clears itself when phase leaves 'user_turn'
+       - Increments timerKey every ai_turn_complete to guarantee a fresh restart
+       - Auto-calls stopRecording() when it hits 0
+       - Pauses during processing/ai_speaking phases
   ── */
   const phaseRef = useRef(phase);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
   useEffect(() => {
+    // Only run timer during active user phases
     if (phase !== 'user_turn' && phase !== 'recording') {
       clearInterval(timerRef.current);
       return;
     }
-    if (phase === 'user_turn') {
-      // Use the phase-specific time limit if available (Addition 6)
-      setTimer(timerMax);
-    }
+    // Always reset to timerMax at the start of a fresh user_turn (timerKey bumped)
+    setTimer(timerMax);
+
     timerRef.current = setInterval(() => {
       setTimer((t) => {
         if (t <= 1) {
           clearInterval(timerRef.current);
-          // Use phaseRef to get the LIVE phase (not stale closure)
           if (phaseRef.current === 'recording') {
             stopRecRef.current?.();
           }
@@ -556,8 +568,9 @@ export default function DebateRoomPage() {
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
+  // timerKey is bumped every ai_turn_complete so the effect re-fires reliably
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase === 'user_turn' ? 'user_turn' : phase, round, timerMax]);
+  }, [timerKey, phase === 'recording' ? 'recording' : 'user_turn', timerMax]);
 
   /* ── Fallacy alert auto-dismiss ── */
   const dismissAlert = useCallback(() => {

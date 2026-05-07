@@ -267,9 +267,9 @@ function initWebSocket(server) {
           roundsInPhase:       0,
           tzOffset, // minutes, where local = UTC + tzOffsetMinutes
           preferredLang: preferredLangIso,
-          // In auto mode we intentionally leave this null until the user's actual
-          // audio/text is processed, otherwise "auto" just turns into browser English.
-          detectedLanguage: preferredLangIso,
+          // If user explicitly selected a language (e.g. 'te'), apply immediately.
+          // Leave null if unset so we auto-detect from their first audio turn.
+          detectedLanguage: (preferredLangIso && preferredLangIso !== 'en') ? preferredLangIso : null,
         };
 
         await redisClient.setex(
@@ -595,8 +595,17 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     /* ── 6. Stream LLM + sentence-level TTS (with 45s timeout) ── */
     let fullAiText    = '';
+    let cleanAiText   = '';
     let sentenceBuffer = '';
     let streamTimedOut = false;
+
+    // Strip parenthetical meta-notes Ollama tends to add e.g. "(Note: I've used the APA study...)"
+    function sanitizeAiChunk(text) {
+      return text
+        .replace(/\([^)]{0,300}\)/g, ' ')   // remove (Note: ...) style asides
+        .replace(/\[[^\]]{0,300}\]/g, ' ')   // remove [Note: ...] style asides
+        .replace(/\s{2,}/g, ' ');            // collapse double spaces
+    }
 
     const streamTimeout = setTimeout(() => { streamTimedOut = true; }, 45000);
     try {
@@ -605,13 +614,18 @@ async function processTranscript(socket, session, debateId, transcript) {
           console.warn('[WS] LLM stream exceeded 45s timeout, aborting');
           break;
         }
-        fullAiText     += chunk;
-        sentenceBuffer += chunk;
-        socket.emit('ai_text_chunk', { text: chunk });
+        fullAiText += chunk; // keep raw text for conversation history
+        const cleanChunk = sanitizeAiChunk(chunk);
+        cleanAiText += cleanChunk;
+        sentenceBuffer += cleanChunk;
 
-        /* Fire TTS as soon as we have a complete sentence */
-        if (/[.!?]$/.test(sentenceBuffer)) {
-          streamTTSToSocket(socket, sentenceBuffer).catch(console.error);  // eslint-disable-line no-console
+        if (cleanChunk.trim()) {
+          socket.emit('ai_text_chunk', { text: cleanChunk });
+        }
+
+        /* Fire ElevenLabs TTS as soon as we have a complete sentence */
+        if (/[.!?]\s*$/.test(sentenceBuffer.trim())) {
+          streamTTSToSocket(socket, sentenceBuffer.trim()).catch(console.error);  // eslint-disable-line no-console
           sentenceBuffer = '';
         }
       }
@@ -621,8 +635,9 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     /* Flush any trailing text */
     if (sentenceBuffer.trim()) {
-      await streamTTSToSocket(socket, sentenceBuffer);
+      await streamTTSToSocket(socket, sentenceBuffer.trim());
     }
+
 
     // Clean up temp phase prompt
     delete session._phasePromptAddition;
@@ -702,7 +717,7 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     /* ── 11. Signal turn complete ── */
     socket.emit('ai_turn_complete', {
-      fullText: fullAiText,
+      fullText: cleanAiText || fullAiText,
       round: session.round,
       detectedLanguage: session.detectedLanguage || 'en',
     });

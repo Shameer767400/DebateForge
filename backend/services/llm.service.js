@@ -89,12 +89,20 @@ Keep reminding them about recurring weaknesses when relevant.
 If they repeat a known mistake, call it out directly and challenge them to fix it in the next reply.
 Even when they improve, acknowledge it briefly and immediately push them to sustain that improvement.
 ${coachingSection}
-${session.detectedLanguage && session.detectedLanguage !== 'en'
-  ? `=== LANGUAGE ===
-The user is speaking in ${LANGUAGE_NAMES[session.detectedLanguage] || session.detectedLanguage}. 
-You MUST respond entirely in ${LANGUAGE_NAMES[session.detectedLanguage] || session.detectedLanguage}. 
-Do NOT use English unless the user switches back to English.`
-  : ''}
+${(() => {
+  // Prefer explicit language selection; fall back to auto-detected
+  const langToUse = (session.detectedLanguage && session.detectedLanguage !== 'en')
+    ? session.detectedLanguage
+    : (session.preferredLang && session.preferredLang !== 'en' ? session.preferredLang : null);
+  if (!langToUse) return '';
+  const langName = LANGUAGE_NAMES[langToUse] || langToUse;
+  return `=== LANGUAGE ===
+The user has selected ${langName} as their debate language.
+You MUST respond ENTIRELY in ${langName}. Every word of your response must be in ${langName}.
+Do NOT use English. Do NOT mix languages.
+This is a hard requirement — any English in your response is a failure.`;
+})()}
+
 === STRICT RULES ===
 1. NEVER agree with the user. Never concede your position.
 2. Maximum 4 sentences per response (this is spoken word)
