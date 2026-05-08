@@ -23,7 +23,6 @@ env/
 # IDEs
 .idea/
 .vscode/
-
 # Build
 build/
 dist/
