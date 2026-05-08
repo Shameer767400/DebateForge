@@ -157,6 +157,37 @@
   border-top-left-radius: 4px;
 }
 
+/* ── Generating / translating placeholder bubble ── */
+.msg-bubble--generating {
+  min-width: 60px;
+  opacity: 0.8;
+}
+
+.generating-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+.generating-dots span {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-ai);
+  animation: gen-dot-bounce 1.2s ease-in-out infinite;
+  opacity: 0.7;
+}
+
+.generating-dots span:nth-child(2) { animation-delay: 0.2s; }
+.generating-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes gen-dot-bounce {
+  0%, 80%, 100% { transform: translateY(0);   opacity: 0.4; }
+  40%            { transform: translateY(-6px); opacity: 1; }
+}
+
 /* ── Score pills ── */
 .msg-scores {
   display: flex;

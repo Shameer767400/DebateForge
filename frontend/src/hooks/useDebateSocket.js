@@ -77,6 +77,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   const connectCountRef = useRef(0); // tracks reconnections
   const lastErrorTimeRef = useRef(0); // debounce error events
   const spokenUpToRef = useRef(0); // how many chars of AI text we've already spoken (prevent double-flush)
+  const shouldKeepRecognizingRef = useRef(false);
 
   /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
@@ -284,8 +285,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      connectCountRef.current += 1;
       setConnected(true);
+      const isReconnect = connectCountRef.current > 0;
+      connectCountRef.current += 1;
       // Always (re)join — handles both initial join and reconnections.
       // Send the actual preferredLang (never null when user has selected one).
       const langToSend = preferredLangRef.current || null;
@@ -294,6 +296,13 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
         preferredLang: langToSend,
         tzOffsetMinutes: tzOffsetMinutesRef.current,
       });
+      // On reconnect: re-send the language preference so the backend session
+      // picks it up immediately even if the session was reset.
+      if (isReconnect && langToSend && langToSend !== 'en') {
+        setTimeout(() => {
+          socket.emit('set_language', { debateId, lang: langToSend });
+        }, 500);
+      }
     });
 
     socket.on('disconnect', (reason) => {
@@ -328,15 +337,27 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
         }
 
         if (event === 'ai_text_chunk') {
-          handleAiTextChunk(data.text ?? data.chunk ?? '');
+          // Skip placeholder dots — they are not real AI text
+          if (!data.isPlaceholder) {
+            handleAiTextChunk(data.text ?? data.chunk ?? '');
+          }
         }
 
         /* Flush any remaining text when the turn is done.
-           Only flush if there is genuinely unspoken text in the buffer. */
+           For non-English debates, the sentence buffer is empty (raw chunks
+           were suppressed). In that case, speak the full translated text. */
         if (event === 'ai_turn_complete') {
+          if (data?.detectedLanguage) {
+            detectedLanguageRef.current = data.detectedLanguage;
+          }
           const remaining = sanitizeTTSText(sentenceBufRef.current);
           if (remaining) {
+            // English debate: flush the leftover sentence buffer
             speakSentence(remaining);
+          } else if (data?.fullText) {
+            // Non-English debate: speak the complete translated text
+            const fullClean = sanitizeTTSText(data.fullText);
+            if (fullClean) speakSentence(fullClean);
           }
           sentenceBufRef.current = '';
           spokenUpToRef.current = 0;
@@ -387,6 +408,16 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     recognition.onerror = (e) => {
       if (process.env.NODE_ENV === 'development') {
         console.warn('[SpeechRecognition error]:', e.error);
+      }
+    };
+
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      if (!shouldKeepRecognizingRef.current || !isRecordingRef.current) return;
+      try {
+        startSpeechRecognition();
+      } catch (err) {
+        console.warn('[SpeechRecognition restart failed]:', err);
       }
     };
 
@@ -458,6 +489,16 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       console.warn('[useDebateSocket] SpeechRecognition fallback error:', e.error);
     };
 
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      if (!shouldKeepRecognizingRef.current || !isRecordingRef.current) return;
+      try {
+        startRecordingFallback();
+      } catch (err) {
+        console.warn('[useDebateSocket] SpeechRecognition fallback restart failed:', err);
+      }
+    };
+
     recognition.start();
     recognitionRef.current = recognition;
   }, [debateId]);
@@ -471,14 +512,26 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     // startRecordingWithMediaRecorder() already calls it internally,
     // so calling it here too would create duplicate SpeechRecognition instances.
     try {
+      shouldKeepRecognizingRef.current = true;
+      try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
       if (typeof MediaRecorder !== 'undefined') {
         await startRecordingWithMediaRecorder();
-      } else {
+      } else if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         startRecordingFallback();
+      } else {
+        onEventRef.current?.('error', {
+          message: 'Voice input is not supported in this browser. Please type your argument instead.',
+        });
       }
     } catch (err) {
       console.error('[startRecording error]:', err);
-      startRecordingFallback();
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        startRecordingFallback();
+      } else {
+        onEventRef.current?.('error', {
+          message: 'Microphone access failed. Please allow mic access or use text input.',
+        });
+      }
     }
   }, [startRecordingWithMediaRecorder, startRecordingFallback]);
 
@@ -492,6 +545,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     /* Only emit audio_end if a recording was actually active */
     const wasRecording = isRecordingRef.current;
     isRecordingRef.current = false;
+    shouldKeepRecognizingRef.current = false;
 
     const recorder = mediaRecRef.current;
     const finalTranscript = liveTranscriptRef.current?.trim();
@@ -549,7 +603,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   /** Notify server of language change mid-debate */
   const setLanguage = useCallback((lang) => {
     preferredLangRef.current = lang;
-    socketRef.current?.emit('set_language', { debateId, lang });
+    socketRef.current?.emit('set_language', { debateId, lang: lang || 'auto' });
   }, [debateId]);
 
   /** Allow callers to toggle voice output without forcing a socket reconnect. */

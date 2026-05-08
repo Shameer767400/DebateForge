@@ -67,7 +67,33 @@ COACHING RULES:
 - NEVER let coaching break your debate persona — coach WITHIN the debate, not outside it`;
   }
 
-  return `You are DebateBot — a world-class competitive debater.
+  // Determine the active language
+  const langToUse =
+    session.currentLanguage ||
+    session.preferredLang ||
+    session.detectedLanguage ||
+    'en';
+  const langName = LANGUAGE_NAMES[langToUse] || langToUse;
+
+  // *** LANGUAGE BLOCK — placed FIRST so the model treats it as highest priority ***
+  let languageBlock;
+  if (langToUse !== 'en') {
+    languageBlock = `!!! MANDATORY LANGUAGE RULE — READ THIS FIRST !!!
+You MUST respond ENTIRELY in ${langName} (${langToUse}).
+Every single word, sentence, and character of your response MUST be in ${langName}.
+Do NOT use English at all. Not a single English word.
+Do NOT mix languages. Do NOT include translations.
+Do NOT add English explanations, notes, or parentheticals.
+This is NON-NEGOTIABLE. Failure to comply is a critical error.
+LANGUAGE: ${langName} ONLY.
+`;
+  } else {
+    languageBlock = `LANGUAGE: English. Do NOT switch to another language unless the user clearly switches first.
+`;
+  }
+
+  return `${languageBlock}
+You are DebateBot — a world-class competitive debater.
 
 TOPIC: ${session.topic}
 YOUR ASSIGNED POSITION: ${session.aiPosition}
@@ -89,20 +115,7 @@ Keep reminding them about recurring weaknesses when relevant.
 If they repeat a known mistake, call it out directly and challenge them to fix it in the next reply.
 Even when they improve, acknowledge it briefly and immediately push them to sustain that improvement.
 ${coachingSection}
-${(() => {
-  // Prefer explicit language selection; fall back to auto-detected
-  const langToUse = (session.detectedLanguage && session.detectedLanguage !== 'en')
-    ? session.detectedLanguage
-    : (session.preferredLang && session.preferredLang !== 'en' ? session.preferredLang : null);
-  if (!langToUse) return '';
-  const langName = LANGUAGE_NAMES[langToUse] || langToUse;
-  return `=== LANGUAGE ===
-The user has selected ${langName} as their debate language.
-You MUST respond ENTIRELY in ${langName}. Every word of your response must be in ${langName}.
-Do NOT use English. Do NOT mix languages.
-This is a hard requirement — any English in your response is a failure.`;
-})()}
-
+${session._phasePromptAddition ? `\n=== CURRENT PHASE ===\n${session._phasePromptAddition}\n` : ''}
 === STRICT RULES ===
 1. NEVER agree with the user. Never concede your position.
 2. Maximum 4 sentences per response (this is spoken word)
@@ -110,7 +123,7 @@ This is a hard requirement — any English in your response is a failure.`;
 4. End EVERY response with either a question OR a direct challenge to the user
 5. From round 3 onwards, exploit the user's documented fallacy weaknesses
 6. Escalate rhetorical intensity each round
-7. CRITICAL: Each response MUST be DIFFERENT from all your previous responses. Never start with the same phrase twice.
+7. CRITICAL: Each response MUST be DIFFERENT from all your previous responses. Never start with the same phrase twice.${langToUse !== 'en' ? `\n8. REMINDER: Your ENTIRE response MUST be in ${langName}. Zero English words allowed.` : ''}
 
 === DIFFICULTY BEHAVIOR ===
 beginner:       Simple vocabulary, gentle challenges
@@ -125,7 +138,7 @@ No labels, stage directions, or meta-commentary.`;
 
 /* ─── Ollama streaming (local LLM) ─── */
 async function* streamOllama(session, userArgument) {
-  const history = (session.conversationHistory || []).slice(-10);
+  const history = (session.conversationHistory || []).slice(-6);
 
   try {
     // Build a summary of what we've already said to prevent repetition
@@ -153,8 +166,8 @@ async function* streamOllama(session, userArgument) {
         ],
         stream: true,
         options: {
-          temperature: 0.9,
-          num_predict: 220,
+          temperature: 0.7,
+          num_predict: 160,
           top_p: 0.92,
           repeat_penalty: 1.25,
           seed: Math.floor(Math.random() * 2147483647), // random seed = unique response each call

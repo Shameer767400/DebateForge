@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev:frontend": "npm --prefix frontend start",
-    "dev:backend": "npm --prefix backend dev",
+    "dev:backend": "npm --prefix backend run dev",
     "dev": "npm run dev:backend & npm run dev:frontend",
     "build:frontend": "npm --prefix frontend run build",
     "test:backend": "npm --prefix backend test"

@@ -68,18 +68,66 @@ def _basic_sentence_split(text: str) -> List[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+def _is_non_latin(text: str) -> bool:
+    """Return True if the text contains a significant amount of non-Latin script."""
+    non_latin = sum(1 for c in text if ord(c) > 0x024F)
+    return non_latin > len(text) * 0.25  # >25% non-Latin characters
+
+
 def extract_features(argument: str, topic: str, context: List[str]):
     text_lower = argument.lower()
 
+    words = argument.split()
+    word_count = len(words) or 1
+    sentences = _basic_sentence_split(argument)
+    sentence_count = len(sentences) or 1
+
+    # ── Non-Latin script (Telugu, Hindi, Tamil, etc.) ──────────────────────
+    # English keyword markers won't match, so use universal structural signals.
+    if _is_non_latin(argument):
+        # LOGIC: measured by sentence count and presence of numbers/structure
+        logic_score = 45.0
+        if sentence_count >= 2:
+            logic_score += 10
+        if sentence_count >= 4:
+            logic_score += 10
+        # Presence of numbers suggests cited evidence → boosts logic too
+        if re.search(r'\d', argument):
+            logic_score += 10
+        # Longer arguments tend to be more structured
+        if word_count >= 20:
+            logic_score += 10
+        logic_score = _clamp(logic_score + random.uniform(-5, 5))
+
+        # EVIDENCE: numbers, years, percentages are universal
+        has_percentage = bool(re.search(r'\d+\s*%', argument))
+        has_year       = bool(re.search(r'\b(19|20)\d{2}\b', argument))
+        has_number     = bool(re.search(r'\b\d+\b', argument))
+        evidence_score = 35.0
+        if has_percentage:
+            evidence_score += 25
+        if has_year:
+            evidence_score += 15
+        if has_number:
+            evidence_score += 10
+        evidence_score = _clamp(evidence_score + random.uniform(-5, 5))
+
+        # CLARITY: use sentence length distribution (universal)
+        avg_sent_len = word_count / sentence_count
+        if 8 <= avg_sent_len <= 20:
+            clarity_score = 75.0
+        else:
+            clarity_score = _clamp(75.0 - abs(avg_sent_len - 14) * 2.5)
+        unique_ratio = len(set(words)) / word_count
+        clarity_score = _clamp((clarity_score * 0.7 + unique_ratio * 100 * 0.3) + random.uniform(-5, 5))
+
+        return int(round(logic_score)), int(round(evidence_score)), int(round(clarity_score))
+
+    # ── Latin-script (English, French, Spanish, etc.) ──────────────────────
     # LOGIC FEATURES
     has_causal = any(marker in text_lower for marker in CAUSAL_MARKERS)
     has_contrast = any(marker in text_lower for marker in CONTRAST_MARKERS)
     has_conclusion = any(marker in text_lower for marker in CONCLUSION_MARKERS)
-
-    words = argument.split()
-    word_count = len(words)
-    sentences = _basic_sentence_split(argument)
-    sentence_count = len(sentences) or 1
 
     structure_score = 0
     if sentence_count >= 3:
@@ -154,8 +202,7 @@ def extract_features(argument: str, topic: str, context: List[str]):
     else:
         flesch_score = 50.0
 
-    sent_count = len(sentences) or 1
-    avg_sent_len = word_count / sent_count
+    avg_sent_len = word_count / sentence_count
     if 15 <= avg_sent_len <= 25:
         length_score = 100.0
     else:

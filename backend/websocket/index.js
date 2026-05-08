@@ -39,6 +39,14 @@ function normalizeLangIso(lang) {
   return raw.split('-')[0].toLowerCase();
 }
 
+function normalizeOptionalLang(lang) {
+  const raw = String(lang || '').trim().toLowerCase();
+  if (!raw || raw === 'auto' || raw === 'detect' || raw === 'detected') {
+    return null;
+  }
+  return normalizeLangIso(raw);
+}
+
 function detectLanguageFromText(text) {
   const raw = String(text || '').trim();
   if (!raw) return 'en';
@@ -54,6 +62,30 @@ function detectLanguageFromText(text) {
   if (/[\u0600-\u06FF]/.test(raw)) return 'ur'; // Arabic script → Urdu fallback
 
   return 'en';
+}
+
+function resolveActiveLanguage(session, detectedLanguage = null) {
+  const preferred = normalizeOptionalLang(session?.preferredLang);
+  if (preferred) return preferred;
+
+  const detected = normalizeOptionalLang(detectedLanguage || session?.detectedLanguage);
+  if (detected) return detected;
+
+  const current = normalizeOptionalLang(session?.currentLanguage);
+  return current || 'en';
+}
+
+function shouldTranslateFallback(text, targetLang) {
+  if (!targetLang || targetLang === 'en') return false;
+
+  const scriptDetectableLangs = new Set(['te', 'ta', 'kn', 'ml', 'hi', 'bn', 'gu', 'pa', 'ur', 'ar', 'zh', 'ja', 'ko']);
+  if (scriptDetectableLangs.has(targetLang)) {
+    return detectLanguageFromText(text) !== targetLang;
+  }
+
+  // For Latin-script languages, only fall back when the output looks purely ASCII,
+  // which usually means the model answered in English.
+  return /^[\x00-\x7F\s.,!?'"%\-:;()0-9/]+$/.test(String(text || '').trim());
 }
 
 function buildImprovementSummary(areasToImprove, grammarMistakes) {
@@ -216,6 +248,8 @@ function initWebSocket(server) {
     ─────────────────────────────────────── */
     socket.on('join_debate', async ({ debateId, tzOffsetMinutes, preferredLang } = {}) => {
       if (!wsRateLimiter(socket, 'join_debate')) return;
+      // Also reset turnInFlight on every join so reconnects don't stay blocked.
+      socket._turnInFlight = false;
       console.log(`[WS] INCOMING: join_debate for debateId: ${debateId} from user: ${socket.user.username}`);
       try {
         const debate = await Debate.findOne({
@@ -227,13 +261,43 @@ function initWebSocket(server) {
           return socket.emit('error', { message: 'Debate not found' });
         }
 
+        const preferredLangIso = normalizeOptionalLang(preferredLang);
+
+        /* ── Check for existing session (reconnect case) ── */
+        const existingRaw = await redisClient.get(`session:${debateId}`);
+        if (existingRaw) {
+          const existing = JSON.parse(existingRaw);
+          if (existing.userId === socket.user.id) {
+            // Restore existing session — do NOT overwrite round/history.
+            // Just update language and tzOffset if they changed.
+            if (preferredLang !== undefined) {
+              existing.preferredLang = preferredLangIso;
+              existing.currentLanguage = resolveActiveLanguage(existing, preferredLangIso);
+            }
+            if (typeof tzOffsetMinutes === 'number') {
+              existing.tzOffset = tzOffsetMinutes;
+            }
+            await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(existing));
+            socket.join(debateId);
+            console.log(`[WS] RECONNECT: Restored existing session for debate ${debateId} at round ${existing.round}`);
+            socket.emit('debate_joined', {
+              topic:      debate.topicSnapshot,
+              userSide:   debate.userSide,
+              aiPosition: existing.aiPosition,
+              difficulty: debate.difficulty,
+              format:     debate.format || 'freeform',
+            });
+            return;
+          }
+        }
+
+        /* ── No existing session — create a fresh one ── */
         const user               = await User.findById(socket.user.id);
         const fallacyProfile     = Object.fromEntries(user.fallacyProfile || new Map());
         const targetImprovements = user.targetImprovements || [];
         const grammarMistakes    = user.grammarMistakes || [];
         const aiPosition         = debate.userSide === 'for' ? 'against' : 'for';
         const tzOffset           = typeof tzOffsetMinutes === 'number' ? tzOffsetMinutes : 0;
-        const preferredLangIso  = normalizeLangIso(preferredLang);
 
         /* ── Fetch coaching plan from ML memory service ── */
         let coachingPlan = null;
@@ -266,10 +330,9 @@ function initWebSocket(server) {
           phaseIndex:          0,
           roundsInPhase:       0,
           tzOffset, // minutes, where local = UTC + tzOffsetMinutes
-          preferredLang: preferredLangIso,
-          // If user explicitly selected a language (e.g. 'te'), apply immediately.
-          // Leave null if unset so we auto-detect from their first audio turn.
-          detectedLanguage: (preferredLangIso && preferredLangIso !== 'en') ? preferredLangIso : null,
+          preferredLang:       preferredLangIso,
+          detectedLanguage:    null,
+          currentLanguage:     preferredLangIso || 'en',
         };
 
         await redisClient.setex(
@@ -320,9 +383,9 @@ function initWebSocket(server) {
           return socket.emit('error', { message: 'Unauthorized' });
         }
 
-        const iso = normalizeLangIso(lang) || 'en';
+        const iso = normalizeOptionalLang(lang);
         session.preferredLang = iso;
-        session.detectedLanguage = iso;
+        session.currentLanguage = resolveActiveLanguage(session, session.detectedLanguage);
 
         await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
       } catch (e) {
@@ -406,14 +469,11 @@ function initWebSocket(server) {
         return socket.emit('error', { message: 'Could not transcribe. Please try again.' });
       }
 
-      const detectedLanguage =
-        (session.preferredLang ? normalizeLangIso(session.preferredLang) : null) ||
-        detectLanguageFromText(text) ||
-        normalizeLangIso(session.detectedLanguage) ||
-        'en';
+      const detectedLanguage = detectLanguageFromText(text) || session.detectedLanguage || session.currentLanguage || 'en';
       session.detectedLanguage = detectedLanguage;
+      session.currentLanguage = resolveActiveLanguage(session, detectedLanguage);
 
-      socket.emit('transcript_final', { text, language: detectedLanguage });
+      socket.emit('transcript_final', { text, language: session.currentLanguage });
       socket._turnInFlight = true;
       try {
         await processTranscript(socket, session, debateId, text);
@@ -500,14 +560,14 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
     session.audioBuffer = [];  // clear to save Redis space
 
     let transcript = '';
-    let detectedLanguage = session.detectedLanguage || session.preferredLang || 'en';
+    let detectedLanguage = session.detectedLanguage || session.currentLanguage || 'en';
 
     /* Try ML transcription first; gracefully fall back to browser transcript */
     if (audioBuffer.length > 1000) {
       try {
         const result = await transcribeAudio(audioBuffer, session.topic);
         transcript   = result.text;
-        detectedLanguage = result.language || 'en';
+        detectedLanguage = result.language || detectedLanguage;
       } catch (mlErr) {
         // ML service is unreachable — fall through to transcriptFallback
         console.warn(`[WS] ML transcription failed (${mlErr.message}), using browser fallback`);
@@ -527,8 +587,9 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
 
     /* Store detected language on session for AI response language */
     session.detectedLanguage = detectedLanguage;
+    session.currentLanguage = resolveActiveLanguage(session, detectedLanguage);
 
-    socket.emit('transcript_final', { text: transcript, language: detectedLanguage });
+    socket.emit('transcript_final', { text: transcript, language: session.currentLanguage });
     await processTranscript(socket, session, debateId, transcript);
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -542,7 +603,8 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
 ═══════════════════════════════════════════════════════════════ */
 async function processTranscript(socket, session, debateId, transcript) {
   try {
-    socket.emit('ai_thinking', {});
+    session.currentLanguage = resolveActiveLanguage(session);
+    socket.emit('ai_thinking', { language: session.currentLanguage });
 
     const historyCtx = session.conversationHistory.slice(-4).map((m) => m.content);
 
@@ -599,6 +661,21 @@ async function processTranscript(socket, session, debateId, transcript) {
     let sentenceBuffer = '';
     let streamTimedOut = false;
 
+    const targetLang = resolveActiveLanguage(session);
+    const turnId = `turn-${session.round}-${Date.now()}`;
+    session._currentTurnId = turnId;
+
+    // *** CRITICAL: Suppress raw English streaming for non-English debates ***
+    // The LLM (llama3) generates primarily in English. For non-English targets,
+    // we MUST NOT stream raw chunks to the UI — the user would see English text.
+    // Instead, show a single placeholder bubble. The final translated text is
+    // delivered via ai_turn_complete.
+    const suppressRawStream = !!(targetLang && targetLang !== 'en');
+
+    if (suppressRawStream) {
+      socket.emit('ai_text_chunk', { text: '\u2026', isPlaceholder: true, turnId });
+    }
+
     // Strip parenthetical meta-notes Ollama tends to add e.g. "(Note: I've used the APA study...)"
     function sanitizeAiChunk(text) {
       return text
@@ -619,12 +696,14 @@ async function processTranscript(socket, session, debateId, transcript) {
         cleanAiText += cleanChunk;
         sentenceBuffer += cleanChunk;
 
-        if (cleanChunk.trim()) {
-          socket.emit('ai_text_chunk', { text: cleanChunk });
+        // *** Only stream raw chunks when language is English ***
+        if (!suppressRawStream && cleanChunk.trim()) {
+          socket.emit('ai_text_chunk', { text: cleanChunk, turnId });
         }
 
-        /* Fire ElevenLabs TTS as soon as we have a complete sentence */
-        if (/[.!?]\s*$/.test(sentenceBuffer.trim())) {
+        // *** Only do sentence-level TTS for English ***
+        // For non-English, TTS happens AFTER translation below.
+        if (!suppressRawStream && /[.!?]\s*$/.test(sentenceBuffer.trim())) {
           streamTTSToSocket(socket, sentenceBuffer.trim()).catch(console.error);  // eslint-disable-line no-console
           sentenceBuffer = '';
         }
@@ -633,8 +712,8 @@ async function processTranscript(socket, session, debateId, transcript) {
       clearTimeout(streamTimeout);
     }
 
-    /* Flush any trailing text */
-    if (sentenceBuffer.trim()) {
+    // Flush trailing English TTS (only for English debates)
+    if (!suppressRawStream && sentenceBuffer.trim()) {
       await streamTTSToSocket(socket, sentenceBuffer.trim());
     }
 
@@ -645,37 +724,7 @@ async function processTranscript(socket, session, debateId, transcript) {
     /* ── 7. Append AI turn to history ── */
     session.conversationHistory.push({ role: 'assistant', content: fullAiText });
 
-    /* ── wait for ML tasks to finish before saving to Mongo ── */
-    await Promise.all([fallacyPromise, scorerPromise]);
-
-    /* ── 8. Persist turn to MongoDB (non-blocking) ── */
-    saveTurnToMongo(debateId, transcript, fullAiText, session.round, scoresResult, fallacyResult)
-      .catch(console.error);  // eslint-disable-line no-console
-
-    /* ── 8.5 Increment cumulative per-dimension scores on User ── */
-    if (scoresResult && (scoresResult.logic || scoresResult.evidence || scoresResult.clarity)) {
-      User.findByIdAndUpdate(session.userId, {
-        $inc: {
-          totalLogicScore:    scoresResult.logic    || 0,
-          totalEvidenceScore: scoresResult.evidence || 0,
-          totalClarityScore:  scoresResult.clarity  || 0,
-          totalScoredTurns:   1,
-        },
-      }).catch(console.error);  // eslint-disable-line no-console
-    }
-
-    /* ── 9. Store embedding in vector DB (non-blocking) ── */
-    callMLService('/memory/store', {
-      user_id:       session.userId,
-      argument_text: transcript,
-      scores:        scoresResult,
-      fallacy_type:  fallacyResult?.fallacy_type || 'no_fallacy',
-      topic:         session.topic,
-      debate_id:     debateId,
-      turn_number:   session.round,
-    }).catch(console.error);  // eslint-disable-line no-console
-
-    /* ── 10. Persist updated session ── */
+    /* ── 8. Persist updated session and unblock the UI immediately ── */
     session.round++;
 
     /* ── 10.5 Phase advancement (Addition 6) ── */
@@ -713,34 +762,71 @@ async function processTranscript(socket, session, debateId, transcript) {
       }
     }
 
-    await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
-
-    /* ── 11. Translate to user's selected language if non-English ── */
-    const targetLang = normalizeLangIso(session.preferredLang) || normalizeLangIso(session.detectedLanguage);
     let finalText = (cleanAiText || fullAiText).trim();
 
+    // *** ALWAYS translate for non-English debates ***
+    // No conditional check — if the user selected Telugu, the output MUST be Telugu.
     if (targetLang && targetLang !== 'en') {
       socket.emit('ai_translating', { language: LANGUAGE_NAMES[targetLang] || targetLang });
       try {
         const translated = await translateText(finalText, targetLang);
-        if (translated && translated !== finalText) {
-          finalText = translated;
-          // Also send the translated text for TTS playback in target language
-          streamTTSToSocket(socket, translated).catch(console.error); // eslint-disable-line no-console
+        if (translated && translated.trim().length > 0) {
+          finalText = translated.trim();
         }
       } catch (e) {
-        console.error('[WS] Translation failed, sending English:', e.message); // eslint-disable-line no-console
+        console.error('[WS] Translation failed, sending original response:', e.message); // eslint-disable-line no-console
       }
+      // Send translated TTS (non-English debates only get TTS after translation)
+      streamTTSToSocket(socket, finalText).catch(console.error); // eslint-disable-line no-console
     }
 
-    /* ── 12. Signal turn complete ── */
+    session.conversationHistory[session.conversationHistory.length - 1] = {
+      role: 'assistant',
+      content: finalText,
+    };
+
+    await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
+
+    /* ── 9. Signal turn complete before slow persistence work finishes ── */
     socket.emit('ai_turn_complete', {
       fullText: finalText,
       round: session.round,
-      detectedLanguage: targetLang || session.detectedLanguage || 'en',
+      detectedLanguage: targetLang || session.currentLanguage || session.detectedLanguage || 'en',
+      turnId: session._currentTurnId || null,
+    });
+    // Clear the turnId after use
+    delete session._currentTurnId;
+
+    Promise.allSettled([fallacyPromise, scorerPromise]).then(async () => {
+      try {
+        await saveTurnToMongo(debateId, transcript, finalText, session.round - 1, scoresResult, fallacyResult);
+
+        if (scoresResult && (scoresResult.logic || scoresResult.evidence || scoresResult.clarity)) {
+          User.findByIdAndUpdate(session.userId, {
+            $inc: {
+              totalLogicScore:    scoresResult.logic    || 0,
+              totalEvidenceScore: scoresResult.evidence || 0,
+              totalClarityScore:  scoresResult.clarity  || 0,
+              totalScoredTurns:   1,
+            },
+          }).catch(console.error);  // eslint-disable-line no-console
+        }
+
+        callMLService('/memory/store', {
+          user_id:       session.userId,
+          argument_text: transcript,
+          scores:        scoresResult,
+          fallacy_type:  fallacyResult?.fallacy_type || 'no_fallacy',
+          topic:         session.topic,
+          debate_id:     debateId,
+          turn_number:   session.round - 1,
+        }).catch(console.error);  // eslint-disable-line no-console
+      } catch (persistErr) {
+        console.error('[WS] Deferred persistence error:', persistErr); // eslint-disable-line no-console
+      }
     });
 
-    /* ── 12. Auto-end after MAX_ROUNDS (freeform only) ── */
+    /* ── 10. Auto-end after MAX_ROUNDS (freeform only) ── */
     if (fmt === 'freeform' && session.round > MAX_ROUNDS) {
       // Instead of calculating scores locally, use the unified LLM judge for the Report Card
       await runJudgeScoring(socket, session, debateId, false, session.tzOffset || 0);

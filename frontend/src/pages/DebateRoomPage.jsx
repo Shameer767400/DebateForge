@@ -267,7 +267,7 @@ export default function DebateRoomPage() {
   const [textInput,      setTextInput]      = useState('');
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [ttsLanguage, setTtsLanguage] = useState('auto'); // 'auto' or iso 639-1
+  const [debateLanguage, setDebateLanguage] = useState('auto'); // 'auto' or iso 639-1
   // Addition 6: Format/phase state
   const [phaseInfo,      setPhaseInfo]      = useState(null);
   const [judgeVerdict,   setJudgeVerdict]   = useState(null);
@@ -280,11 +280,7 @@ export default function DebateRoomPage() {
 
   const toast = useToast();
 
-  const browserPreferredLang = (typeof navigator !== 'undefined' && navigator.language)
-    ? navigator.language.split('-')[0].toLowerCase()
-    : 'en';
-
-  const TTS_LANG_OPTIONS = [
+  const LANGUAGE_OPTIONS = [
     { value: 'auto', label: 'Auto (detected)' },
     { value: 'en', label: 'English' },
     { value: 'hi', label: 'Hindi' },
@@ -364,13 +360,17 @@ export default function DebateRoomPage() {
         setPhase('processing');
         break;
 
-      /* Streaming token from GPT-4 */
+      /* Streaming token from LLM */
       case 'ai_text_chunk': {
         const token = data.text ?? data.chunk ?? '';
+        const isPlaceholder = !!data.isPlaceholder;
+        const chunkTurnId = data.turnId || null;
         setPhase('ai_speaking');
         setMessages((prev) => {
           const hasPending = prev.some((m) => m.isStreaming);
           if (hasPending) {
+            // If it's a placeholder we only have '…' — don't keep appending it
+            if (isPlaceholder) return prev;
             return prev.map((m) =>
               m.isStreaming ? { ...m, text: m.text + token } : m
             );
@@ -378,7 +378,15 @@ export default function DebateRoomPage() {
           // First chunk — assign a stable id immediately so the key never changes
           return [
             ...prev,
-            { id: `ai-${Date.now()}`, speaker: 'ai', text: token, scores: null, isStreaming: true },
+            {
+              id: `ai-${Date.now()}`,
+              speaker: 'ai',
+              text: token,
+              scores: null,
+              isStreaming: true,
+              isPlaceholder,
+              turnId: chunkTurnId,
+            },
           ];
         });
         break;
@@ -393,20 +401,24 @@ export default function DebateRoomPage() {
         setPhase('ai_speaking'); // keep the AI speaking indicator active
         break;
 
-      /* AI finished its turn — flip isStreaming off (id stays the same, key unchanged) */
-      case 'ai_turn_complete':
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.isStreaming
-              ? { ...m, isStreaming: false, text: data.fullText ?? m.text }
-              : m
-          )
-        );
+      /* AI finished its turn — match by turnId (precise) or first streaming bubble */
+      case 'ai_turn_complete': {
+        const completeTurnId = data.turnId || null;
+        setMessages((prev) => {
+          const hasTurnIdMatch = completeTurnId && prev.some((m) => m.isStreaming && m.turnId === completeTurnId);
+          return prev.map((m) => {
+            if (!m.isStreaming) return m;
+            // If we have a turnId match, only update that specific bubble
+            if (hasTurnIdMatch && m.turnId !== completeTurnId) return m;
+            return { ...m, isStreaming: false, isPlaceholder: false, text: data.fullText ?? m.text };
+          });
+        });
         setRound(data.round ?? ((r) => r + 1));
         setPhase('user_turn');
-        setTimerKey((k) => k + 1); // bump key → timer effect re-runs with fresh reset
+        setTimerKey((k) => k + 1);
         playDing();
         break;
+      }
 
       /* Legacy Debate over — still set phase to 'ended' to disable inputs */
       case 'debate_ended':
@@ -471,7 +483,7 @@ export default function DebateRoomPage() {
   } = useDebateSocket(debateId, {
     onEvent: handleEvent,
     selectedVoiceURI,
-    preferredLang: ttsLanguage === 'auto' ? null : ttsLanguage,
+    preferredLang: debateLanguage === 'auto' ? null : debateLanguage,
   });
 
   useEffect(() => {
@@ -479,24 +491,13 @@ export default function DebateRoomPage() {
   }, [voiceEnabled, setHookVoiceEnabled]);
 
   useEffect(() => {
-    setTtsLanguageOverride(ttsLanguage);
-  }, [ttsLanguage, setTtsLanguageOverride]);
+    setTtsLanguageOverride(debateLanguage);
+  }, [debateLanguage, setTtsLanguageOverride]);
 
-  // If user manually selects a language, force the backend to respond in that language.
   useEffect(() => {
     if (!connected) return;
-    if (ttsLanguage === 'auto') return;
-    setLanguage(ttsLanguage);
-    // Also update the hook's internal detectedLanguage ref so TTS uses it immediately
-    // (handled by setTtsLanguageOverride already)
-  }, [connected, ttsLanguage, setLanguage]);
-
-  // When user first selects a non-auto language, emit set_language even before AI responds
-  useEffect(() => {
-    if (ttsLanguage !== 'auto') {
-      setTtsLanguageOverride(ttsLanguage);
-    }
-  }, [ttsLanguage, setTtsLanguageOverride]);
+    setLanguage(debateLanguage === 'auto' ? null : debateLanguage);
+  }, [connected, debateLanguage, setLanguage]);
 
   /* Keep stopRecording accessible inside the timer callback without stale closure */
   useEffect(() => { stopRecRef.current = stopRecording; }, [stopRecording]);
@@ -735,17 +736,18 @@ export default function DebateRoomPage() {
                   checked={voiceEnabled}
                   onChange={(e) => setVoiceEnabled(e.target.checked)}
                   disabled={phase !== 'user_turn' || judgeVerdict}
-                  aria-label="Use voice"
+                  aria-label="AI voice"
                 />
                 <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                  Use voice
+                  AI voice
                 </span>
               </label>
 
               <select
-                value={ttsLanguage}
-                onChange={(e) => setTtsLanguage(e.target.value)}
+                value={debateLanguage}
+                onChange={(e) => setDebateLanguage(e.target.value)}
                 disabled={phase !== 'user_turn' || judgeVerdict}
+                aria-label="Debate language"
                 style={{
                   background: 'var(--surface-color)',
                   color: 'var(--text-color)',
@@ -755,7 +757,7 @@ export default function DebateRoomPage() {
                   fontSize: '0.85rem',
                 }}
               >
-                {TTS_LANG_OPTIONS.map((o) => (
+                {LANGUAGE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
@@ -783,8 +785,12 @@ export default function DebateRoomPage() {
                   {msg.speaker === 'user' ? '🎤' : '🤖'}
                 </div>
                 <div className="msg-body">
-                  <div className={`msg-bubble msg-bubble--${msg.speaker}`}>
-                    {msg.speaker === 'ai' && !msg.isStreaming ? (
+                  <div className={`msg-bubble msg-bubble--${msg.speaker}${msg.isPlaceholder ? ' msg-bubble--generating' : ''}`}>
+                    {msg.speaker === 'ai' && msg.isPlaceholder ? (
+                      <span className="generating-dots">
+                        <span /><span /><span />
+                      </span>
+                    ) : msg.speaker === 'ai' && !msg.isStreaming ? (
                       <StreamText text={msg.text} />
                     ) : (
                       msg.text
@@ -843,7 +849,7 @@ export default function DebateRoomPage() {
                   isProcessing || isAISpeaking ? 'mic-btn--processing' : '',
                 ].join(' ')}
                 onClick={handleMicToggle}
-                disabled={!voiceEnabled || isProcessing || isAISpeaking || isEnded}
+                disabled={isProcessing || isAISpeaking || isEnded}
                 aria-label={isRecording ? 'Tap to Submit' : 'Tap to Speak'}
               >
                 {isProcessing ? (
@@ -856,7 +862,7 @@ export default function DebateRoomPage() {
                 {isRecording  ? 'Tap to Submit'     :
                  isProcessing ? 'Processing…'       :
                  isAISpeaking ? 'AI Speaking…'      :
-                  !voiceEnabled ? 'Voice off' : 'Tap to Speak'}
+                  'Tap to Speak'}
               </span>
             </div>
 
