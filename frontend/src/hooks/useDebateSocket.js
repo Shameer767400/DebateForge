@@ -154,6 +154,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       pl: 'pl-PL',
       sv: 'sv-SE',
       da: 'da-DK',
+      sn: 'sn-ZW',
     };
     return map[code] || iso || 'en-US';
   }

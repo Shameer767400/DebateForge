@@ -304,6 +304,7 @@ export default function DebateRoomPage() {
     { value: 'ko', label: 'Korean' },
     { value: 'zh', label: 'Chinese' },
     { value: 'ar', label: 'Arabic' },
+    { value: 'sn', label: 'Shona' },
   ];
 
   /* ── refs ── */

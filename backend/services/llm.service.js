@@ -16,7 +16,7 @@ const LANGUAGE_NAMES = {
   ar: 'Arabic', tr: 'Turkish', pl: 'Polish', sv: 'Swedish', da: 'Danish',
   fi: 'Finnish', no: 'Norwegian', el: 'Greek', th: 'Thai', vi: 'Vietnamese',
   id: 'Indonesian', ms: 'Malay', ro: 'Romanian', uk: 'Ukrainian', cs: 'Czech',
-  hu: 'Hungarian', he: 'Hebrew', sw: 'Swahili',
+  hu: 'Hungarian', he: 'Hebrew', sw: 'Swahili', sn: 'Shona',
 };
 
 function formatFallacyProfile(profile) {
