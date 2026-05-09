@@ -1008,7 +1008,8 @@ async function streamTTSToSocket(_socket, _text) {
    Helper: ML microservice call
 ═══════════════════════════════════════════════════════════════ */
 async function callMLService(path, data, method = 'POST') {
-  const url = `${process.env.ML_SERVICE_URL}${path}`;
+  const baseUrl = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/$/, '');
+  const url = `${baseUrl}${path}`;
   const config = { timeout: 10000 }; // Prevent infinite hangs if ML service freezes
 
   if (data && typeof data.getHeaders === 'function') {
