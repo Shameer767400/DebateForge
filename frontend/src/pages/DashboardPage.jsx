@@ -95,7 +95,7 @@ function RadarTick({ x, y, payload }) {
    MAIN PAGE
 ────────────────────────────────────────── */
 export default function DashboardPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
@@ -104,7 +104,7 @@ export default function DashboardPage() {
   const [history, setHistory] = useState([]);
 
   const { supported: pushSupported, subscribed: pushSubscribed, subscribe: subscribePush } =
-    usePushNotifications(token);
+    usePushNotifications();
 
   const DAILY_CHALLENGES = [
     'Win a debate using only questions (Socratic style)',
@@ -119,21 +119,20 @@ export default function DashboardPage() {
 
   /* ── parallel fetch ── */
   useEffect(() => {
-    if (!token) return;
-    const headers = { Authorization: `Bearer ${token}` };
     const base = process.env.REACT_APP_API_URL;
+    const opts = { baseURL: base, withCredentials: true };
 
     Promise.allSettled([
-      axios.get('/api/profile/me',                   { baseURL: base, headers }),
-      axios.get('/api/profile/fallacies',            { baseURL: base, headers }),
-      axios.get('/api/debates/history?limit=20',     { baseURL: base, headers }),
+      axios.get('/api/profile/me',                   opts),
+      axios.get('/api/profile/fallacies',            opts),
+      axios.get('/api/debates/history?limit=20',     opts),
     ]).then(([prof, fall, hist]) => {
       if (prof.status  === 'fulfilled') setProfile(prof.value.data);
       if (fall.status  === 'fulfilled') setFallacies(fall.value.data?.fallacies ?? fall.value.data ?? []);
       if (hist.status  === 'fulfilled') setHistory(hist.value.data?.debates     ?? hist.value.data ?? []);
       setLoading(false);
     });
-  }, [token]);
+  }, []);
 
   /* ── derived stats ── */
   const totalDebates = profile?.totalDebates ?? history.length;

@@ -42,8 +42,6 @@ backend/test*.js
 frontend/test*.js
 
 
-
-
 render.yaml
 
 # Environment files

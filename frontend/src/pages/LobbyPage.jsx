@@ -68,7 +68,7 @@ const DIFF_COLORS = {
 const MAX_CUSTOM_TOPIC_LEN = 150;
 
 export default function LobbyPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   // "browse" | "custom"
@@ -98,12 +98,12 @@ export default function LobbyPage() {
     axios
       .get('/api/topics', {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       })
       .then((res) => setTopics(res.data.topics ?? res.data))
       .catch(() => setError('Failed to load topics.'))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   /* ── Reset step-2 / step-3 when mode or topic changes ── */
   const resetSteps = () => {
@@ -186,7 +186,7 @@ export default function LobbyPage() {
 
       const res = await axios.post('/api/debates/start', body, {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       navigate(`/debate/${res.data.debateId ?? res.data._id}`);
     } catch (err) {

@@ -142,7 +142,6 @@ function ResultBadge({ winner }) {
    MAIN PAGE
 ══════════════════════════════════════════════════════════ */
 export default function DebateHistoryPage() {
-  const { token } = useAuth();
   const navigate = useNavigate();
 
   const [debates, setDebates] = useState([]);
@@ -159,7 +158,7 @@ export default function DebateHistoryPage() {
     axios
       .get(`/api/debates/history?page=${page}&limit=${LIMIT}`, {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       })
       .then((r) => {
         setDebates(r.data?.debates ?? r.data ?? []);
@@ -167,7 +166,7 @@ export default function DebateHistoryPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token, page]);
+  }, [page]);
 
   const filtered = filter === 'all'
     ? debates
@@ -178,7 +177,7 @@ export default function DebateHistoryPage() {
     axios
       .get(`/api/debates/${id}`, {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       })
       .then((r) => {
         const detail = r.data?.debate ?? r.data;

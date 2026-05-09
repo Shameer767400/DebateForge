@@ -198,9 +198,15 @@ const MAX_CONNECTIONS_PER_USER = 5;
    Entry point — attach Socket.IO to the HTTP server
 ───────────────────────────────────────────────────────────── */
 function initWebSocket(server) {
+  // Reuse the same CORS origins as the HTTP server (from shared config)
+  const { ALLOWED_ORIGINS } = require('../config/cors');
+
   const io = new Server(server, {
     cors: {
-      origin: (process.env.FRONTEND_URL || 'http://localhost:3000').split(',').map(o => o.trim()),
+      origin: (origin, cb) => {
+        if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+        cb(new Error(`WebSocket CORS: origin ${origin} not allowed`));
+      },
       credentials: true,
     },
     maxHttpBufferSize: 1e7,  // 10 MB (audio chunks)
@@ -213,7 +219,13 @@ function initWebSocket(server) {
 
   /* ── JWT auth middleware ── */
   io.use((socket, next) => {
-    const token = socket.handshake.auth?.token;
+    // Try cookie first (set by HTTP-only cookie on login), then fall back to auth.token
+    const cookieHeader = socket.handshake.headers?.cookie || '';
+    const tokenFromCookie = cookieHeader.split(';').map(c => c.trim())
+      .find(c => c.startsWith('token='));
+    // Use substring to handle tokens containing '=' (Base64 padding)
+    const cookieToken = tokenFromCookie ? tokenFromCookie.substring('token='.length) : null;
+    const token = cookieToken || socket.handshake.auth?.token;
     if (!token) return next(new Error('No token'));
     try {
       socket.user = jwt.verify(token, process.env.JWT_SECRET);

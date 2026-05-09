@@ -3,6 +3,8 @@ const express = require('express');
 const {
   register,
   login,
+  logout,
+  checkSession,
   getMe,
   refresh,
   changePassword,
@@ -18,9 +20,13 @@ const router = express.Router();
 /* ── Public routes ── */
 router.post('/register', register);
 router.post('/login', login);
+router.post('/logout', logout);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 router.post('/verify-email-otp', verifyEmailOTP);
+
+// Session check — always returns 200 (no 401 errors in console)
+router.get('/session', checkSession);
 
 /* ── Protected routes ── */
 router.get('/me', protect, getMe);

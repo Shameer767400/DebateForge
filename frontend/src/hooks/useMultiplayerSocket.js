@@ -40,10 +40,8 @@ export function useMultiplayerSocket(roomId, { onEvent } = {}) {
 
     const baseUrl = process.env.REACT_APP_WS_URL || process.env.REACT_APP_API_URL || '';
     const socket = io(`${baseUrl}/multiplayer`, {
-      transports: ['websocket'],
-      auth: {
-        token: localStorage.getItem('debateforge_token') || localStorage.getItem('token'),
-      },
+      transports: ['polling', 'websocket'],
+      withCredentials: true, // Send HTTP-only cookie with handshake
     });
 
     socketRef.current = socket;

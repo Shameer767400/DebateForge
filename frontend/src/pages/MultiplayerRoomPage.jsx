@@ -9,7 +9,7 @@ const API = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
 
 export default function MultiplayerRoomPage() {
   const { id: roomId } = useParams();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
 
   /* ── Room state ── */
   const [roomState, setRoomState] = useState(null);
@@ -48,7 +48,7 @@ export default function MultiplayerRoomPage() {
     axios
       .get(`/api/rooms/${roomId}`, {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       })
       .then((res) => {
         const r = res.data.room;
@@ -71,7 +71,7 @@ export default function MultiplayerRoomPage() {
       })
       .catch(() => setError('Failed to load room.'))
       .finally(() => setLoading(false));
-  }, [roomId, token]);
+  }, [roomId]);
 
   /* ── Socket event handler ── */
   const handleEvent = useCallback((event, data) => {

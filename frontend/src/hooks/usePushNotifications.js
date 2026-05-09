@@ -12,7 +12,7 @@ const API = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
  * - Registers service worker
  * - Subscribes/unsubscribes to push via backend
  */
-export function usePushNotifications(token) {
+export function usePushNotifications() {
   const [permission, setPermission] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'denied'
   );
@@ -33,7 +33,7 @@ export function usePushNotifications(token) {
   }, [supported]);
 
   const subscribe = useCallback(async () => {
-    if (!supported || !token) return false;
+    if (!supported) return false;
 
     try {
       // 1. Request permission
@@ -73,7 +73,7 @@ export function usePushNotifications(token) {
         { subscription: subscription.toJSON() },
         {
           baseURL: API,
-          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
         }
       );
 
@@ -83,10 +83,10 @@ export function usePushNotifications(token) {
       console.error('[PUSH] Subscribe error:', err);
       return false;
     }
-  }, [supported, token]);
+  }, [supported]);
 
   const unsubscribe = useCallback(async () => {
-    if (!supported || !token) return;
+    if (!supported) return;
 
     try {
       const registration = await navigator.serviceWorker.ready;
@@ -100,7 +100,7 @@ export function usePushNotifications(token) {
         {},
         {
           baseURL: API,
-          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
         }
       );
 
@@ -108,7 +108,7 @@ export function usePushNotifications(token) {
     } catch (err) {
       console.error('[PUSH] Unsubscribe error:', err);
     }
-  }, [supported, token]);
+  }, [supported]);
 
   return {
     supported,

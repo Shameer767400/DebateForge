@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const http = require('http');
 const mongoose = require('mongoose');
 const path = require('path');
@@ -103,10 +104,7 @@ app.use((req, _res, next) => {
 /* ═══════════════════════════════════════════
    2. CORS — only allow trusted origins
 ═══════════════════════════════════════════ */
-const ALLOWED_ORIGINS = (
-  process.env.FRONTEND_URL ||
-  'http://localhost:3000'
-).split(',').map((o) => o.trim());
+const { ALLOWED_ORIGINS } = require('./config/cors');
 
 app.use(
   cors({
@@ -130,6 +128,7 @@ app.use(
 ═══════════════════════════════════════════ */
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(cookieParser());
 
 // Structured access logging (combined format in prod, dev format in dev)
 app.use(morgan(IS_PROD ? 'combined' : 'dev'));
@@ -272,11 +271,21 @@ app.use('/api/push', pushRoutes);
 
 app.use('/api/rooms', roomRoutes);
 
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
+app.get('/health', (_req, res) => {
+  const mongoState = mongoose.connection.readyState;
+  const mongoStates = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  const redisStatus = redisClient.status();
+
+  const healthy = mongoState === 1;
+
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
     env: NODE_ENV,
     uptime: Math.round(process.uptime()),
+    dependencies: {
+      mongodb: mongoStates[mongoState] || 'unknown',
+      redis: redisStatus,
+    },
   });
 });
 
@@ -351,10 +360,18 @@ if (require.main === module) {
     // eslint-disable-next-line no-console
     console.log(`\n🛑 ${signal} received — shutting down gracefully…`);
 
-    server.close(() => {
+    server.close(async () => {
       // eslint-disable-next-line no-console
       console.log('   ✅ HTTP server closed');
 
+      // Close Redis
+      try {
+        await redisClient.disconnect();
+        // eslint-disable-next-line no-console
+        console.log('   ✅ Redis disconnected');
+      } catch { /* ignore */ }
+
+      // Close MongoDB
       mongoose.connection.close(false).then(() => {
         // eslint-disable-next-line no-console
         console.log('   ✅ MongoDB disconnected');

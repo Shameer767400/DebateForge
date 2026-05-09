@@ -7,8 +7,8 @@ const redisClient = require('../config/redis');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/email.service');
 const secLogger = require('../services/security-logger.service');
 
-/* ── Config (from env with sane defaults) ── */
-const JWT_EXPIRY = process.env.JWT_EXPIRY || '1d';
+const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days — must match JWT_EXPIRY
 const MAX_LOGIN_ATTEMPTS = parseInt(process.env.LOGIN_MAX_ATTEMPTS, 10) || 5;
 const LOCKOUT_MINUTES = parseInt(process.env.LOGIN_LOCKOUT_MINUTES, 10) || 15;
 
@@ -44,6 +44,32 @@ function mintToken(user) {
     process.env.JWT_SECRET,
     { expiresIn: JWT_EXPIRY }
   );
+}
+
+/**
+ * Set the JWT as an HTTP-only cookie on the response.
+ * In production (behind HTTPS proxy on Render), uses secure + SameSite=None
+ * so cross-origin requests from the deployed frontend include the cookie.
+ */
+function setTokenCookie(res, token) {
+  const IS_PROD = process.env.NODE_ENV === 'production';
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: IS_PROD ? 'None' : 'Lax',
+    maxAge: COOKIE_MAX_AGE,
+    path: '/',
+  });
+}
+
+function clearTokenCookie(res) {
+  const IS_PROD = process.env.NODE_ENV === 'production';
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: IS_PROD ? 'None' : 'Lax',
+    path: '/',
+  });
 }
 
 /* ═══════════════════════════════════════════
@@ -111,34 +137,26 @@ async function register(req, res) {
       $or: [{ email }, { username }],
     });
 
-    console.log(`🔍 Checking existing user for email: ${email}, username: ${username}`);
+    const IS_DEV = process.env.NODE_ENV !== 'production';
+
+    if (IS_DEV) console.log(`🔍 Checking existing user for email: ${email}, username: ${username}`);
     if (existingUser) {
-      console.log(`📋 Found existing user:`, {
-        username: existingUser.username,
-        email: existingUser.email,
-        emailVerified: existingUser.emailVerified,
-        id: existingUser._id
-      });
+      if (IS_DEV) console.log(`📋 Found existing user: ${existingUser.username} (verified: ${existingUser.emailVerified})`);
       
       // If username exists, always block
       if (existingUser.username === username) {
-        console.log(`❌ Username already taken: ${username}`);
         return res.status(409).json({ error: 'Username already taken' });
       }
       
       // If email exists but is not verified, allow re-registration by deleting the old account
       if (existingUser.email === email && !existingUser.emailVerified) {
-        console.log(`🗑️ Deleting unverified account for email: ${email}`);
         await User.deleteOne({ _id: existingUser._id });
-        console.log(`✅ Successfully deleted unverified account`);
+        if (IS_DEV) console.log(`🗑️ Deleted unverified account for re-registration`);
       } 
       // If email exists and is verified, block
       else if (existingUser.email === email && existingUser.emailVerified) {
-        console.log(`❌ Email already registered and verified: ${email}`);
         return res.status(409).json({ error: 'Email already registered and verified' });
       }
-    } else {
-      console.log(`✅ No existing user found, proceeding with registration`);
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
@@ -151,17 +169,14 @@ async function register(req, res) {
     });
 
     // Generate email verification OTP
-    console.log('\n🔐 ══════════════════════════════════════');
-    console.log(`   📧 Generating OTP for: ${email}`);
     const verificationOTP = user.createEmailVerificationOTP();
-    console.log(`   🔢 Generated OTP: ${verificationOTP}`);
-    console.log(`   ⏰ Expires at: ${new Date(user.emailVerificationOTPExpires).toISOString()}`);
-    console.log('══════════════════════════════════════\n');
+    if (IS_DEV) {
+      console.log(`🔐 OTP for ${email}: ${verificationOTP} (expires: ${new Date(user.emailVerificationOTPExpires).toISOString()})`);
+    }
     
     await user.save();
 
     // Send verification email with OTP (non-blocking — don't let email failure block registration)
-    console.log('📧 Triggering email send...');
     sendVerificationEmail(email, verificationOTP).catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to send verification email:', err.message);
@@ -170,6 +185,8 @@ async function register(req, res) {
     const token = mintToken(user);
 
     secLogger.logRegistration(req, username, email);
+
+    setTokenCookie(res, token);
 
     return res.status(201).json({
       token,
@@ -266,6 +283,8 @@ async function login(req, res) {
 
     secLogger.logLoginSuccess(req, user);
 
+    setTokenCookie(res, token);
+
     return res.status(200).json({
       token,
       user: user.toSafeObject(),
@@ -278,7 +297,60 @@ async function login(req, res) {
 }
 
 /* ═══════════════════════════════════════════
-   GET /api/auth/me
+   POST /api/auth/logout
+═══════════════════════════════════════════ */
+function logout(req, res) {
+  clearTokenCookie(res);
+  return res.status(200).json({ message: 'Logged out successfully' });
+}
+
+/* ═══════════════════════════════════════════
+   GET /api/auth/session
+   — Lightweight, PUBLIC session check.
+   — Returns 200 always (never 401), so the
+     browser console stays clean on page load.
+   — If a valid cookie exists → { authenticated: true, user }
+   — If no cookie / expired   → { authenticated: false }
+═══════════════════════════════════════════ */
+async function checkSession(req, res) {
+  try {
+    const tokenFromCookie = req.cookies?.token || null;
+    const tokenFromHeader = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.split(' ')[1]
+      : null;
+    const token = tokenFromCookie || tokenFromHeader;
+
+    if (!token) {
+      return res.status(200).json({ authenticated: false });
+    }
+
+    const jwt = require('jsonwebtoken');
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      // Clear stale cookie
+      if (tokenFromCookie) {
+        clearTokenCookie(res);
+      }
+      return res.status(200).json({ authenticated: false, reason: err.name });
+    }
+
+    const user = await User.findById(decoded.id).select('-passwordHash');
+    if (!user) {
+      if (tokenFromCookie) clearTokenCookie(res);
+      return res.status(200).json({ authenticated: false, reason: 'user_not_found' });
+    }
+
+    return res.status(200).json({ authenticated: true, user });
+  } catch (error) {
+    console.error('Error in checkSession:', error);
+    return res.status(200).json({ authenticated: false });
+  }
+}
+
+/* ═══════════════════════════════════════════
+   GET /api/auth/me (protected)
 ═══════════════════════════════════════════ */
 async function getMe(req, res) {
   try {
@@ -307,6 +379,9 @@ async function refresh(req, res) {
     }
 
     const token = mintToken(user);
+
+    setTokenCookie(res, token);
+
     return res.status(200).json({ token, user });
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -520,6 +595,8 @@ async function resendVerificationOTP(req, res) {
 module.exports = {
   register,
   login,
+  logout,
+  checkSession,
   getMe,
   refresh,
   changePassword,

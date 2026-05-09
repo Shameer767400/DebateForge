@@ -33,7 +33,7 @@ export default function VerifyEmailOTPPage() {
       const res = await axios.post(
         '/api/auth/verify-email-otp',
         { email, otp },
-        { baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001' }
+        { baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001', withCredentials: true }
       );
       setStatus('success');
       setMessage(res.data.message || 'Email verified successfully!');
@@ -55,21 +55,12 @@ export default function VerifyEmailOTPPage() {
 
     setResending(true);
     try {
-      // First login to get a token (since resend endpoint is protected)
-      // For this demo, we'll assume the user is already logged in from registration
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please log in first to resend OTP');
-        setResending(false);
-        return;
-      }
-
       const res = await axios.post(
         '/api/auth/resend-verification-otp',
         {},
         {
           baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001',
-          headers: { Authorization: `Bearer ${token}` }
+          withCredentials: true,
         }
       );
       toast.success('New OTP sent to your email!');

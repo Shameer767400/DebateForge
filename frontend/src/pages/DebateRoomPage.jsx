@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
+
 import { useToast } from '../context/ToastContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
 import Confetti from '../components/Confetti';
@@ -247,7 +247,6 @@ function StreamText({ text }) {
 export default function DebateRoomPage() {
   const { id: debateId } = useParams();
   const navigate          = useNavigate();
-  const { token }         = useAuth();
 
   /* ── state ── */
   const [debateInfo,     setDebateInfo]     = useState(null);
@@ -509,11 +508,11 @@ export default function DebateRoomPage() {
     axios
       .get(`/api/debates/${debateId}`, {
         baseURL: process.env.REACT_APP_API_URL,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       })
       .then((r) => setDebateInfo(r.data?.debate ?? r.data))
       .catch(console.error);
-  }, [debateId, token]);
+  }, [debateId]);
 
   /* ── Navigate to dashboard after debate ends ──
        If judgeVerdict is showing, user navigates manually via the verdict buttons.

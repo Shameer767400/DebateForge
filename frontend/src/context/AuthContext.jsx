@@ -1,65 +1,114 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext(null);
 
+const API_BASE = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
+
+/**
+ * Shared axios instance for auth-only requests.
+ * NOT the same as the useApi hook (which adds auto-logout on 401).
+ * This instance is used internally by AuthProvider so that auth-check
+ * failures (expected 401s) don't trigger logout loops.
+ */
+const authApi = axios.create({
+  baseURL: API_BASE,
+  withCredentials: true,
+});
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const logoutInProgress = useRef(false);
 
-  const isAuthenticated = !!token && !!user;
+  const isAuthenticated = !!user;
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem('debateforge_token');
-
-    if (!storedToken) {
-      setLoading(false);
-      return;
-    }
-
-    setToken(storedToken);
-
-    axios
-      .get('/api/auth/me', {
-        baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001',
-        headers: {
-          Authorization: `Bearer ${storedToken}`,
-        },
-      })
-      .then((res) => {
+  /**
+   * Check session validity by calling /api/auth/me.
+   * Returns the user object on success, or null on failure.
+   * This is called once on mount and can be called again to re-validate.
+   */
+  const checkSession = useCallback(async () => {
+    try {
+      const res = await authApi.get('/api/auth/session');
+      if (res.data?.authenticated && res.data?.user) {
         setUser(res.data.user);
-      })
-      .catch(() => {
-        localStorage.removeItem('debateforge_token');
-        setToken(null);
-        setUser(null);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+        return res.data.user;
+      }
+      setUser(null);
+      return null;
+    } catch {
+      // Network error or server down — silently treat as unauthenticated
+      setUser(null);
+      return null;
+    }
   }, []);
 
-  const login = (newToken, newUser) => {
-    localStorage.setItem('debateforge_token', newToken);
-    setToken(newToken);
-    setUser(newUser);
-  };
+  // On mount: check if there's a valid cookie/session
+  useEffect(() => {
+    checkSession().finally(() => setLoading(false));
+  }, [checkSession]);
 
-  const logout = () => {
-    localStorage.removeItem('debateforge_token');
-    setToken(null);
+  /**
+   * Called after successful login/register.
+   * The server already set the HTTP-only cookie via Set-Cookie header.
+   * We just store the user in React state.
+   */
+  const login = useCallback((_token, newUser) => {
+    setUser(newUser);
+  }, []);
+
+  /**
+   * Logout: call the server to clear the cookie, then reset state.
+   * Uses a guard to prevent multiple concurrent logout calls.
+   */
+  const logout = useCallback(async () => {
+    if (logoutInProgress.current) return;
+    logoutInProgress.current = true;
+
+    try {
+      await authApi.post('/api/auth/logout');
+    } catch {
+      // best-effort — clear state regardless
+    }
+
     setUser(null);
+    logoutInProgress.current = false;
+
+    // Navigate to landing page
     window.location.href = '/';
-  };
+  }, []);
+
+  /**
+   * Silently refresh the session cookie.
+   * Called when a 401 is received on an authenticated request.
+   * Returns true if refresh succeeded, false otherwise.
+   */
+  const refreshSession = useCallback(async () => {
+    try {
+      const res = await authApi.post('/api/auth/refresh');
+      const userData = res.data?.user ?? null;
+      if (userData) {
+        setUser(userData);
+        return true;
+      }
+      return false;
+    } catch {
+      // Refresh failed — session is truly expired
+      setUser(null);
+      return false;
+    }
+  }, []);
 
   const value = {
     user,
-    token,
+    token: null, // Deprecated — kept for backward compat
     login,
     logout,
     isAuthenticated,
     loading,
+    checkSession,
+    refreshSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -72,4 +121,3 @@ export function useAuth() {
   }
   return ctx;
 }
-

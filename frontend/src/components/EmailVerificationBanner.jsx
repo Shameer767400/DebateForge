@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 export default function EmailVerificationBanner() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -20,7 +20,7 @@ export default function EmailVerificationBanner() {
         {},
         {
           baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001',
-          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
         }
       );
       setSent(true);

@@ -48,7 +48,13 @@ function initMultiplayerWS(io) {
 
   /* ── JWT auth middleware ── */
   mpNs.use((socket, next) => {
-    const token = socket.handshake.auth?.token;
+    // Try cookie first (set by HTTP-only cookie on login), then fall back to auth.token
+    const cookieHeader = socket.handshake.headers?.cookie || '';
+    const tokenFromCookie = cookieHeader.split(';').map(c => c.trim())
+      .find(c => c.startsWith('token='));
+    // Use substring to handle tokens containing '=' (Base64 padding)
+    const cookieToken = tokenFromCookie ? tokenFromCookie.substring('token='.length) : null;
+    const token = cookieToken || socket.handshake.auth?.token;
     if (!token) return next(new Error('No token'));
     try {
       socket.user = jwt.verify(token, process.env.JWT_SECRET);

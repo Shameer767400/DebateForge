@@ -5,7 +5,6 @@ class MemoryStore {
   constructor() {
     this._store = new Map();
     this._timers = new Map();
-    console.warn('⚠️  Redis unavailable — using in-memory session store (sessions lost on restart)');
   }
 
   async get(key) {
@@ -18,7 +17,6 @@ class MemoryStore {
 
   async setex(key, ttlSeconds, value) {
     this._store.set(key, value);
-    // Clear any previous timer and set a new one
     if (this._timers.has(key)) clearTimeout(this._timers.get(key));
     const timer = setTimeout(() => {
       this._store.delete(key);
@@ -32,34 +30,59 @@ class MemoryStore {
     this._timers.delete(key);
     this._store.delete(key);
   }
+
+  async quit() {
+    // no-op for memory store
+  }
 }
 
 /*
  * Proxy wrapper that delegates to whatever the current backing store is.
  *
- * Bug fix: the old code exported a direct reference to the ioredis client,
- * then on error it reassigned a local variable — but every other module that
- * had already `require()`-d the file still held the old broken reference.
- * This proxy ensures every call always goes through the current backend.
+ * Ensures every call always goes through the current backend, even after
+ * a fallback from ioredis to MemoryStore.
  */
-
-// Create ONE shared MemoryStore so session data is never lost on fallback
 const sharedMemoryStore = new MemoryStore();
-// Suppress the constructor log — we'll log when we actually fall back
-sharedMemoryStore; // eslint: just reference
 
 const wrapper = {
   _backend: null,
+  _redisClient: null, // keep reference for graceful shutdown & health checks
+  _usingRedis: false,
 
   async get(key)            { return this._backend.get(key); },
   async set(key, value)     { return this._backend.set(key, value); },
   async setex(key, ttl, val){ return this._backend.setex(key, ttl, val); },
   async del(key)            { return this._backend.del(key); },
+
+  /** Graceful shutdown — close Redis connection if one exists */
+  async disconnect() {
+    if (this._redisClient) {
+      try {
+        await this._redisClient.quit();
+      } catch {
+        // ignore — we're shutting down
+      }
+    }
+  },
+
+  /** Health check — returns { connected, using } */
+  status() {
+    if (this._usingRedis && this._redisClient) {
+      return {
+        store: 'redis',
+        connected: this._redisClient.status === 'ready',
+        status: this._redisClient.status,
+      };
+    }
+    return { store: 'memory', connected: true, status: 'ready' };
+  },
 };
 
-function switchToMemoryStore() {
+function switchToMemoryStore(reason) {
   if (wrapper._backend !== sharedMemoryStore) {
+    console.warn(`⚠️  Redis unavailable (${reason}) — using in-memory session store`);
     wrapper._backend = sharedMemoryStore;
+    wrapper._usingRedis = false;
   }
 }
 
@@ -67,9 +90,9 @@ try {
   const redisUrl = process.env.REDIS_URL;
 
   // Quick sanity check: REDIS_URL must look like a URL, not a CLI command
-  if (!redisUrl || redisUrl.includes('redis-cli') || !redisUrl.startsWith('redis')) {
+  if (!redisUrl || redisUrl.includes('redis-cli') || (!redisUrl.startsWith('redis://') && !redisUrl.startsWith('rediss://'))) {
     if (redisUrl) {
-      console.warn('⚠️  REDIS_URL looks like a CLI command, not a connection string. Falling back to in-memory store.');
+      console.warn('⚠️  REDIS_URL is not a valid connection string. Falling back to in-memory store.');
     }
     throw new Error('Invalid or missing REDIS_URL');
   }
@@ -77,30 +100,54 @@ try {
   const client = new Redis(redisUrl, {
     lazyConnect:          true,
     enableOfflineQueue:   false,
-    retryStrategy:        (times) => (times > 3 ? null : 200 * times),
-    maxRetriesPerRequest: 1,
-    connectTimeout:       3000,
-    tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+    maxRetriesPerRequest: 2,
+    connectTimeout:       5000,
+    // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, then cap at 5s
+    // Keeps retrying indefinitely (returns number, not null) to survive transient outages
+    retryStrategy: (times) => {
+      if (times > 20) return 5000; // cap at 5s after 20 attempts
+      return Math.min(times * 200, 5000);
+    },
+    // TLS config for rediss:// URLs
+    tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
   });
 
-  client.on('connect', () => console.log('✅ Redis connected'));
-  client.on('error', () => {}); // silenced — handled by fallback
+  client.on('connect', () => {
+    console.log('✅ Redis connected');
+    // Switch back to Redis if we had fallen back to memory
+    if (wrapper._backend === sharedMemoryStore) {
+      wrapper._backend = client;
+      wrapper._usingRedis = true;
+      console.log('✅ Redis recovered — switched back from in-memory store');
+    }
+  });
+
+  client.on('error', (err) => {
+    // Only log occasionally to avoid flooding
+    if (wrapper._usingRedis) {
+      console.warn(`⚠️  Redis error: ${err.message}`);
+    }
+  });
+
+  client.on('close', () => {
+    // Switch to memory store on disconnect so the app keeps working
+    switchToMemoryStore('connection closed');
+  });
 
   client.connect().catch(() => {});
 
   wrapper._backend = client;
+  wrapper._redisClient = client;
+  wrapper._usingRedis = true;
 
-  // On first error, switch to memory store
-  client.once('error', switchToMemoryStore);
-
-  // Also switch if not ready within 3 seconds
+  // If not ready within 5 seconds, fall back to memory
   setTimeout(() => {
     if (client.status !== 'ready') {
-      switchToMemoryStore();
+      switchToMemoryStore('connection timeout');
     }
-  }, 3000);
+  }, 5000);
 } catch {
-  switchToMemoryStore();
+  switchToMemoryStore('init error');
 }
 
 module.exports = wrapper;

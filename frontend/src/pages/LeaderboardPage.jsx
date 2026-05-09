@@ -37,7 +37,7 @@ function timeAgo(date) {
    MAIN PAGE
 ──────────────────────────────────────── */
 export default function LeaderboardPage() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
 
   const [rows, setRows]           = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -56,9 +56,9 @@ export default function LeaderboardPage() {
   const fetchLeaderboard = useCallback(() => {
     setLoading(true);
     axios
-      .get('/api/profile/leaderboard', {
+       .get('/api/profile/leaderboard', {
         baseURL: process.env.REACT_APP_API_URL,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       })
       .then((res) => {
         const data = res.data?.leaderboard ?? res.data ?? [];
@@ -74,7 +74,7 @@ export default function LeaderboardPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [token, user]);
+  }, [user]);
 
   useEffect(() => { fetchLeaderboard(); }, [fetchLeaderboard]);
 

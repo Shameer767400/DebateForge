@@ -72,7 +72,7 @@ export default function RegisterPage() {
       const res = await axios.post(
         '/api/auth/register',
         { username, email, password },
-        { baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001' }
+        { baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001', withCredentials: true }
       );
       login(res.data.token, res.data.user);
       toast.success('Account created! Please check your email for a verification code.');

@@ -30,7 +30,7 @@ function StatCard({ value, label, color }) {
 }
 
 export default function ProfilePage() {
-  const { user, token, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
@@ -42,13 +42,12 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
-    const headers = { Authorization: `Bearer ${token}` };
+    const opts = { baseURL: API, withCredentials: true };
 
     Promise.allSettled([
-      axios.get('/api/profile/me', { baseURL: API, headers }),
-      axios.get('/api/profile/fallacies', { baseURL: API, headers }),
-      axios.get('/api/debates/history?limit=10', { baseURL: API, headers }),
+      axios.get('/api/profile/me', opts),
+      axios.get('/api/profile/fallacies', opts),
+      axios.get('/api/debates/history?limit=10', opts),
     ]).then(([prof, fall, hist]) => {
       if (prof.status === 'fulfilled') {
         setProfile(prof.value.data);
@@ -60,7 +59,7 @@ export default function ProfilePage() {
       if (hist.status === 'fulfilled') setHistory(hist.value.data?.debates ?? []);
       setLoading(false);
     });
-  }, [token]);
+  }, []);
 
   const profileUser = profile?.user ?? user;
   const wins = profileUser?.wins ?? 0;
@@ -87,8 +86,8 @@ export default function ProfilePage() {
       formData.append('avatar', file);
       const res = await axios.post('/api/profile/avatar', formData, {
         baseURL: API,
+        withCredentials: true,
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
         },
       });
@@ -104,7 +103,7 @@ export default function ProfilePage() {
     try {
       await axios.delete('/api/profile/avatar', {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       setAvatarUrl(null);
     } catch (err) {
@@ -126,7 +125,7 @@ export default function ProfilePage() {
     try {
       await axios.put('/api/profile/bio', { bio }, {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       setEditingBio(false);
     } catch (err) {
@@ -168,7 +167,7 @@ export default function ProfilePage() {
     try {
       await axios.post('/api/auth/change-password', { currentPassword, newPassword }, {
         baseURL: API,
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       setPasswordMsg({ type: 'success', text: 'Password changed successfully!' });
       setCurrentPassword('');

@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
 import '../styles/multiplayer.css';
 
 const API = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
 
 export default function MultiplayerLobbyPage() {
-  const { token } = useAuth();
   const navigate = useNavigate();
 
   const [tab, setTab] = useState('create'); // create | join | browse
@@ -33,13 +31,13 @@ export default function MultiplayerLobbyPage() {
       axios
         .get('/api/rooms', {
           baseURL: API,
-          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
         })
         .then((res) => setRooms(res.data.rooms || []))
         .catch(() => setError('Failed to load rooms.'))
         .finally(() => setLoading(false));
     }
-  }, [tab, token]);
+  }, [tab]);
 
   /* ── Create room ── */
   const handleCreate = async () => {
@@ -53,7 +51,7 @@ export default function MultiplayerLobbyPage() {
       const res = await axios.post(
         '/api/rooms',
         { topic: topic.trim(), maxTeamSize, maxRounds, turnTimerSecs: turnTimer },
-        { baseURL: API, headers: { Authorization: `Bearer ${token}` } }
+        { baseURL: API, withCredentials: true }
       );
       navigate(`/room/${res.data.roomId}`);
     } catch (err) {
@@ -75,7 +73,7 @@ export default function MultiplayerLobbyPage() {
       const res = await axios.post(
         '/api/rooms/join',
         { roomCode: roomCode.trim().toUpperCase() },
-        { baseURL: API, headers: { Authorization: `Bearer ${token}` } }
+        { baseURL: API, withCredentials: true }
       );
       navigate(`/room/${res.data.roomId}`);
     } catch (err) {

@@ -278,9 +278,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     const socket = io(resolveSocketUrl(), {
       path: '/socket.io',
       transports: ['polling', 'websocket'],
-      auth: {
-        token: localStorage.getItem('debateforge_token') || localStorage.getItem('token'),
-      },
+      withCredentials: true, // Send HTTP-only cookie with handshake
     });
 
     socketRef.current = socket;
