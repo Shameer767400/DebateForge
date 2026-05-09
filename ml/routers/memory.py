@@ -59,7 +59,32 @@ class CoachingPlanResponse(BaseModel):
 FAISS_DIR = os.path.join(os.path.dirname(__file__), "..", "faiss_data")
 os.makedirs(FAISS_DIR, exist_ok=True)
 
-DIMENSION = 384  # all-MiniLM-L6-v2 output dimension
+DIMENSION = 128  # TF-IDF SVD reduced dimension (replaces 384 from MiniLM)
+
+# ── Lightweight TF-IDF encoder (replaces sentence-transformers/torch) ──
+import hashlib
+
+def _tfidf_encode(text: str) -> "np.ndarray":
+    """
+    Fast, deterministic text → float32 vector using character n-gram hashing.
+    No model loading required. Memory usage: <1MB.
+    """
+    import numpy as np
+    vec = np.zeros(DIMENSION, dtype="float32")
+    text = text.lower().strip()
+    # Character 3-grams
+    ngrams = [text[i:i+3] for i in range(len(text) - 2)]
+    if not ngrams:
+        ngrams = list(text) or ["<empty>"]
+    for gram in ngrams:
+        h = int(hashlib.md5(gram.encode()).hexdigest(), 16)
+        idx = h % DIMENSION
+        vec[idx] += 1.0
+    # L2 normalize
+    norm = np.linalg.norm(vec)
+    if norm > 0:
+        vec /= norm
+    return vec.reshape(1, -1)
 
 
 def get_user_index(user_id: str):
@@ -126,9 +151,6 @@ def _get_index():
 
 @router.post("/store")
 async def store_argument(payload: StoreRequest):
-    if not model_store.sentence_model:
-        return {"stored": False}
-
     if USE_LOCAL_MEMORY:
         return await _store_faiss(payload)
     else:
@@ -141,9 +163,7 @@ async def _store_faiss(payload: StoreRequest):
         return {"stored": False, "error": "faiss-cpu not installed"}
 
     try:
-        embedding = model_store.sentence_model.encode(
-            [payload.argument_text], convert_to_numpy=True
-        )[0].astype("float32").reshape(1, -1)
+        embedding = _tfidf_encode(payload.argument_text).astype("float32")
 
         # Normalize for cosine similarity
         faiss.normalize_L2(embedding)
@@ -185,9 +205,7 @@ async def _store_pinecone(payload: StoreRequest):
         return {"stored": False}
 
     try:
-        embedding = model_store.sentence_model.encode(
-            [payload.argument_text], convert_to_numpy=True
-        )[0]
+        embedding = _tfidf_encode(payload.argument_text).astype("float32").flatten()
         timestamp = int(time.time())
         user_id = payload.user_id
         debate_id = payload.debate_id

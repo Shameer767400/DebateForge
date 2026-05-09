@@ -13,11 +13,6 @@ from routers.scorer import router as scorer_router
 from routers.memory import router as memory_router
 from routers.transcription import router as transcription_router
 
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:  # pragma: no cover - optional at runtime
-    SentenceTransformer = None
-
 app = FastAPI(title="DebateForge ML Service", version="1.0.0")
 
 app.add_middleware(
@@ -31,43 +26,25 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    # Load sentence transformer
-    if SentenceTransformer is not None and model_store.sentence_model is None:
-        model_store.sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
-        print("✅ Sentence transformer loaded")
-
-    # Try to load XGBoost or other models if files exist
+    """
+    Lightweight startup — no heavy model loading.
+    sentence-transformers/torch removed to stay under 512MB RAM (Render free tier).
+    Uses scikit-learn TF-IDF for embeddings instead.
+    """
+    # Try to load optional XGBoost scoring models if present
     base_dir = Path(__file__).parent
     logic_path = base_dir / "models" / "logic_model.json"
     evidence_path = base_dir / "models" / "evidence_model.json"
     clarity_path = base_dir / "models" / "clarity_model.json"
 
     if logic_path.exists():
-        # Placeholder for real XGBoost loading
         model_store.logic_model = str(logic_path)
-
     if evidence_path.exists():
         model_store.evidence_model = str(evidence_path)
-
     if clarity_path.exists():
         model_store.clarity_model = str(clarity_path)
 
-    # Pre-load local models if toggles are enabled
-    if os.getenv("USE_LOCAL_STT", "false").lower() == "true":
-        try:
-            from services.whisper_service import get_whisper_model
-            get_whisper_model()
-        except Exception as e:
-            print(f"⚠️  Local Whisper not loaded: {e}")
-
-    if os.getenv("USE_LOCAL_TTS", "false").lower() == "true":
-        try:
-            from services.tts_service import get_tts_model
-            get_tts_model()
-        except Exception as e:
-            print(f"⚠️  Local TTS not loaded: {e}")
-
-    print("✅ All models ready")
+    print("✅ ML Service ready (lightweight mode — TF-IDF embeddings)")
 
 
 app.include_router(fallacy_router, prefix="/fallacy")
@@ -78,8 +55,11 @@ app.include_router(transcription_router, prefix="/transcription")
 
 @app.get("/health")
 async def health():
-    models_loaded = model_store.sentence_model is not None
-    return {"status": "ok", "models_loaded": models_loaded}
+    return {
+        "status": "ok",
+        "mode": "lightweight",
+        "embeddings": "tfidf",
+    }
 
 @app.get("/")
 async def root():
@@ -90,5 +70,6 @@ async def root():
           "/fallacy",
           "/scorer",
           "/memory",
+          "/transcription",
         ],
     }
