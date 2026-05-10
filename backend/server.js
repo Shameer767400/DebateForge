@@ -249,6 +249,20 @@ const uploadLimiter = rateLimit({
    6. ROUTES — with targeted rate limiters
 ═══════════════════════════════════════════ */
 
+// Debug endpoint to check Render environment variables
+app.get('/api/debug/env', (req, res) => {
+  res.json({
+    ml_url: process.env.ML_SERVICE_URL || 'NOT_SET',
+    smtp_host: process.env.SMTP_HOST || 'NOT_SET',
+    smtp_user: process.env.SMTP_USER || 'NOT_SET',
+    smtp_pass_length: process.env.SMTP_PASS ? process.env.SMTP_PASS.length : 0,
+    sarvam_key_length: process.env.SARVAM_API_KEY ? process.env.SARVAM_API_KEY.length : 0,
+    groq_key_length: process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.length : 0,
+    openai_key_length: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0,
+    node_env: process.env.NODE_ENV,
+  });
+});
+
 // Serve uploaded files (profile pics, etc.)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
