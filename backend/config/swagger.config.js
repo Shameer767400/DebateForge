@@ -51,6 +51,7 @@ const options = {
       { name: 'Topics', description: 'Debate topic discovery and proposal' },
       { name: 'Push', description: 'Web Push notification subscription management' },
       { name: 'Health', description: 'Service health and readiness checks' },
+      { name: 'Monitoring', description: 'System status, AI provider health, ML service monitoring' },
     ],
     components: {
       securitySchemes: {

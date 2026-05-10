@@ -1,3 +1,19 @@
+/**
+ * @fileoverview DashboardPage — user's debate command center.
+ *
+ * Displays:
+ *   - ELO rating, win/loss/draw stats, and global rank
+ *   - Daily streak tracker with freeze indicator
+ *   - Fallacy radar chart (6-axis visualization)
+ *   - Recent debate history with score breakdown
+ *   - Daily challenge card
+ *   - Push notification subscription
+ *
+ * Data Sources: /api/profile/me, /api/profile/fallacies, /api/debates/history
+ *
+ * @module pages/DashboardPage
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {

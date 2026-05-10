@@ -5,7 +5,7 @@
 
 **Sharpen your arguments against AI.** Real-time voice & text debate platform with live scoring, fallacy detection, formal debate formats, and competitive ELO rankings.
 
-📖 **[API Documentation](API_DOCS.md)** · 🗺️ **[Roadmap](ROADMAP.md)** · 🔧 **[Swagger UI](https://debateforge-backend.onrender.com/api-docs)**
+📖 **[API Documentation](API_DOCS.md)** · 🏗️ **[Architecture](ARCHITECTURE.md)** · 🗺️ **[Roadmap](ROADMAP.md)** · 🔧 **[Swagger UI](https://debateforge-backend.onrender.com/api-docs)**
 
 ---
 

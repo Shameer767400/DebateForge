@@ -1,3 +1,24 @@
+/**
+ * @fileoverview DebateRoomPage — real-time AI debate interface.
+ *
+ * Core Features:
+ *   - Voice recording with Whisper transcription
+ *   - Text input for no-mic fallback
+ *   - Streaming AI responses with TTS playback
+ *   - Live fallacy detection alerts
+ *   - Per-turn scoring (logic, evidence, clarity)
+ *   - Formal debate format phase management
+ *   - AI judge verdict with downloadable Report Card
+ *   - Victory confetti and streak celebrations
+ *
+ * WebSocket Events Used:
+ *   - join_debate, audio_chunk, audio_end, transcript_direct
+ *   - ai_text_chunk, ai_turn_complete, fallacy_detected, scores_update
+ *   - phase_update, judge_verdict, debate_ended
+ *
+ * @module pages/DebateRoomPage
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';

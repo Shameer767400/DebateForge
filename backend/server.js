@@ -18,6 +18,7 @@ const debateRoutes = require('./routes/debates');
 const profileRoutes = require('./routes/profile');
 const topicRoutes = require('./routes/topics');
 const pushRoutes = require('./routes/push.routes');
+const statusRoutes = require('./routes/status.routes');
 const swaggerSpec = require('./config/swagger.config');
 
 const { scheduleNotificationJobs } = require('./jobs/notifications.job');
@@ -308,6 +309,8 @@ app.use('/api/topics/propose', topicProposalLimiter);
 app.use('/api/topics', topicRoutes);
 
 app.use('/api/push', pushRoutes);
+
+app.use('/api/status', statusRoutes);
 
 /* ═══════════════════════════════════════════
    6a. SWAGGER / OPENAPI DOCUMENTATION
