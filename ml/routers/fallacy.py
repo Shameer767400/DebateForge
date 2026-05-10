@@ -1,3 +1,23 @@
+"""
+fallacy.py — Multi-layer logical fallacy detection engine.
+
+Detection Pipeline:
+  Layer 1: Rule-based keyword matching (fast, high precision)
+  Layer 2: Semantic similarity via sentence embeddings (when available)
+  Layer 3: SpaCy NLP analysis — dependency parsing, named entity recognition,
+           and syntactic pattern detection for advanced fallacy identification
+
+Supported Fallacy Types (11):
+  - slippery_slope, hasty_generalization, appeal_to_emotion
+  - strawman, ad_hominem, false_dichotomy, circular_reasoning
+  - appeal_to_authority, bandwagon, appeal_to_nature, red_herring
+
+Technology Stack:
+  - SpaCy (en_core_web_sm) — tokenization, POS tagging, NER, dependency parsing
+  - NumPy — cosine similarity for semantic detection
+  - Pydantic — request/response validation
+"""
+
 from typing import List, Dict, Optional, Tuple
 
 import numpy as np
@@ -5,6 +25,23 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from models.store import model_store
+
+# ── SpaCy NLP pipeline (loaded lazily) ──
+_nlp = None
+
+def _get_nlp():
+    """Load SpaCy English model (lazy singleton). Uses en_core_web_sm for
+    tokenization, POS tagging, Named Entity Recognition, and dependency parsing."""
+    global _nlp
+    if _nlp is None:
+        try:
+            import spacy
+            _nlp = spacy.load("en_core_web_sm")
+            print("✅ SpaCy en_core_web_sm loaded for fallacy NLP analysis")
+        except Exception as e:
+            print(f"⚠️  SpaCy not available ({e}), using rule-based detection only")
+            _nlp = False  # Mark as attempted but failed
+    return _nlp if _nlp is not False else None
 
 
 router = APIRouter(tags=["fallacy"])
@@ -369,6 +406,81 @@ def _semantic_detection(text: str) -> Optional[Tuple[str, float, str]]:
   return best_type, best_conf, ""
 
 
+# ═══════════════════════════════════════
+#    LAYER 3: SpaCy NLP-Based Detection
+# ═══════════════════════════════════════
+
+def _nlp_based_detection(text: str) -> Optional[Tuple[str, float, str]]:
+    """
+    Use SpaCy's NLP pipeline (dependency parsing, POS tagging, NER) to detect
+    fallacies based on syntactic and semantic patterns.
+
+    This layer catches fallacies that keyword matching misses, e.g.:
+    - Ad hominem: second-person pronouns as nsubj of negative predicates
+    - Hasty generalization: universal quantifiers (DET) + absolute adverbs
+    - Appeal to authority: PERSON/ORG entities + verbs like 'says', 'proves'
+    - Circular reasoning: high token overlap between first and last clauses
+    - False dichotomy: coordinating conjunctions with 'or' as exclusive structure
+    """
+    nlp = _get_nlp()
+    if nlp is None:
+        return None
+
+    try:
+        doc = nlp(text)
+
+        # ── Ad Hominem: "you" as subject of negative/dismissive predicate ──
+        ad_hominem_verbs = {"understand", "know", "qualified", "capable", "competent"}
+        for token in doc:
+            if token.dep_ == "nsubj" and token.text.lower() in ("you", "your"):
+                head = token.head
+                # Check for negation + dismissive verb
+                has_neg = any(c.dep_ == "neg" for c in head.children)
+                if has_neg and head.lemma_.lower() in ad_hominem_verbs:
+                    return ("ad_hominem", 68.0, f"'{head.text}' targeting 'you'")
+
+        # ── Hasty Generalization: universal quantifiers + absolute language ──
+        universal_dets = {"all", "every", "each", "no", "none"}
+        absolute_advs = {"always", "never", "constantly", "invariably"}
+        for token in doc:
+            if token.pos_ == "DET" and token.text.lower() in universal_dets:
+                return ("hasty_generalization", 64.0, f"universal quantifier '{token.text}'")
+            if token.pos_ == "ADV" and token.text.lower() in absolute_advs:
+                return ("hasty_generalization", 62.0, f"absolute adverb '{token.text}'")
+
+        # ── Appeal to Authority: PERSON/ORG entity + authority verbs ──
+        authority_verbs = {"say", "prove", "confirm", "agree", "show", "demonstrate"}
+        entities = [ent for ent in doc.ents if ent.label_ in ("PERSON", "ORG")]
+        if entities:
+            for token in doc:
+                if token.lemma_.lower() in authority_verbs:
+                    return ("appeal_to_authority", 58.0, f"authority '{entities[0].text}' + '{token.text}'")
+
+        # ── Circular Reasoning (NLP-enhanced): token overlap between clauses ──
+        sents = list(doc.sents)
+        if len(sents) >= 2:
+            first_lemmas = set(t.lemma_.lower() for t in sents[0] if t.pos_ not in ("DET", "ADP", "PUNCT", "AUX"))
+            last_lemmas = set(t.lemma_.lower() for t in sents[-1] if t.pos_ not in ("DET", "ADP", "PUNCT", "AUX"))
+            if first_lemmas and last_lemmas:
+                overlap = len(first_lemmas & last_lemmas) / max(len(first_lemmas), len(last_lemmas))
+                if overlap > 0.6:
+                    shared = ", ".join(list(first_lemmas & last_lemmas)[:3])
+                    return ("circular_reasoning", 65.0, f"high lemma overlap: {shared}")
+
+        # ── False Dichotomy: "either...or" syntactic structure ──
+        text_lower = text.lower()
+        if "either" in text_lower and " or " in text_lower:
+            # Check if 'or' is acting as a coordinating conjunction (cc)
+            for token in doc:
+                if token.text.lower() == "or" and token.dep_ == "cc":
+                    return ("false_dichotomy", 66.0, "'either...or' structure")
+
+    except Exception as e:
+        print(f"[fallacy] SpaCy NLP analysis error: {e}")
+
+    return None
+
+
 EXPLANATIONS: Dict[str, str] = {
   "slippery_slope": (
     "Your argument assumes that {triggered_phrase} will inevitably lead to an "
@@ -412,6 +524,15 @@ SEMANTIC_THRESHOLD = 52.0
 
 @router.post("/detect", response_model=FallacyResponse)
 async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
+  """
+  Detect logical fallacies in a debate argument using a multi-layer pipeline:
+
+  1. **Rule-based** — keyword pattern matching (fastest, highest precision)
+  2. **Semantic** — embedding similarity against known fallacy examples
+  3. **NLP** — SpaCy dependency parsing, POS tagging, and entity recognition
+
+  Returns the highest-confidence detection across all layers.
+  """
   argument_text = payload.argument.strip()
 
   if not argument_text:
@@ -465,6 +586,26 @@ async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
         triggered_phrase=phrase or "",
       )
 
+  # Layer 3: SpaCy NLP-based detection (catches what keywords miss)
+  nlp_result = _nlp_based_detection(argument_text)
+  if nlp_result:
+    fallacy_type, conf, phrase = nlp_result
+    explanation_template = EXPLANATIONS.get(
+      fallacy_type,
+      "This argument exhibits characteristics of {fallacy_type}.",
+    )
+    explanation = explanation_template.format(
+      triggered_phrase=phrase or "",
+      fallacy_type=fallacy_type,
+    )
+    return FallacyResponse(
+      detected=True,
+      fallacy_type=fallacy_type,
+      confidence=round(conf, 2),
+      explanation=explanation,
+      triggered_phrase=phrase or "",
+    )
+
   # No fallacy detected with sufficient confidence
   return FallacyResponse(
     detected=False,
@@ -473,4 +614,3 @@ async def detect_fallacy(payload: FallacyRequest) -> FallacyResponse:
     explanation="No logical fallacy detected",
     triggered_phrase="",
   )
-

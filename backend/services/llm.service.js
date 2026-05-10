@@ -1,3 +1,28 @@
+/**
+ * @fileoverview Multi-provider LLM service for DebateForge AI debate responses.
+ *
+ * Architecture: Cascading provider chain with automatic failover:
+ *   Indian Languages → Sarvam AI → Groq → OpenAI → Ollama (local)
+ *   English/Other    → Groq → OpenAI → Ollama (local)
+ *
+ * Features:
+ *   - API key rotation pool (up to 6 keys per provider) with rate-limit cooldown
+ *   - Adaptive coaching system prompt with user weakness profiling
+ *   - Multilingual debate support (30+ languages) with script validation
+ *   - Translation pipeline: Gemini primary → Ollama fallback
+ *   - Anti-repetition: previous responses injected to prevent duplicate output
+ *   - Per-persona debate styles: balanced, socratic, aggressive, academic, casual
+ *
+ * Providers:
+ *   - Sarvam AI (sarvam-m) — optimized for Indian languages (Telugu, Hindi, Tamil, etc.)
+ *   - Groq (llama-3.3-70b-versatile) — FREE, ultra-fast inference (~500ms)
+ *   - OpenAI (gpt-4o-mini) — reliable, paid fallback
+ *   - Ollama (llama3) — local LLM, no API key required, streaming
+ *   - Gemini (gemini-2.0-flash) — translation service
+ *
+ * @module services/llm.service
+ */
+
 const axios = require('axios');
 
 /* ── Local Ollama Config (Addition 4) ── */

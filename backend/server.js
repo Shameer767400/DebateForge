@@ -18,6 +18,7 @@ const debateRoutes = require('./routes/debates');
 const profileRoutes = require('./routes/profile');
 const topicRoutes = require('./routes/topics');
 const pushRoutes = require('./routes/push.routes');
+const swaggerSpec = require('./config/swagger.config');
 
 const { scheduleNotificationJobs } = require('./jobs/notifications.job');
 const secLogger = require('./services/security-logger.service');
@@ -308,8 +309,35 @@ app.use('/api/topics', topicRoutes);
 
 app.use('/api/push', pushRoutes);
 
+/* ═══════════════════════════════════════════
+   6a. SWAGGER / OPENAPI DOCUMENTATION
+   — Interactive API docs at /api-docs
+═══════════════════════════════════════════ */
+try {
+  const swaggerUi = require('swagger-ui-express');
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'DebateForge API Documentation',
+  }));
+  app.get('/api-docs.json', (_req, res) => res.json(swaggerSpec));
+} catch (e) {
+  // eslint-disable-next-line no-console
+  console.warn('⚠️  swagger-ui-express not installed, /api-docs disabled');
+}
 
-
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Service health check
+ *     description: Returns the health status of the backend, MongoDB, and Redis.
+ *     responses:
+ *       200:
+ *         description: All services healthy
+ *       503:
+ *         description: One or more dependencies degraded
+ */
 app.get('/health', (_req, res) => {
   const mongoState = mongoose.connection.readyState;
   const mongoStates = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };

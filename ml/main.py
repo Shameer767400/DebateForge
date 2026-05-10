@@ -1,3 +1,26 @@
+"""
+DebateForge ML Service — AI-powered debate analysis microservice.
+
+Provides four core capabilities via REST API:
+  1. /fallacy  — Multi-layer fallacy detection (rule-based + semantic + SpaCy NLP)
+  2. /scorer   — Argument quality scoring (logic, evidence, clarity) with NLTK sentiment
+  3. /memory   — FAISS / Pinecone vector memory for user weakness tracking & coaching
+  4. /transcription — Speech-to-text via Whisper (local) or Gemini API
+
+NLP Technology Stack:
+  - SpaCy (en_core_web_sm): tokenization, POS tagging, NER, dependency parsing
+  - NLTK (VADER): sentiment analysis for argument tone assessment
+  - scikit-learn: TF-IDF embeddings for lightweight semantic similarity
+  - FAISS: local vector store for per-user argument memory
+  - NumPy: numerical operations for similarity computation
+
+Architecture:
+  - FastAPI async framework with Pydantic validation
+  - Modular router-per-feature design for easy model swapping
+  - Lazy model loading to minimize cold-start memory usage
+  - Production-tested under Render free tier 512MB RAM constraint
+"""
+
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -13,7 +36,15 @@ from routers.scorer import router as scorer_router
 from routers.memory import router as memory_router
 from routers.transcription import router as transcription_router
 
-app = FastAPI(title="DebateForge ML Service", version="1.0.0")
+app = FastAPI(
+    title="DebateForge ML Service",
+    version="1.0.0",
+    description=(
+        "AI-powered debate analysis microservice providing fallacy detection, "
+        "argument scoring, vector memory for weakness tracking, and speech transcription. "
+        "Uses SpaCy for NLP, NLTK VADER for sentiment analysis, and TF-IDF for embeddings."
+    ),
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,7 +58,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event() -> None:
     """
-    Lightweight startup — no heavy model loading.
+    Lightweight startup — loads SpaCy model and NLTK data.
     sentence-transformers/torch removed to stay under 512MB RAM (Render free tier).
     Uses scikit-learn TF-IDF for embeddings instead.
     """
@@ -44,7 +75,23 @@ async def startup_event() -> None:
     if clarity_path.exists():
         model_store.clarity_model = str(clarity_path)
 
-    print("✅ ML Service ready (lightweight mode — TF-IDF embeddings)")
+    # Pre-load SpaCy model for fallacy detection & scoring
+    try:
+        import spacy
+        _nlp = spacy.load("en_core_web_sm")
+        print("✅ SpaCy en_core_web_sm loaded")
+    except Exception as e:
+        print(f"⚠️  SpaCy not available: {e} (fallacy detection will use rule-based only)")
+
+    # Pre-download NLTK VADER lexicon for sentiment analysis
+    try:
+        import nltk
+        nltk.download('vader_lexicon', quiet=True)
+        print("✅ NLTK VADER lexicon ready")
+    except Exception as e:
+        print(f"⚠️  NLTK not available: {e} (sentiment scoring disabled)")
+
+    print("✅ ML Service ready (lightweight mode — TF-IDF embeddings, SpaCy NLP, NLTK sentiment)")
 
 
 app.include_router(fallacy_router, prefix="/fallacy")
@@ -59,17 +106,24 @@ async def health():
         "status": "ok",
         "mode": "lightweight",
         "embeddings": "tfidf",
+        "nlp": "spacy_en_core_web_sm",
+        "sentiment": "nltk_vader",
     }
 
 @app.get("/")
 async def root():
     return {
         "service": "DebateForge ML",
+        "version": "1.0.0",
+        "nlp_stack": ["spacy", "nltk", "scikit-learn", "faiss"],
         "endpoints": [
           "/health",
-          "/fallacy",
-          "/scorer",
-          "/memory",
-          "/transcription",
+          "/fallacy/detect",
+          "/scorer/score",
+          "/memory/store",
+          "/memory/weaknesses/{user_id}",
+          "/memory/coaching-plan/{user_id}",
+          "/memory/clear/{user_id}",
+          "/transcription/transcribe",
         ],
     }

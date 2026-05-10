@@ -1,3 +1,52 @@
+/**
+ * @fileoverview Real-time WebSocket debate engine for DebateForge.
+ *
+ * Built on Socket.IO, this module manages the full lifecycle of a live debate session:
+ *   1. JWT authentication middleware
+ *   2. Connection limiting (max 5 per user)
+ *   3. Debate session management (Redis-backed state)
+ *   4. Audio transcription pipeline (ML service → Whisper/Gemini)
+ *   5. Real-time fallacy detection and argument scoring
+ *   6. Multi-provider LLM response streaming
+ *   7. Multilingual debate support with translation
+ *   8. Formal debate format engine (Oxford, Lincoln-Douglas, Parliamentary)
+ *   9. AI judge scoring with Report Card generation
+ *   10. ELO, streak, and achievement updates
+ *
+ * WebSocket Event Protocol:
+ *
+ *   Client → Server:
+ *     join_debate      — Join a debate room (creates/restores session)
+ *     audio_chunk      — Stream raw audio data (PCM/webm)
+ *     audio_end        — Signal end of audio recording → triggers transcription
+ *     transcript_direct — Send text directly (fallback for no-mic)
+ *     set_language     — Override debate language
+ *     end_debate       — End debate early (may trigger forfeit)
+ *
+ *   Server → Client:
+ *     debate_joined    — Confirmation with topic, side, difficulty, format
+ *     transcript_final — Transcribed user text
+ *     ai_thinking      — AI is generating a response
+ *     ai_text_chunk    — Streaming AI response text
+ *     ai_turn_complete — Full AI response ready
+ *     ai_translating   — Translation in progress (non-English)
+ *     fallacy_detected — Real-time fallacy alert
+ *     scores_update    — Per-turn scores (logic, evidence, clarity)
+ *     phase_update     — Formal debate phase transition
+ *     judge_verdict    — End-of-debate judge scoring and report card
+ *     debate_ended     — Debate concluded (forfeit case)
+ *     error            — Error message
+ *
+ * Security:
+ *   - JWT token verification on every connection
+ *   - Per-event rate limiting (configurable per event type)
+ *   - IDOR prevention: session.userId === socket.user.id on every event
+ *   - Turn-in-flight guard: prevents double-processing
+ *   - Connection limiting: max 5 sockets per user
+ *
+ * @module websocket/index
+ */
+
 'use strict';
 
 const { Server } = require('socket.io');

@@ -1,6 +1,11 @@
 # ⚔ DebateForge
 
+[![CI](https://github.com/Shameer767400/DebateForge/actions/workflows/ci.yml/badge.svg)](https://github.com/Shameer767400/DebateForge/actions/workflows/ci.yml)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Shameer767400/Shameer767400?utm_source=oss&utm_medium=github&utm_campaign=Shameer767400%2FShameer767400&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 **Sharpen your arguments against AI.** Real-time voice & text debate platform with live scoring, fallacy detection, formal debate formats, and competitive ELO rankings.
+
+📖 **[API Documentation](API_DOCS.md)** · 🗺️ **[Roadmap](ROADMAP.md)** · 🔧 **[Swagger UI](https://debateforge-backend.onrender.com/api-docs)**
 
 ---
 
@@ -11,7 +16,7 @@
 |---------|-------------|
 | 🎤 **Voice Debates** | Speak your arguments in real-time via browser mic — transcribed by Whisper |
 | 📝 **Text Debates** | Full text-based debate mode as an alternative to voice |
-| 🤖 **AI Opponent** | GPT/Gemini-powered responses (or local Ollama fallback) with streaming text + TTS voice output |
+| 🤖 **AI Opponent** | Multi-provider AI (Sarvam AI → Groq → OpenAI → Ollama) with streaming text + TTS voice output |
 | 📊 **Live Scoring** | Logic, Evidence, and Clarity scored after each round |
 | 🔍 **Fallacy Detection** | Real-time detection of logical fallacies (strawman, ad hominem, slippery slope, etc.) |
 | 🧠 **AI Memory** | FAISS / Pinecone vector store tracks your argument history and weaknesses across debates |
@@ -64,15 +69,19 @@
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | React 18, React Router v6, Axios, Recharts, Vanilla CSS (custom design system) |
-| **Backend** | Node.js, Express 5, Mongoose, JWT auth |
+| **Backend** | Node.js, Express 5, Mongoose, JWT auth, Swagger/OpenAPI |
 | **Database** | MongoDB (Atlas or local) |
 | **Cache** | Redis (optional, for ELO + leaderboard) |
-| **WebSocket** | ws — real-time debate events (with robust Redis fallback proxy) |
-| **AI/ML** | Python FastAPI — Whisper transcription, Ollama/GPT/Gemini responses, TTS |
+| **WebSocket** | Socket.IO — real-time debate events (with Redis session persistence) |
+| **AI Providers** | Sarvam AI (Indian languages), Groq (fast), OpenAI (reliable), Ollama (local) |
+| **NLP** | SpaCy (en_core_web_sm) — tokenization, POS tagging, NER, dependency parsing |
+| **Sentiment** | NLTK VADER — argument tone analysis for scoring |
+| **ML Service** | Python FastAPI — fallacy detection, scoring, memory, transcription |
 | **Vector Memory** | FAISS (local) or Pinecone (cloud) for argument history |
-| **Email** | Nodemailer (SMTP) — verification & password reset |
+| **Email** | Resend HTTP API — verification & password reset (Render-compatible) |
 | **Push** | Web Push API (VAPID) — browser push notifications |
 | **Testing** | Jest, Supertest, MongoDB Memory Server |
+| **CI/CD** | GitHub Actions — lint, test, build on every push |
 
 ---
 
@@ -293,8 +302,26 @@ Each phase has a configurable time limit and AI instructions tuned for that phas
 - All secrets loaded exclusively from environment variables
 
 ---
+---
 
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Shameer767400/Shameer767400?utm_source=oss&utm_medium=github&utm_campaign=Shameer767400%2FShameer767400&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+## 📖 API Documentation
+
+Interactive REST API documentation is available via Swagger UI:
+- **Local**: http://localhost:5001/api-docs
+- **Production**: https://debateforge-backend.onrender.com/api-docs
+
+WebSocket event protocol is documented in [API_DOCS.md](API_DOCS.md).
+
+---
+
+## 🗺️ Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned features including:
+- Peer-to-peer human debates
+- Video debates with emotion detection
+- React Native mobile app
+- Tournament system with bracket elimination
+- Enterprise API for classroom integration
 
 ## 📜 License
 
