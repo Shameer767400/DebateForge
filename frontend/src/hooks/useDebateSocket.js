@@ -92,24 +92,10 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       return wsUrl || apiUrl || '';
     }
 
-    const pageUrl = new URL(window.location.href);
-    const wsTarget = wsUrl ? new URL(wsUrl, window.location.href) : null;
-    const apiTarget = apiUrl ? new URL(apiUrl, window.location.href) : null;
-
-    const isLocalPage = ['localhost', '127.0.0.1'].includes(pageUrl.hostname);
-    const usesSeparateLocalBackend = [wsTarget, apiTarget].some(
-      (target) =>
-        target &&
-        ['localhost', '127.0.0.1'].includes(target.hostname) &&
-        target.origin !== pageUrl.origin
-    );
-
-    // In local dev, prefer same-origin so Vite can proxy /socket.io reliably.
-    if (isLocalPage && usesSeparateLocalBackend) {
-      return pageUrl.origin;
-    }
-
-    return wsUrl || apiUrl || pageUrl.origin;
+    // In local development, connect directly to the backend's WS_URL
+    // instead of relying on Vite's HTTP proxy for WebSocket connections.
+    // Vite's proxy can fail on WebSocket upgrade, causing silent disconnects.
+    return wsUrl || apiUrl || window.location.origin;
   }
 
   /* ─────────────────────────────────────────────

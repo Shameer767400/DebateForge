@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/theme.css';
 import '../styles/leaderboard.css';
@@ -37,6 +37,7 @@ function timeAgo(date) {
    MAIN PAGE
 ──────────────────────────────────────── */
 export default function LeaderboardPage() {
+  const api = useApi();
   const { user } = useAuth();
 
   const [rows, setRows]           = useState([]);

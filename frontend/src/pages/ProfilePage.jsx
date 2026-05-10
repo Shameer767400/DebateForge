@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/profile.css';
 import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
@@ -30,6 +30,7 @@ function StatCard({ value, label, color }) {
 }
 
 export default function ProfilePage() {
+  const api = useApi();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -45,9 +46,9 @@ export default function ProfilePage() {
     const opts = { baseURL: API, withCredentials: true };
 
     Promise.allSettled([
-      axios.get('/api/profile/me', opts),
-      axios.get('/api/profile/fallacies', opts),
-      axios.get('/api/debates/history?limit=10', opts),
+      api.get('/api/profile/me', opts),
+      api.get('/api/profile/fallacies', opts),
+      api.get('/api/debates/history?limit=10', opts),
     ]).then(([prof, fall, hist]) => {
       if (prof.status === 'fulfilled') {
         setProfile(prof.value.data);
@@ -84,7 +85,7 @@ export default function ProfilePage() {
     try {
       const formData = new FormData();
       formData.append('avatar', file);
-      const res = await axios.post('/api/profile/avatar', formData, {
+      const res = await api.post('/api/profile/avatar', formData, {
         baseURL: API,
         withCredentials: true,
         headers: {
@@ -101,7 +102,7 @@ export default function ProfilePage() {
 
   const handleRemoveAvatar = async () => {
     try {
-      await axios.delete('/api/profile/avatar', {
+      await api.delete('/api/profile/avatar', {
         baseURL: API,
         withCredentials: true,
       });
@@ -123,7 +124,7 @@ export default function ProfilePage() {
   const handleSaveBio = async () => {
     setSavingBio(true);
     try {
-      await axios.put('/api/profile/bio', { bio }, {
+      await api.put('/api/profile/bio', { bio }, {
         baseURL: API,
         withCredentials: true,
       });
@@ -165,7 +166,7 @@ export default function ProfilePage() {
 
     setSavingPassword(true);
     try {
-      await axios.post('/api/auth/change-password', { currentPassword, newPassword }, {
+      await api.post('/api/auth/change-password', { currentPassword, newPassword }, {
         baseURL: API,
         withCredentials: true,
       });

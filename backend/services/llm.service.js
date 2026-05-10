@@ -207,17 +207,217 @@ async function* streamOllama(session, userArgument) {
   }
 }
 
-/* ─── Public: stream response via Ollama ─── */
+/* ─── OpenAI key rotation pool ─── */
+/**
+ * Loads all available OpenAI API keys from environment.
+ * Supports OPENAI_API_KEY, OPENAI_API_KEY_2 through OPENAI_API_KEY_6.
+ */
+function getOpenAIKeys() {
+  const keys = [];
+  const primary = process.env.OPENAI_API_KEY;
+  if (primary) keys.push(primary);
+  for (let i = 2; i <= 6; i++) {
+    const k = process.env[`OPENAI_API_KEY_${i}`];
+    if (k) keys.push(k);
+  }
+  return keys;
+}
+
+// Track rate-limited keys: { keyIndex: failedAtTimestamp }
+const _rateLimitedKeys = new Map();
+const RATE_LIMIT_COOLDOWN_MS = 60000; // 60s cooldown before retrying a failed key
+
+function getNextAvailableKeyIndex(keys) {
+  const now = Date.now();
+  for (let i = 0; i < keys.length; i++) {
+    const failedAt = _rateLimitedKeys.get(i);
+    if (!failedAt || (now - failedAt) > RATE_LIMIT_COOLDOWN_MS) {
+      _rateLimitedKeys.delete(i); // Cooldown expired, key is available again
+      return i;
+    }
+  }
+  return -1; // All keys exhausted
+}
+
+/* ─── OpenAI direct generation (all languages — fast + reliable) ─── */
+/**
+ * Generate a debate response using OpenAI GPT-4o-mini.
+ * Works for ALL languages — generates natively in the target language.
+ * Automatically rotates through multiple API keys on rate-limit (429).
+ */
+async function generateOpenAIDirect(session, userArgument) {
+  const keys = getOpenAIKeys();
+  if (keys.length === 0) return null;
+
+  const systemPrompt = buildSystemPrompt(session);
+  const history = (session.conversationHistory || []).slice(-6);
+
+  const previousAiReplies = history
+    .filter(m => m.role === 'assistant')
+    .map(m => m.content)
+    .slice(-3);
+
+  const fullSystemPrompt = systemPrompt +
+    (previousAiReplies.length > 0
+      ? `\n\n=== YOUR PREVIOUS RESPONSES (DO NOT REPEAT THESE) ===\n${previousAiReplies.map((r, i) => `Round ${i + 1}: ${r.slice(0, 100)}...`).join('\n')}`
+      : '');
+
+  const messages = [
+    { role: 'system', content: fullSystemPrompt },
+    ...history.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    })),
+    { role: 'user', content: userArgument },
+  ];
+
+  // Try each available key until one works
+  let lastError = null;
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const keyIndex = getNextAvailableKeyIndex(keys);
+    if (keyIndex === -1) {
+      console.warn(`[OPENAI] All ${keys.length} API keys are rate-limited`); // eslint-disable-line no-console
+      break;
+    }
+
+    const apiKey = keys[keyIndex];
+    const keyLabel = keyIndex === 0 ? 'primary' : `key-${keyIndex + 1}`;
+
+    try {
+      const response = await Promise.race([
+        axios.post('https://api.openai.com/v1/chat/completions', {
+          model: 'gpt-4o-mini',
+          messages,
+          max_tokens: 300,
+          temperature: 0.7,
+        }, {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('OpenAI timed out')), 15000)),
+      ]);
+
+      const text = response.data?.choices?.[0]?.message?.content;
+      if (text?.trim()) {
+        console.log(`[OPENAI] Generated ${text.trim().length} chars via ${keyLabel} (lang: ${session.currentLanguage || 'en'})`); // eslint-disable-line no-console
+        return text.trim();
+      }
+    } catch (e) {
+      const status = e.response?.status;
+      const errMsg = e.response?.data?.error?.message || e.message?.slice(0, 120);
+      console.warn(`[OPENAI] ${keyLabel} failed (${status || 'timeout'}): ${errMsg}`); // eslint-disable-line no-console
+      lastError = e;
+
+      // Mark key as rate-limited on 429 or auth errors
+      if (status === 429 || status === 401 || status === 403) {
+        _rateLimitedKeys.set(keyIndex, Date.now());
+        continue; // Try next key
+      }
+      // For other errors (network, timeout), don't rotate — likely a general issue
+      break;
+    }
+  }
+
+  return null;
+}
+
+/* ─── Groq generation (FREE, ultra-fast, multilingual) ─── */
+/**
+ * Generate a debate response using Groq's free API.
+ * Groq runs on custom LPU chips — responses come in ~500ms-2s.
+ * Uses llama-3.3-70b-versatile which handles multilingual well.
+ */
+async function generateGroqDirect(session, userArgument) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  const systemPrompt = buildSystemPrompt(session);
+  const history = (session.conversationHistory || []).slice(-6);
+
+  const previousAiReplies = history
+    .filter(m => m.role === 'assistant')
+    .map(m => m.content)
+    .slice(-3);
+
+  const fullSystemPrompt = systemPrompt +
+    (previousAiReplies.length > 0
+      ? `\n\n=== YOUR PREVIOUS RESPONSES (DO NOT REPEAT THESE) ===\n${previousAiReplies.map((r, i) => `Round ${i + 1}: ${r.slice(0, 100)}...`).join('\n')}`
+      : '');
+
+  const messages = [
+    { role: 'system', content: fullSystemPrompt },
+    ...history.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    })),
+    { role: 'user', content: userArgument },
+  ];
+
+  try {
+    const response = await Promise.race([
+      axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        max_tokens: 300,
+        temperature: 0.7,
+      }, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Groq timed out')), 10000)),
+    ]);
+
+    const text = response.data?.choices?.[0]?.message?.content;
+    if (text?.trim()) {
+      console.log(`[GROQ] Generated ${text.trim().length} chars (lang: ${session.currentLanguage || 'en'})`); // eslint-disable-line no-console
+      return text.trim();
+    }
+    return null;
+  } catch (e) {
+    const status = e.response?.status;
+    const errMsg = e.response?.data?.error?.message || e.message?.slice(0, 150);
+    console.warn(`[GROQ] Failed (${status || 'timeout'}): ${errMsg}`); // eslint-disable-line no-console
+    return null;
+  }
+}
+
+/* ─── Public: generate response via Groq (primary) → OpenAI → Ollama (fallback) ─── */
 async function* streamDebateResponse(session, userArgument) {
+  const lang = session.currentLanguage || 'en';
+
+  // 1. Try Groq first — FREE, ultra-fast (~500ms-2s)
+  console.log(`[LLM] Trying Groq (lang: ${lang})`); // eslint-disable-line no-console
+  const groqResponse = await generateGroqDirect(session, userArgument);
+  if (groqResponse) {
+    yield groqResponse;
+    return;
+  }
+
+  // 2. Try OpenAI — paid but reliable
+  console.log(`[LLM] Groq unavailable, trying OpenAI (lang: ${lang})`); // eslint-disable-line no-console
+  const openaiResponse = await generateOpenAIDirect(session, userArgument);
+  if (openaiResponse) {
+    yield openaiResponse;
+    return;
+  }
+
+  // 3. Last resort — local Ollama
+  console.warn(`[LLM] All cloud APIs failed, falling back to Ollama`); // eslint-disable-line no-console
   try {
     yield* streamOllama(session, userArgument);
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error(`[LLM] Ollama failed:`, err?.message);
+    console.error(`[LLM] Ollama also failed:`, err?.message);
     if (err.message === 'AI_SERVICE_OFFLINE') {
       throw new Error('AI service is offline. Please start Ollama (`ollama serve`) and try again.');
     }
-    throw new Error('Local AI failed to respond. Ensure Ollama is running and the llama3 model is installed (`ollama run llama3`).');
+    throw new Error('All AI services failed. Please check your API keys and try again.');
   }
 }
 
@@ -260,80 +460,135 @@ async function translateText(text, langCode) {
 
   const langName = LANGUAGE_NAMES[langCode] || langCode;
 
-  const translationPrompt = `Translate the following debate argument into ${langName}.
+  // Script-based validation: check if output contains characters from the target language
+  const SCRIPT_PATTERNS = {
+    te: /[\u0C00-\u0C7F]/,  // Telugu
+    ta: /[\u0B80-\u0BFF]/,  // Tamil
+    kn: /[\u0C80-\u0CFF]/,  // Kannada
+    ml: /[\u0D00-\u0D7F]/,  // Malayalam
+    hi: /[\u0900-\u097F]/,  // Devanagari (Hindi/Marathi)
+    mr: /[\u0900-\u097F]/,  // Marathi (also Devanagari)
+    bn: /[\u0980-\u09FF]/,  // Bengali
+    gu: /[\u0A80-\u0AFF]/,  // Gujarati
+    pa: /[\u0A00-\u0A7F]/,  // Punjabi (Gurmukhi)
+    ur: /[\u0600-\u06FF]/,  // Urdu (Arabic script)
+    ar: /[\u0600-\u06FF]/,  // Arabic
+    zh: /[\u4E00-\u9FFF]/,  // Chinese
+    ja: /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/,  // Japanese
+    ko: /[\uAC00-\uD7AF\u1100-\u11FF]/,  // Korean
+    ru: /[\u0400-\u04FF]/,  // Russian/Cyrillic
+  };
 
-RULES:
-- Translate the ENTIRE text into ${langName}. Every single word must be in ${langName}.
-- Do NOT keep any English words, phrases, or sentences.
-- Do NOT add any commentary, notes, or explanations.
-- Preserve the argumentative tone and rhetorical style.
-- Output ONLY the translated text, nothing else.
+  function isInTargetLanguage(output) {
+    const pattern = SCRIPT_PATTERNS[langCode];
+    if (!pattern) return true; // Can't validate Latin-script languages
+    // At least 30% of non-whitespace characters should be in the target script
+    const stripped = output.replace(/[\s\d.,!?;:'"()\-—–…\u0000-\u007F]/g, '');
+    if (stripped.length === 0) return false;
+    const matches = (stripped.match(new RegExp(pattern.source, 'g')) || []).length;
+    return (matches / stripped.length) > 0.3;
+  }
 
-TEXT TO TRANSLATE:
+  function stripEnglishLeakage(output) {
+    // Remove any leading/trailing English sentences before/after the target language text
+    const pattern = SCRIPT_PATTERNS[langCode];
+    if (!pattern) return output;
+    const lines = output.split(/\n/).filter(l => l.trim());
+    return lines.filter(line => {
+      // Keep line if it contains target-script characters
+      return pattern.test(line);
+    }).join('\n') || output;
+  }
+
+  const primaryPrompt = `You are a professional translator. Translate the following text into ${langName}.
+
+CRITICAL RULES:
+1. Output ONLY the ${langName} translation. Nothing else.
+2. Every single word must be in ${langName}. ZERO English words allowed.
+3. Do NOT include the original English text.
+4. Do NOT add notes, explanations, or labels like "Translation:" or "Here is the translation".
+5. Translate proper nouns and technical terms into ${langName} equivalents.
+6. Preserve the argumentative tone.
+
+TEXT:
 ${text}`;
 
-  /* ── Attempt 1: Gemini API ── */
-  const model = getGeminiModel();
-  if (model) {
+  const retryPrompt = `TRANSLATE TO ${langName.toUpperCase()} ONLY. Your previous translation contained English. This time output ONLY ${langName} text. No English at all. Not even one English word.
+
+${text}`;
+
+  async function attemptGemini(prompt) {
+    const model = getGeminiModel();
+    if (!model) return null;
     try {
       const result = await Promise.race([
-        model.generateContent(translationPrompt),
+        model.generateContent(prompt),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini translation timed out')), 15000)),
       ]);
-
       const translated = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (translated && translated.trim().length > 0) {
-        // eslint-disable-next-line no-console
-        console.log(`[GEMINI] Translated ${text.length} chars → ${langName} (${translated.trim().length} chars)`);
-        return translated.trim();
-      }
+      return translated?.trim() || null;
     } catch (e) {
-      const is429 = e.message?.includes('429') || e.message?.includes('quota');
-      // eslint-disable-next-line no-console
-      console.warn(`[GEMINI] Translation failed${is429 ? ' (quota exceeded)' : ''}: ${e.message?.slice(0, 120)}`);
-      // Fall through to Ollama
+      console.warn(`[GEMINI] Translation failed: ${e.message?.slice(0, 120)}`); // eslint-disable-line no-console
+      return null;
     }
   }
 
-  /* ── Attempt 2: Ollama local translation ── */
-  try {
-    // eslint-disable-next-line no-console
-    console.log(`[OLLAMA] Attempting translation to ${langName}...`);
-    const response = await axios.post(
-      `${OLLAMA_URL}/api/chat`,
-      {
-        model: OLLAMA_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: `You are a translator. You ONLY output translated text. No explanations.`,
-          },
-          {
-            role: 'user',
-            content: translationPrompt,
-          },
-        ],
-        stream: false,
-        options: {
-          temperature: 0.3,
-          num_predict: 500,
+  async function attemptOllama(prompt) {
+    try {
+      const response = await axios.post(
+        `${OLLAMA_URL}/api/chat`,
+        {
+          model: OLLAMA_MODEL,
+          messages: [
+            { role: 'system', content: `You are a translator. Output ONLY the ${langName} translation. No English.` },
+            { role: 'user', content: prompt },
+          ],
+          stream: false,
+          options: { temperature: 0.3, num_predict: 500 },
         },
-      },
-      { timeout: 45000 }
-    );
-
-    const ollamaTranslated = response.data?.message?.content;
-    if (ollamaTranslated && ollamaTranslated.trim().length > 0) {
-      // eslint-disable-next-line no-console
-      console.log(`[OLLAMA] Translated ${text.length} chars → ${langName} (${ollamaTranslated.trim().length} chars)`);
-      return ollamaTranslated.trim();
+        { timeout: 45000 }
+      );
+      return response.data?.message?.content?.trim() || null;
+    } catch (e) {
+      console.error(`[OLLAMA] Translation failed:`, e.message?.slice(0, 120)); // eslint-disable-line no-console
+      return null;
     }
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error(`[OLLAMA] Translation also failed:`, e.message?.slice(0, 120));
   }
 
-  // All translation methods failed — return original English
+  // Attempt 1: Gemini primary translation
+  let translated = await attemptGemini(primaryPrompt);
+  if (translated && translated.length > 0) {
+    // Validate: does the output actually contain target-language script?
+    if (isInTargetLanguage(translated)) {
+      translated = stripEnglishLeakage(translated);
+      console.log(`[TRANSLATE] Gemini → ${langName}: ${text.length} → ${translated.length} chars`); // eslint-disable-line no-console
+      return translated;
+    }
+    // First attempt returned English/mixed — retry with stricter prompt
+    console.warn(`[TRANSLATE] Gemini returned mixed/English output, retrying with stricter prompt`); // eslint-disable-line no-console
+    const retry = await attemptGemini(retryPrompt);
+    if (retry && isInTargetLanguage(retry)) {
+      console.log(`[TRANSLATE] Gemini retry → ${langName}: ${retry.length} chars`); // eslint-disable-line no-console
+      return stripEnglishLeakage(retry);
+    }
+  }
+
+  // Attempt 2: Ollama fallback
+  console.log(`[TRANSLATE] Falling back to Ollama for ${langName} translation`); // eslint-disable-line no-console
+  const ollamaResult = await attemptOllama(primaryPrompt);
+  if (ollamaResult && isInTargetLanguage(ollamaResult)) {
+    console.log(`[TRANSLATE] Ollama → ${langName}: ${ollamaResult.length} chars`); // eslint-disable-line no-console
+    return stripEnglishLeakage(ollamaResult);
+  }
+
+  // All attempts failed — return whatever we got (even if mixed) rather than pure English
+  const bestAttempt = translated || ollamaResult;
+  if (bestAttempt && bestAttempt !== text) {
+    console.warn(`[TRANSLATE] Returning best-effort translation (may contain English)`); // eslint-disable-line no-console
+    return stripEnglishLeakage(bestAttempt);
+  }
+
+  console.error(`[TRANSLATE] All translation methods failed for ${langName}`); // eslint-disable-line no-console
   return text;
 }
 

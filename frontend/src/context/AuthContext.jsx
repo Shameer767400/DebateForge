@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const AuthContext = createContext(null);
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
+const API_BASE = process.env.REACT_APP_API_URL || '';
 
 /**
  * Shared axios instance for auth-only requests.
@@ -75,8 +75,9 @@ export function AuthProvider({ children }) {
     setUser(null);
     logoutInProgress.current = false;
 
-    // Navigate to landing page
-    window.location.href = '/';
+    // Don't do window.location.href = '/' here — it causes a full page reload
+    // that destroys React state (e.g. mid-debate). The ProtectedRoute component
+    // will detect isAuthenticated=false and redirect to /login via React Router.
   }, []);
 
   /**

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
+import { useApi } from '../hooks/useApi';
 
 import { useToast } from '../context/ToastContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
@@ -245,6 +245,7 @@ function StreamText({ text }) {
   MAIN PAGE
 ───────────────────────────────────────── */
 export default function DebateRoomPage() {
+  const api = useApi();
   const { id: debateId } = useParams();
   const navigate          = useNavigate();
 
@@ -505,25 +506,27 @@ export default function DebateRoomPage() {
   /* ── fetch debate metadata on mount ── */
   useEffect(() => {
     if (!debateId) return;
-    axios
-      .get(`/api/debates/${debateId}`, {
-        baseURL: process.env.REACT_APP_API_URL,
-        withCredentials: true,
-      })
+    api
+      .get(`/api/debates/${debateId}`)
       .then((r) => setDebateInfo(r.data?.debate ?? r.data))
-      .catch(console.error);
+      .catch((err) => {
+        console.error('[DebateRoom] Failed to load debate info:', err);
+        toast.error('Could not load debate. Returning to lobby.');
+        navigate('/lobby');
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debateId]);
 
   /* ── Navigate to dashboard after debate ends ──
        If judgeVerdict is showing, user navigates manually via the verdict buttons.
-       If there's no verdict (e.g. user pressed Esc), auto-navigate after 3s. ── */
+       If there's no verdict (e.g. user pressed Esc), show a toast and let user navigate. ── */
   useEffect(() => {
     if (phase !== 'ended') return;
     if (judgeVerdict) return; // Let user dismiss the verdict overlay manually
     if (endResult?.winner === 'user') toast.success('🏆 You won the debate!');
     else if (endResult?.winner === 'ai') toast.error('The AI won this round. Keep forging!');
-    else toast.info('Debate ended.');
-    const t = setTimeout(() => navigate('/dashboard'), 3000);
+    else toast.info('Debate ended. Returning to dashboard...');
+    const t = setTimeout(() => navigate('/dashboard'), 5000);
     return () => clearTimeout(t);
   }, [phase, navigate, endResult, toast, judgeVerdict]);
 

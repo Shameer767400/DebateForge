@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/theme.css';
 
@@ -142,6 +142,7 @@ function ResultBadge({ winner }) {
    MAIN PAGE
 ══════════════════════════════════════════════════════════ */
 export default function DebateHistoryPage() {
+  const api = useApi();
   const navigate = useNavigate();
 
   const [debates, setDebates] = useState([]);

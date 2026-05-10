@@ -9,7 +9,6 @@ const axios      = require('axios');
 const redisClient = require('../config/redis');
 const { SCORE_THRESHOLDS, MAX_ROUNDS } = require('../config/constants');
 const { finalizeDebateStats } = require('../controllers/debate.controller');
-const initMultiplayerWS = require('./multiplayer');
 
 // Export immediately to prevent CommonJS circular dependency issues
 module.exports = initWebSocket;
@@ -214,8 +213,6 @@ function initWebSocket(server) {
     pingInterval: 15000,
   });
 
-  /* ── Initialize multiplayer namespace ── */
-  initMultiplayerWS(io);
 
   /* ── JWT auth middleware ── */
   io.use((socket, next) => {
@@ -776,19 +773,42 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     let finalText = (cleanAiText || fullAiText).trim();
 
-    // *** ALWAYS translate for non-English debates ***
-    // No conditional check — if the user selected Telugu, the output MUST be Telugu.
+    // *** ALWAYS translate for non-English debates — BUT skip if Gemini already
+    //     generated directly in the target language (saves 5-10s) ***
     if (targetLang && targetLang !== 'en') {
-      socket.emit('ai_translating', { language: LANGUAGE_NAMES[targetLang] || targetLang });
-      try {
-        const translated = await translateText(finalText, targetLang);
-        if (translated && translated.trim().length > 0) {
-          finalText = translated.trim();
+      // Quick script check: is the response already in the target language?
+      const alreadyInTarget = (() => {
+        const SCRIPT_CHECKS = {
+          te: /[\u0C00-\u0C7F]/, ta: /[\u0B80-\u0BFF]/, kn: /[\u0C80-\u0CFF]/,
+          ml: /[\u0D00-\u0D7F]/, hi: /[\u0900-\u097F]/, mr: /[\u0900-\u097F]/,
+          bn: /[\u0980-\u09FF]/, gu: /[\u0A80-\u0AFF]/, pa: /[\u0A00-\u0A7F]/,
+          ur: /[\u0600-\u06FF]/, ar: /[\u0600-\u06FF]/, zh: /[\u4E00-\u9FFF]/,
+          ja: /[\u3040-\u309F\u30A0-\u30FF]/, ko: /[\uAC00-\uD7AF]/,
+          ru: /[\u0400-\u04FF]/,
+        };
+        const pattern = SCRIPT_CHECKS[targetLang];
+        if (!pattern) return false; // Can't check Latin-script languages
+        // If >40% of non-ASCII chars are in target script, it's already translated
+        const nonAscii = finalText.replace(/[\x00-\x7F\s]/g, '');
+        if (nonAscii.length < 5) return false;
+        const matches = (nonAscii.match(new RegExp(pattern.source, 'g')) || []).length;
+        return (matches / nonAscii.length) > 0.4;
+      })();
+
+      if (alreadyInTarget) {
+        console.log(`[WS] Response already in ${targetLang} — skipping translation`); // eslint-disable-line no-console
+      } else {
+        socket.emit('ai_translating', { language: LANGUAGE_NAMES[targetLang] || targetLang });
+        try {
+          const translated = await translateText(finalText, targetLang);
+          if (translated && translated.trim().length > 0) {
+            finalText = translated.trim();
+          }
+        } catch (e) {
+          console.error('[WS] Translation failed, sending original response:', e.message); // eslint-disable-line no-console
         }
-      } catch (e) {
-        console.error('[WS] Translation failed, sending original response:', e.message); // eslint-disable-line no-console
       }
-      // Send translated TTS (non-English debates only get TTS after translation)
+      // Send TTS for the final text (whether translated or already in target language)
       streamTTSToSocket(socket, finalText).catch(console.error); // eslint-disable-line no-console
     }
 

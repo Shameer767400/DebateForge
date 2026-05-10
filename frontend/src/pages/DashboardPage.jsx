@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import axios from 'axios';
+import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import StreakBadge from '../components/StreakBadge';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -95,6 +95,7 @@ function RadarTick({ x, y, payload }) {
    MAIN PAGE
 ────────────────────────────────────────── */
 export default function DashboardPage() {
+  const api = useApi();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -123,9 +124,9 @@ export default function DashboardPage() {
     const opts = { baseURL: base, withCredentials: true };
 
     Promise.allSettled([
-      axios.get('/api/profile/me',                   opts),
-      axios.get('/api/profile/fallacies',            opts),
-      axios.get('/api/debates/history?limit=20',     opts),
+      api.get('/api/profile/me',                   opts),
+      api.get('/api/profile/fallacies',            opts),
+      api.get('/api/debates/history?limit=20',     opts),
     ]).then(([prof, fall, hist]) => {
       if (prof.status  === 'fulfilled') setProfile(prof.value.data);
       if (fall.status  === 'fulfilled') setFallacies(fall.value.data?.fallacies ?? fall.value.data ?? []);

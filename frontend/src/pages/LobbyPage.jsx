@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+
 import { useAuth } from '../context/AuthContext';
+import { useApi } from '../hooks/useApi';
 import '../styles/lobby.css';
 import '../styles/lobby-format.css';
-
-const API = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
 
 const CATEGORIES = [
   'All',
@@ -69,6 +68,7 @@ const MAX_CUSTOM_TOPIC_LEN = 150;
 
 export default function LobbyPage() {
   const { user } = useAuth();
+  const api = useApi();
   const navigate = useNavigate();
 
   // "browse" | "custom"
@@ -95,15 +95,12 @@ export default function LobbyPage() {
 
   /* ── Fetch topics on mount ── */
   useEffect(() => {
-    axios
-      .get('/api/topics', {
-        baseURL: API,
-        withCredentials: true,
-      })
+    api
+      .get('/api/topics')
       .then((res) => setTopics(res.data.topics ?? res.data))
       .catch(() => setError('Failed to load topics.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [api]);
 
   /* ── Reset step-2 / step-3 when mode or topic changes ── */
   const resetSteps = () => {
@@ -184,10 +181,7 @@ export default function LobbyPage() {
               format,
             };
 
-      const res = await axios.post('/api/debates/start', body, {
-        baseURL: API,
-        withCredentials: true,
-      });
+      const res = await api.post('/api/debates/start', body);
       navigate(`/debate/${res.data.debateId ?? res.data._id}`);
     } catch (err) {
       setError(
@@ -208,23 +202,6 @@ export default function LobbyPage() {
       <header className="lobby-header">
         <h1 className="lobby-heading">Choose Your Debate</h1>
         <div className="lobby-user" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link
-            to="/multiplayer"
-            style={{
-              textDecoration: 'none',
-              padding: '0.5rem 1rem',
-              background: 'linear-gradient(135deg, rgba(0,170,255,0.2), rgba(0,255,135,0.2))',
-              border: '1px solid rgba(0,170,255,0.3)',
-              borderRadius: '8px',
-              color: '#00aaff',
-              fontSize: '0.8rem',
-              fontFamily: 'var(--font-ui)',
-              fontWeight: 700,
-              transition: 'all 0.2s',
-            }}
-          >
-            ⚔️ Multiplayer
-          </Link>
           <Link to="/profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="lobby-elo">{user?.eloRating ?? 1000}</span>
             <span className="lobby-username">{user?.username ?? 'Debater'}</span>

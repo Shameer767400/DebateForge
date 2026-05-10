@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
+// Set env vars BEFORE any test imports server.js (which calls process.exit if missing)
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key-for-jest-32chars!!';
+process.env.NODE_ENV = 'test';
+
 let mongoServer;
 
 beforeAll(async () => {

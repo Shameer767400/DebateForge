@@ -63,7 +63,7 @@
 
 | Layer | Technology |
 |-------|-----------|
-| **Frontend** | React 18, React Router v6, Axios, Recharts |
+| **Frontend** | React 18, React Router v6, Axios, Recharts, Vanilla CSS (custom design system) |
 | **Backend** | Node.js, Express 5, Mongoose, JWT auth |
 | **Database** | MongoDB (Atlas or local) |
 | **Cache** | Redis (optional, for ELO + leaderboard) |
@@ -223,7 +223,7 @@ debateforge/
 │       │   ├── ProfilePage.jsx
 │       │   ├── DebateHistoryPage.jsx
 │       │   └── NotFoundPage.jsx
-│       └── styles/      # Page-specific CSS + theme.css
+│       └── styles/      # Page-specific CSS + theme.css (vanilla CSS design system)
 └── ml/
     ├── routers/
     │   ├── fallacy.py       # Rule-based + semantic fallacy detection
@@ -235,6 +235,24 @@ debateforge/
     │   └── tts_service.py
     └── main.py
 ```
+
+---
+
+## 🧠 AI Memory Architecture
+
+DebateForge tracks each user's argument history using a vector store for semantic similarity.
+
+| Config | Backend | Description |
+|--------|---------|-------------|
+| `USE_LOCAL_MEMORY=true` | FAISS (local) | Per-user `.index` + `.json` files stored in `ml/faiss_data/`. Uses TF-IDF embeddings via scikit-learn (lightweight, no PyTorch). |
+| `USE_LOCAL_MEMORY=false` | Pinecone (cloud) | Cloud-hosted vector DB with namespace-per-user isolation. Requires `PINECONE_API_KEY`. |
+
+The memory service powers three features:
+- **Weakness analysis** — identifies recurring fallacy patterns and weak argument areas
+- **Coaching plans** — generates spaced-repetition practice suggestions
+- **Argument recall** — retrieves semantically similar past arguments for context
+
+The FAISS path is production-tested and runs within the Render free tier's 512MB RAM constraint by using TF-IDF instead of transformer-based embeddings.
 
 ---
 

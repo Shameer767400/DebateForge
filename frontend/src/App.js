@@ -21,8 +21,7 @@ const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const DebateHistoryPage = lazy(() => import('./pages/DebateHistoryPage'));
-const MultiplayerLobbyPage = lazy(() => import('./pages/MultiplayerLobbyPage'));
-const MultiplayerRoomPage = lazy(() => import('./pages/MultiplayerRoomPage'));
+
 
 function App() {
   return (
@@ -89,22 +88,7 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route
-                    path="/multiplayer"
-                    element={
-                      <ProtectedRoute>
-                        <MultiplayerLobbyPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/room/:id"
-                    element={
-                      <ProtectedRoute>
-                        <MultiplayerRoomPage />
-                      </ProtectedRoute>
-                    }
-                  />
+
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </Suspense>
