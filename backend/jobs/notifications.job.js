@@ -69,6 +69,28 @@ function scheduleNotificationJobs() {
     }
   });
 
+  /* ── Every 10 min: ping ML service to prevent Render cold starts ── */
+  const ML_URL = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/$/, '');
+  const BACKEND_URL = process.env.RENDER_EXTERNAL_URL || null;
+  const axios = require('axios');
+
+  cron.schedule('*/10 * * * *', async () => {
+    try {
+      const res = await axios.get(`${ML_URL}/health`, { timeout: 8000 });
+      // eslint-disable-next-line no-console
+      console.log(`[CRON] ML keepalive ✅ ${res.data?.status || 'ok'} (${ML_URL})`);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[CRON] ML keepalive ⚠️  ${err.message} — service may be waking up`);
+    }
+    // Also ping backend itself to keep it warm
+    if (BACKEND_URL) {
+      try { await axios.get(`${BACKEND_URL}/health`, { timeout: 5000 }); } catch { /* noop */ }
+    }
+  });
+
+  // eslint-disable-next-line no-console
+  console.log(`[CRON] ML keepalive scheduled every 10 min → ${ML_URL}`);
   // eslint-disable-next-line no-console
   console.log('[CRON] Notification jobs scheduled ✅');
 }
