@@ -74,7 +74,7 @@ function scheduleNotificationJobs() {
   const BACKEND_URL = process.env.RENDER_EXTERNAL_URL || null;
   const axios = require('axios');
 
-  cron.schedule('*/10 * * * *', async () => {
+  cron.schedule('*/14 * * * *', async () => {
     try {
       const res = await axios.get(`${ML_URL}/health`, { timeout: 8000 });
       // eslint-disable-next-line no-console
