@@ -324,74 +324,161 @@ async function generateOpenAIDirect(session, userArgument) {
   return null;
 }
 
-/* ─── Groq generation (FREE, ultra-fast, multilingual) ─── */
-/**
- * Generate a debate response using Groq's free API.
- * Groq runs on custom LPU chips — responses come in ~500ms-2s.
- * Uses llama-3.3-70b-versatile which handles multilingual well.
- */
-async function generateGroqDirect(session, userArgument) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return null;
+/* ─── Sarvam AI generation (Indian languages — Telugu, Hindi, Tamil, etc.) ─── */
+const INDIAN_LANGUAGES = new Set(['te', 'hi', 'ta', 'kn', 'ml', 'mr', 'bn', 'gu', 'pa', 'ur']);
+
+/** Load all Sarvam keys: SARVAM_API_KEY, SARVAM_API_KEY_2 … _5 */
+function getSarvamKeys() {
+  const keys = [];
+  if (process.env.SARVAM_API_KEY) keys.push(process.env.SARVAM_API_KEY);
+  for (let i = 2; i <= 5; i++) {
+    const k = process.env[`SARVAM_API_KEY_${i}`];
+    if (k) keys.push(k);
+  }
+  return keys;
+}
+
+const _sarvamLimited = new Map();
+
+async function generateSarvamDirect(session, userArgument) {
+  const keys = getSarvamKeys();
+  if (keys.length === 0) return null;
 
   const systemPrompt = buildSystemPrompt(session);
   const history = (session.conversationHistory || []).slice(-6);
-
-  const previousAiReplies = history
-    .filter(m => m.role === 'assistant')
-    .map(m => m.content)
-    .slice(-3);
-
+  const previousAiReplies = history.filter(m => m.role === 'assistant').map(m => m.content).slice(-3);
   const fullSystemPrompt = systemPrompt +
     (previousAiReplies.length > 0
       ? `\n\n=== YOUR PREVIOUS RESPONSES (DO NOT REPEAT THESE) ===\n${previousAiReplies.map((r, i) => `Round ${i + 1}: ${r.slice(0, 100)}...`).join('\n')}`
       : '');
-
   const messages = [
     { role: 'system', content: fullSystemPrompt },
-    ...history.map(m => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
-    })),
+    ...history.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
     { role: 'user', content: userArgument },
   ];
 
-  try {
-    const response = await Promise.race([
-      axios.post('https://api.groq.com/openai/v1/chat/completions', {
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 300,
-        temperature: 0.7,
-      }, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 10000,
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Groq timed out')), 10000)),
-    ]);
-
-    const text = response.data?.choices?.[0]?.message?.content;
-    if (text?.trim()) {
-      console.log(`[GROQ] Generated ${text.trim().length} chars (lang: ${session.currentLanguage || 'en'})`); // eslint-disable-line no-console
-      return text.trim();
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    // Find next available key
+    const now = Date.now();
+    let keyIdx = -1;
+    for (let i = 0; i < keys.length; i++) {
+      const failedAt = _sarvamLimited.get(i);
+      if (!failedAt || (now - failedAt) > RATE_LIMIT_COOLDOWN_MS) { _sarvamLimited.delete(i); keyIdx = i; break; }
     }
-    return null;
-  } catch (e) {
-    const status = e.response?.status;
-    const errMsg = e.response?.data?.error?.message || e.message?.slice(0, 150);
-    console.warn(`[GROQ] Failed (${status || 'timeout'}): ${errMsg}`); // eslint-disable-line no-console
-    return null;
+    if (keyIdx === -1) { console.warn(`[SARVAM] All ${keys.length} keys rate-limited`); break; } // eslint-disable-line no-console
+
+    const keyLabel = keyIdx === 0 ? 'primary' : `key-${keyIdx + 1}`;
+    try {
+      const response = await Promise.race([
+        axios.post('https://api.sarvam.ai/v1/chat/completions', {
+          model: 'sarvam-m', messages, max_tokens: 300, temperature: 0.7,
+        }, {
+          headers: { 'Authorization': `Bearer ${keys[keyIdx]}`, 'Content-Type': 'application/json' },
+          timeout: 15000,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Sarvam timed out')), 15000)),
+      ]);
+      const text = response.data?.choices?.[0]?.message?.content;
+      if (text?.trim()) {
+        console.log(`[SARVAM] Generated ${text.trim().length} chars via ${keyLabel} (lang: ${session.currentLanguage || 'en'})`); // eslint-disable-line no-console
+        return text.trim();
+      }
+    } catch (e) {
+      const status = e.response?.status;
+      console.warn(`[SARVAM] ${keyLabel} failed (${status || 'timeout'}): ${(e.response?.data?.error?.message || e.message).slice(0, 120)}`); // eslint-disable-line no-console
+      if (status === 429 || status === 401 || status === 403) { _sarvamLimited.set(keyIdx, Date.now()); continue; }
+      break;
+    }
   }
+  return null;
 }
 
-/* ─── Public: generate response via Groq (primary) → OpenAI → Ollama (fallback) ─── */
+/* ─── Groq generation (FREE, ultra-fast) ─── */
+/** Load all Groq keys: GROQ_API_KEY, GROQ_API_KEY_2 … _5 */
+function getGroqKeys() {
+  const keys = [];
+  if (process.env.GROQ_API_KEY) keys.push(process.env.GROQ_API_KEY);
+  for (let i = 2; i <= 5; i++) {
+    const k = process.env[`GROQ_API_KEY_${i}`];
+    if (k) keys.push(k);
+  }
+  return keys;
+}
+
+const _groqLimited = new Map();
+
+async function generateGroqDirect(session, userArgument) {
+  const keys = getGroqKeys();
+  if (keys.length === 0) return null;
+
+  const systemPrompt = buildSystemPrompt(session);
+  const history = (session.conversationHistory || []).slice(-6);
+  const previousAiReplies = history.filter(m => m.role === 'assistant').map(m => m.content).slice(-3);
+  const fullSystemPrompt = systemPrompt +
+    (previousAiReplies.length > 0
+      ? `\n\n=== YOUR PREVIOUS RESPONSES (DO NOT REPEAT THESE) ===\n${previousAiReplies.map((r, i) => `Round ${i + 1}: ${r.slice(0, 100)}...`).join('\n')}`
+      : '');
+  const messages = [
+    { role: 'system', content: fullSystemPrompt },
+    ...history.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+    { role: 'user', content: userArgument },
+  ];
+
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const now = Date.now();
+    let keyIdx = -1;
+    for (let i = 0; i < keys.length; i++) {
+      const failedAt = _groqLimited.get(i);
+      if (!failedAt || (now - failedAt) > RATE_LIMIT_COOLDOWN_MS) { _groqLimited.delete(i); keyIdx = i; break; }
+    }
+    if (keyIdx === -1) { console.warn(`[GROQ] All ${keys.length} keys rate-limited`); break; } // eslint-disable-line no-console
+
+    const keyLabel = keyIdx === 0 ? 'primary' : `key-${keyIdx + 1}`;
+    try {
+      const response = await Promise.race([
+        axios.post('https://api.groq.com/openai/v1/chat/completions', {
+          model: 'llama-3.3-70b-versatile', messages, max_tokens: 300, temperature: 0.7,
+        }, {
+          headers: { 'Authorization': `Bearer ${keys[keyIdx]}`, 'Content-Type': 'application/json' },
+          timeout: 10000,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Groq timed out')), 10000)),
+      ]);
+      const text = response.data?.choices?.[0]?.message?.content;
+      if (text?.trim()) {
+        console.log(`[GROQ] Generated ${text.trim().length} chars via ${keyLabel} (lang: ${session.currentLanguage || 'en'})`); // eslint-disable-line no-console
+        return text.trim();
+      }
+    } catch (e) {
+      const status = e.response?.status;
+      console.warn(`[GROQ] ${keyLabel} failed (${status || 'timeout'}): ${(e.response?.data?.error?.message || e.message).slice(0, 120)}`); // eslint-disable-line no-console
+      if (status === 429 || status === 401 || status === 403) { _groqLimited.set(keyIdx, Date.now()); continue; }
+      break;
+    }
+  }
+  return null;
+}
+
+/* ─── Public: generate response via best provider for the language ─── */
+/* Priority chain:
+ *   Indian languages → Sarvam AI → Groq → OpenAI → Ollama
+ *   English/Other   → Groq → OpenAI → Ollama
+ */
 async function* streamDebateResponse(session, userArgument) {
   const lang = session.currentLanguage || 'en';
+  const isIndianLang = INDIAN_LANGUAGES.has(lang);
 
-  // 1. Try Groq first — FREE, ultra-fast (~500ms-2s)
+  // 1. For Indian languages: try Sarvam AI first (built for Indian languages)
+  if (isIndianLang) {
+    console.log(`[LLM] Indian language (${lang}) — trying Sarvam AI`); // eslint-disable-line no-console
+    const sarvamResponse = await generateSarvamDirect(session, userArgument);
+    if (sarvamResponse) {
+      yield sarvamResponse;
+      return;
+    }
+  }
+
+  // 2. Try Groq — FREE, ultra-fast (~500ms-2s)
   console.log(`[LLM] Trying Groq (lang: ${lang})`); // eslint-disable-line no-console
   const groqResponse = await generateGroqDirect(session, userArgument);
   if (groqResponse) {
@@ -399,15 +486,15 @@ async function* streamDebateResponse(session, userArgument) {
     return;
   }
 
-  // 2. Try OpenAI — paid but reliable
-  console.log(`[LLM] Groq unavailable, trying OpenAI (lang: ${lang})`); // eslint-disable-line no-console
+  // 3. Try OpenAI — paid but reliable
+  console.log(`[LLM] Trying OpenAI (lang: ${lang})`); // eslint-disable-line no-console
   const openaiResponse = await generateOpenAIDirect(session, userArgument);
   if (openaiResponse) {
     yield openaiResponse;
     return;
   }
 
-  // 3. Last resort — local Ollama
+  // 4. Last resort — local Ollama (matches documentation)
   console.warn(`[LLM] All cloud APIs failed, falling back to Ollama`); // eslint-disable-line no-console
   try {
     yield* streamOllama(session, userArgument);

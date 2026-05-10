@@ -56,11 +56,8 @@ export default function LeaderboardPage() {
   /* ── fetch ── */
   const fetchLeaderboard = useCallback(() => {
     setLoading(true);
-    axios
-       .get('/api/profile/leaderboard', {
-        baseURL: process.env.REACT_APP_API_URL,
-        withCredentials: true,
-      })
+    api
+       .get('/api/profile/leaderboard')
       .then((res) => {
         const data = res.data?.leaderboard ?? res.data ?? [];
         setRows(data.slice(0, 50));
@@ -75,7 +72,7 @@ export default function LeaderboardPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [user, api]);
 
   useEffect(() => { fetchLeaderboard(); }, [fetchLeaderboard]);
 

@@ -156,18 +156,15 @@ export default function DebateHistoryPage() {
 
   useEffect(() => {
     setLoading(true);
-    axios
-      .get(`/api/debates/history?page=${page}&limit=${LIMIT}`, {
-        baseURL: API,
-        withCredentials: true,
-      })
+    api
+      .get(`/api/debates/history?page=${page}&limit=${LIMIT}`)
       .then((r) => {
         setDebates(r.data?.debates ?? r.data ?? []);
         setTotalPages(r.data?.pages ?? 1);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, api]);
 
   const filtered = filter === 'all'
     ? debates
@@ -175,11 +172,8 @@ export default function DebateHistoryPage() {
 
   const fetchDetail = (id) => {
     if (detailCache[id]) return;
-    axios
-      .get(`/api/debates/${id}`, {
-        baseURL: API,
-        withCredentials: true,
-      })
+    api
+      .get(`/api/debates/${id}`)
       .then((r) => {
         const detail = r.data?.debate ?? r.data;
         setDetailCache(prev => ({ ...prev, [id]: detail }));
