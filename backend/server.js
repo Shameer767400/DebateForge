@@ -251,24 +251,33 @@ const uploadLimiter = rateLimit({
 
 // Debug endpoint to check Render environment variables and test email
 app.get('/api/debug/env', async (req, res) => {
-  const { sendVerificationEmail } = require('./services/email.service');
-  let emailTestResult = 'Not tested';
-  let emailTestError = null;
+  // Test Resend directly here so we see the raw error
+  let resendResult = 'skipped (no key)';
+  let resendError = null;
+  const resendKey = process.env.RESEND_API_KEY;
 
-  try {
-    const info = await sendVerificationEmail('meerambigarishameer@gmail.com', '000000');
-    emailTestResult = info.fallback ? 'Fallback Triggered (Check SMTP config)' : 'Success';
-    if (info.error) emailTestError = info.error;
-  } catch (err) {
-    emailTestResult = 'Failed';
-    emailTestError = err.message;
+  if (resendKey) {
+    try {
+      const { Resend } = require('resend');
+      const resend = new Resend(resendKey);
+      const { data, error } = await resend.emails.send({
+        from: 'DebateForge <onboarding@resend.dev>',
+        to: 'meerambigarishameer@gmail.com',
+        subject: 'DebateForge — Test Email',
+        html: '<p>Test email from debug endpoint. OTP: <b>000000</b></p>',
+      });
+      if (error) { resendResult = 'Resend API Error'; resendError = JSON.stringify(error); }
+      else { resendResult = 'SUCCESS'; }
+    } catch (err) {
+      resendResult = 'Exception';
+      resendError = err.message;
+    }
   }
 
   res.json({
-    email_test: {
-      result: emailTestResult,
-      error: emailTestError
-    },
+    email_test: { resend: resendResult, resend_error: resendError },
+    resend_key_length: resendKey ? resendKey.length : 0,
+    resend_key_prefix: resendKey ? resendKey.slice(0, 6) : 'NOT_SET',
     ml_url: process.env.ML_SERVICE_URL || 'NOT_SET',
     smtp_host: process.env.SMTP_HOST || 'NOT_SET',
     smtp_user: process.env.SMTP_USER || 'NOT_SET',
