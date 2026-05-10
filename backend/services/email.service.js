@@ -3,15 +3,21 @@ const nodemailer = require('nodemailer');
 /* ── Create reusable transporter ── */
 let transporter;
 
+const SMTP_PORT = parseInt(process.env.SMTP_PORT, 10) || 465;
+const IS_SSL = SMTP_PORT === 465;
+
 try {
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT, 10) || 587,
-    secure: false, // true for 465, false for other ports
+    port: SMTP_PORT,
+    secure: IS_SSL, // true for 465 (SSL), false for 587 (STARTTLS)
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    connectionTimeout: 10000, // 10s — fail fast on blocked ports
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 } catch (err) {
   // eslint-disable-next-line no-console
