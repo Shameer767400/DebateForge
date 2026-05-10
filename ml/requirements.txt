@@ -11,6 +11,7 @@ nltk==3.9.2
 numpy==1.26.4
 scikit-learn==1.4.2      # TF-IDF embeddings (replaces sentence-transformers)
 faiss-cpu==1.9.0
+pinecone-client==5.1.0   # Cloud vector DB (alternative to FAISS)
 
 # Google Gemini (for transcription)
 google-generativeai==0.8.5
@@ -23,10 +24,10 @@ httpx==0.28.1
 python-dotenv==1.1.0
 python-multipart==0.0.20
 
+# Voice Transcription
+openai-whisper==20240930
+
 # NOTE: sentence-transformers is intentionally excluded.
 # It pulls in PyTorch (~2GB) which exceeds Render free tier 512MB RAM.
 # We use scikit-learn TF-IDF for lightweight semantic similarity instead.
-
-# Optional local model packages (install manually when USE_LOCAL_*=true):
-# openai-whisper
-# TTS
+# Whisper uses a lightweight model (tiny/base) to stay within memory limits.
