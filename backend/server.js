@@ -249,16 +249,32 @@ const uploadLimiter = rateLimit({
    6. ROUTES — with targeted rate limiters
 ═══════════════════════════════════════════ */
 
-// Debug endpoint to check Render environment variables
-app.get('/api/debug/env', (req, res) => {
+// Debug endpoint to check Render environment variables and test email
+app.get('/api/debug/env', async (req, res) => {
+  const { sendVerificationEmail } = require('./services/email.service');
+  let emailTestResult = 'Not tested';
+  let emailTestError = null;
+
+  try {
+    const info = await sendVerificationEmail('meerambigarishameer@gmail.com', '000000');
+    emailTestResult = info.fallback ? 'Fallback Triggered (Check SMTP config)' : 'Success';
+    if (info.error) emailTestError = info.error;
+  } catch (err) {
+    emailTestResult = 'Failed';
+    emailTestError = err.message;
+  }
+
   res.json({
+    email_test: {
+      result: emailTestResult,
+      error: emailTestError
+    },
     ml_url: process.env.ML_SERVICE_URL || 'NOT_SET',
     smtp_host: process.env.SMTP_HOST || 'NOT_SET',
     smtp_user: process.env.SMTP_USER || 'NOT_SET',
     smtp_pass_length: process.env.SMTP_PASS ? process.env.SMTP_PASS.length : 0,
     sarvam_key_length: process.env.SARVAM_API_KEY ? process.env.SARVAM_API_KEY.length : 0,
     groq_key_length: process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.length : 0,
-    openai_key_length: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0,
     node_env: process.env.NODE_ENV,
   });
 });
