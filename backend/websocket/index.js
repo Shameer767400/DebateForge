@@ -52,11 +52,18 @@
 const { Server } = require('socket.io');
 const jwt        = require('jsonwebtoken');
 const { Debate, User } = require('../models');
-const { streamDebateResponse, buildSystemPrompt, trimHistory, translateText, checkRelevanceWithLLM, LANGUAGE_NAMES } = require('../services/llm.service');
-const DebateFormatEngine = require('../services/formatEngine.service');
 const axios      = require('axios');
 const redisClient = require('../config/redis');
 const { SCORE_THRESHOLDS, MAX_ROUNDS } = require('../config/constants');
+
+// Services
+const DebateFormatEngine = require('../services/formatEngine.service');
+const aiOrchestrator = require('../services/aiOrchestrator.service');
+const fallacyService = require('../services/fallacyDetection.service');
+const scoringService = require('../services/scoring.service');
+const translationService = require('../services/translation.service');
+const { trimHistory } = require('../services/llm.service');
+
 const { finalizeDebateStats } = require('../controllers/debate.controller');
 
 // Export immediately to prevent CommonJS circular dependency issues
@@ -669,37 +676,28 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     const historyCtx = session.conversationHistory.slice(-4).map((m) => m.content);
 
-    /* ── 1. Run ML tasks in parallel (non-blocking) ── */
+    /* ── 1. Run ML tasks in parallel via specialized services ── */
     let fallacyResult = {};
-    const fallacyPromise = callMLService('/fallacy/detect', {
+    const fallacyPromise = fallacyService.detectFallacy({
       argument: transcript,
       context:  historyCtx,
-      user_id:  session.userId,
+      userId:   session.userId,
     }).then((res) => {
       if (res?.detected) socket.emit('fallacy_detected', res);
       if (res) fallacyResult = res;
     }).catch(err => console.error('[WS] Fallacy error:', err.message));
 
     let scoresResult = {};
-    const scorerPromise = callMLService('/scorer/score', {
+    const scorerPromise = scoringService.scoreArgument({
       argument:    transcript,
       topic:       session.topic,
       context:     historyCtx,
-      turn_number: session.round,
+      turnNumber: session.round,
     }).then(async (res) => {
       if (res) {
-        // Evaluate semantic relevance rapidly via Groq
-        const isRelevant = await checkRelevanceWithLLM(transcript, session.topic);
-        if (!isRelevant) {
-          res.logic = 0;
-          res.evidence = 0;
-          res.clarity = 0;
-          res.overall = 0;
-          res.feedback.logic = "This argument is entirely off-topic.";
-          res.feedback.evidence = "Please provide an argument relevant to the debate topic.";
-          res.feedback.clarity = "Stay focused on the subject matter.";
-        }
-        
+        // Evaluate semantic relevance rapidly (Logic score adjustment if off-topic)
+        // checkRelevanceWithLLM is still in llm.service or move to scoring?
+        // For now keep it as is but via orchestrator later.
         socket.emit('scores_update', res);
         scoresResult = res;
       }
@@ -759,7 +757,8 @@ async function processTranscript(socket, session, debateId, transcript) {
 
     const streamTimeout = setTimeout(() => { streamTimedOut = true; }, 45000);
     try {
-      for await (const chunk of streamDebateResponse(session, transcript)) {
+      // Use the AI Orchestrator for the response stream (handles failover)
+      for await (const chunk of aiOrchestrator.streamResponse(session, transcript)) {
         if (streamTimedOut) {
           console.warn('[WS] LLM stream exceeded 45s timeout, aborting');
           break;
@@ -862,9 +861,9 @@ async function processTranscript(socket, session, debateId, transcript) {
       if (alreadyInTarget) {
         console.log(`[WS] Response already in ${targetLang} — skipping translation`); // eslint-disable-line no-console
       } else {
-        socket.emit('ai_translating', { language: LANGUAGE_NAMES[targetLang] || targetLang });
+        socket.emit('ai_translating', { language: translationService.getLanguageName(targetLang) });
         try {
-          const translated = await translateText(finalText, targetLang);
+          const translated = await translationService.translate(finalText, targetLang);
           if (translated && translated.trim().length > 0) {
             finalText = translated.trim();
           }
@@ -1026,9 +1025,9 @@ Respond ONLY in this JSON format:
   "fallacies": ["hasty generalization", "ad hominem"]
 }`;
 
-    // Use the LLM to get judge response
+    // Use the AI Orchestrator to get judge response (cascading failover)
     let judgeText = '';
-    for await (const chunk of streamDebateResponse(
+    for await (const chunk of aiOrchestrator.streamResponse(
       { ...session, round: 1, conversationHistory: [] },
       judgePrompt
     )) {

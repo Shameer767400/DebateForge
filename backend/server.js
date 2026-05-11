@@ -23,6 +23,7 @@ const swaggerSpec = require('./config/swagger.config');
 
 const { scheduleNotificationJobs } = require('./jobs/notifications.job');
 const secLogger = require('./services/security-logger.service');
+const aiOrchestrator = require('./services/aiOrchestrator.service');
 
 const initWebSocket = require('./websocket/index');
 
@@ -308,8 +309,11 @@ app.get('/health', (_req, res) => {
   const mongoState = mongoose.connection.readyState;
   const mongoStates = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
   const redisStatus = redisClient.status();
+  
+  // New: AI Provider Health Monitoring
+  const aiStatus = aiOrchestrator.getAIStatus();
 
-  const healthy = mongoState === 1;
+  const healthy = mongoState === 1 && aiStatus.status === 'operational';
 
   res.status(healthy ? 200 : 503).json({
     status: healthy ? 'ok' : 'degraded',
@@ -318,6 +322,7 @@ app.get('/health', (_req, res) => {
     dependencies: {
       mongodb: mongoStates[mongoState] || 'unknown',
       redis: redisStatus,
+      aiProviders: aiStatus,
     },
   });
 });
