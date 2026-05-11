@@ -14,7 +14,7 @@
  * @module pages/DashboardPage
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -135,29 +135,64 @@ export default function DashboardPage() {
   const todaysChallenge = DAILY_CHALLENGES[new Date().getDay()];
 
   /* ── parallel fetch ── */
+  const apiRef = useRef(api);
+  apiRef.current = api;
+
   useEffect(() => {
-    const base = process.env.REACT_APP_API_URL;
-    const opts = { baseURL: base, withCredentials: true };
+    let mounted = true;
 
     Promise.allSettled([
-      api.get('/api/profile/me',                   opts),
-      api.get('/api/profile/fallacies',            opts),
-      api.get('/api/debates/history?limit=20',     opts),
+      apiRef.current.get('/api/profile/me'),
+      apiRef.current.get('/api/profile/fallacies'),
+      apiRef.current.get('/api/debates/history?limit=100'),
     ]).then(([prof, fall, hist]) => {
+      if (!mounted) return;
       if (prof.status  === 'fulfilled') setProfile(prof.value.data);
       if (fall.status  === 'fulfilled') setFallacies(fall.value.data?.fallacies ?? fall.value.data ?? []);
       if (hist.status  === 'fulfilled') setHistory(hist.value.data?.debates     ?? hist.value.data ?? []);
       setLoading(false);
     });
+
+    return () => { mounted = false; };
   }, []);
 
   /* ── derived stats ── */
-  const totalDebates = profile?.totalDebates ?? history.length;
-  const wins         = profile?.wins ?? 0;
+  const totalDebates = profile?.stats?.totalDebates ?? profile?.user?.totalDebates ?? history.length;
+  const wins         = profile?.user?.wins ?? 0;
   const winRate      = totalDebates > 0 ? Math.round((wins / totalDebates) * 100) : 0;
-  const avgScore     = profile?.avgScore ?? 0;
-  const elo          = profile?.elo ?? user?.elo ?? 1200;
-  const streakData   = profile?.user?.streak || user?.streak || { current: 0, longest: 0, freezeUsed: false };
+  const avgScore     = profile?.stats?.avgScore ? Math.round(profile.stats.avgScore) : 0;
+  const elo          = profile?.user?.eloRating ?? user?.eloRating ?? user?.elo ?? 1200;
+  
+  /* ── streak derived logic ── */
+  const rawStreak = profile?.user?.streak || user?.streak || { current: 0, longest: 0, freezeUsed: false, lastDebateDate: null };
+  let currentStreak = rawStreak.current || 0;
+  let freezeUsed = rawStreak.freezeUsed || false;
+
+  if (rawStreak.lastDebateDate && currentStreak > 0) {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+
+    // backend stores lastDebateDate as YYYY-MM-DDT00:00:00Z for the user's local day
+    const lastStr = new Date(rawStreak.lastDebateDate).toISOString().slice(0, 10);
+    
+    const msToday = new Date(todayStr + 'T00:00:00Z').getTime();
+    const msLast = new Date(lastStr + 'T00:00:00Z').getTime();
+    const diffDays = Math.round(Math.abs(msToday - msLast) / 86400000);
+
+    if (diffDays > 1) {
+      if (diffDays === 2 && !freezeUsed) {
+        // Streak is hanging by a thread (freeze available), not broken yet
+      } else {
+        // Streak broken
+        currentStreak = 0;
+      }
+    }
+  }
+
+  const streakData = { ...rawStreak, current: currentStreak, freezeUsed };
 
   /* ── weekly activity (last 7 live local days from debate history) ── */
   const weekdayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
@@ -195,17 +230,38 @@ export default function DashboardPage() {
   });
 
   /* ── score trend data (last 20) ── */
-  const trendData = history.slice().reverse().map((d, i) => ({
+  const trendData = history.slice(0, 20).reverse().map((d, i) => ({
     n:        i + 1,
-    Logic:    d.scores?.logic    ?? 0,
-    Evidence: d.scores?.evidence ?? 0,
-    Clarity:  d.scores?.clarity  ?? 0,
+    Score:    d.userFinalScore ?? 0,
   }));
 
   /* ── fallacy radar data ── */
-  const radarData = fallacies.length > 0
-    ? fallacies.map((f) => ({ subject: f.type, count: f.count }))
-    : [];
+  const DEFAULT_FALLACIES = [
+    { subject: 'Ad Hominem', count: 0 },
+    { subject: 'Straw Man', count: 0 },
+    { subject: 'False Dilemma', count: 0 },
+    { subject: 'Slippery Slope', count: 0 },
+    { subject: 'Circular Reasoning', count: 0 },
+    { subject: 'Red Herring', count: 0 }
+  ];
+
+  let radarData = [...DEFAULT_FALLACIES];
+  if (fallacies && fallacies.length > 0) {
+    const fMap = new Map();
+    fallacies.forEach(f => fMap.set(f.type.toLowerCase().replace(/_/g, ' '), f.count));
+    
+    radarData = radarData.map(df => ({
+      subject: df.subject,
+      count: fMap.get(df.subject.toLowerCase()) || 0
+    }));
+
+    fallacies.forEach(f => {
+      const formattedType = f.type.replace(/_/g, ' ');
+      if (!radarData.some(rd => rd.subject.toLowerCase() === formattedType.toLowerCase())) {
+        radarData.push({ subject: formattedType, count: f.count });
+      }
+    });
+  }
 
   /* ── achievements (unlock by debateCount for demo) ── */
   const earned = new Set(profile?.achievements ?? []);
@@ -428,9 +484,7 @@ export default function DashboardPage() {
                 <Legend
                   wrapperStyle={{ fontSize: 12, paddingTop: 12, color: 'rgba(255,255,255,0.5)' }}
                 />
-                <Line type="monotone" dataKey="Logic"    stroke="#00FF87" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Evidence" stroke="#00AAFF" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Clarity"  stroke="#FFCC00" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Score" stroke="#00FF87" strokeWidth={3} dot={{ r: 3, fill: '#181826' }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

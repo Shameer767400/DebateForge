@@ -24,11 +24,12 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!user;
 
   /**
-   * Check session validity by calling /api/auth/me.
+   * Check session validity by calling /api/auth/session.
    * Returns the user object on success, or null on failure.
-   * This is called once on mount and can be called again to re-validate.
+   * Retries once on network error to handle transient failures
+   * (e.g. slow cold-start, brief connectivity blip).
    */
-  const checkSession = useCallback(async () => {
+  const checkSession = useCallback(async (retryCount = 0) => {
     try {
       const res = await authApi.get('/api/auth/session');
       if (res.data?.authenticated && res.data?.user) {
@@ -37,8 +38,14 @@ export function AuthProvider({ children }) {
       }
       setUser(null);
       return null;
-    } catch {
-      // Network error or server down — silently treat as unauthenticated
+    } catch (err) {
+      // Network error or server down — retry once before giving up
+      if (retryCount < 1) {
+        // Wait 1 second before retry to give the server time to respond
+        await new Promise((r) => setTimeout(r, 1000));
+        return checkSession(retryCount + 1);
+      }
+      // After retry, silently treat as unauthenticated
       setUser(null);
       return null;
     }

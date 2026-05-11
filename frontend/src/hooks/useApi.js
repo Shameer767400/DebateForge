@@ -9,6 +9,22 @@ export function useApi() {
   const isRefreshing = useRef(false);
   const failedQueue = useRef([]);
 
+  // ── Use refs so the interceptor always reads the LATEST values ──
+  // Without refs, the closure inside useMemo captures the initial values
+  // (isAuthenticated=false on mount) and never updates, causing premature
+  // logouts whenever a 401 arrives.
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  isAuthenticatedRef.current = isAuthenticated;
+
+  const logoutRef = useRef(logout);
+  logoutRef.current = logout;
+
+  const refreshSessionRef = useRef(refreshSession);
+  refreshSessionRef.current = refreshSession;
+
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+
   const api = useMemo(() => {
     const instance = axios.create({
       baseURL: process.env.REACT_APP_API_URL,
@@ -36,7 +52,8 @@ export function useApi() {
         }
 
         // If we're not authenticated, don't try to refresh — just reject
-        if (!isAuthenticated) {
+        // Uses ref to get the CURRENT value, not the stale closure value
+        if (!isAuthenticatedRef.current) {
           return Promise.reject(error);
         }
 
@@ -55,7 +72,7 @@ export function useApi() {
         isRefreshing.current = true;
 
         try {
-          const refreshed = await refreshSession();
+          const refreshed = await refreshSessionRef.current();
 
           if (refreshed) {
             // Retry all queued requests
@@ -71,8 +88,11 @@ export function useApi() {
             failedQueue.current = [];
             isRefreshing.current = false;
 
-            logout();
-            navigate('/login');
+            // Let logout() set isAuthenticated=false, then ProtectedRoute
+            // will handle the redirect naturally. Do NOT call navigate('/login')
+            // here — it causes race conditions with React Router and can
+            // interrupt active pages (e.g. debate room).
+            logoutRef.current();
             return Promise.reject(error);
           }
         } catch {
@@ -80,8 +100,7 @@ export function useApi() {
           failedQueue.current = [];
           isRefreshing.current = false;
 
-          logout();
-          navigate('/login');
+          logoutRef.current();
           return Promise.reject(error);
         }
       }

@@ -24,7 +24,8 @@ httpx==0.28.1
 python-dotenv==1.1.0
 python-multipart==0.0.20
 
-# Voice Transcription
+# Voice Transcription (CORE REQUIREMENT)
+# Whisper AI is mandatory for the real-time voice debate features.
 openai-whisper==20240930
 
 # NOTE: sentence-transformers is intentionally excluded.

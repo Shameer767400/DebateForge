@@ -78,6 +78,8 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   const lastErrorTimeRef = useRef(0); // debounce error events
   const spokenUpToRef = useRef(0); // how many chars of AI text we've already spoken (prevent double-flush)
   const shouldKeepRecognizingRef = useRef(false);
+  const debateJoinedRef = useRef(false); // true once 'debate_joined' is received — prevents set_language race
+  const chunksSpokenRef = useRef(false); // true if any ai_text_chunk was spoken as TTS — prevents double-speak on ai_turn_complete
 
   /* keep refs fresh without re-running socket effect */
   useEffect(() => { onEventRef.current = onEvent; }, [onEvent]);
@@ -318,6 +320,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
           // New AI turn starting — reset buffer and cancel any queued speech
           sentenceBufRef.current = '';
           spokenUpToRef.current = 0;
+          chunksSpokenRef.current = false;
           try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
         }
 
@@ -325,27 +328,33 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
           // Skip placeholder dots — they are not real AI text
           if (!data.isPlaceholder) {
             handleAiTextChunk(data.text ?? data.chunk ?? '');
+            chunksSpokenRef.current = true;
           }
         }
 
         /* Flush any remaining text when the turn is done.
            For non-English debates, the sentence buffer is empty (raw chunks
-           were suppressed). In that case, speak the full translated text. */
+           were suppressed). In that case, speak the full translated text.
+           IMPORTANT: Only speak fullText if we HAVEN'T already spoken chunks.
+           Otherwise the entire response gets spoken twice — once during
+           streaming and once here. */
         if (event === 'ai_turn_complete') {
           if (data?.detectedLanguage) {
             detectedLanguageRef.current = data.detectedLanguage;
           }
           const remaining = sanitizeTTSText(sentenceBufRef.current);
           if (remaining) {
-            // English debate: flush the leftover sentence buffer
+            // Flush the leftover sentence buffer (partial sentence not yet spoken)
             speakSentence(remaining);
-          } else if (data?.fullText) {
+          } else if (data?.fullText && !chunksSpokenRef.current) {
             // Non-English debate: speak the complete translated text
+            // ONLY if we haven't already spoken any chunks (to prevent double-speaking)
             const fullClean = sanitizeTTSText(data.fullText);
             if (fullClean) speakSentence(fullClean);
           }
           sentenceBufRef.current = '';
           spokenUpToRef.current = 0;
+          chunksSpokenRef.current = false;
         }
 
         /* Propagate every event to caller (debounce errors) */
@@ -362,6 +371,9 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
+      debateJoinedRef.current = false;
+      // Cancel any ongoing TTS when the socket is torn down
+      try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debateId]);
@@ -532,6 +544,10 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     isRecordingRef.current = false;
     shouldKeepRecognizingRef.current = false;
 
+    // Cancel any ongoing AI TTS so it doesn't play over the user's next turn
+    try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+    setIsAISpeaking(false);
+
     const recorder = mediaRecRef.current;
     const finalTranscript = liveTranscriptRef.current?.trim();
 
@@ -582,6 +598,12 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   }, [debateId, sendText]);
 
   const endDebate = useCallback(() => {
+    // Cancel all TTS playback immediately when ending the debate
+    try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+    setIsAISpeaking(false);
+    sentenceBufRef.current = '';
+    spokenUpToRef.current = 0;
+    chunksSpokenRef.current = false;
     socketRef.current?.emit('end_debate', { debateId, tzOffsetMinutes: tzOffsetMinutesRef.current });
   }, [debateId]);
 
@@ -611,6 +633,8 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       recognitionRef.current?.stop();
       audioCtxRef.current?.close();
       audioQueueRef.current = [];
+      // Cancel all TTS on unmount to prevent orphaned speech playback
+      try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
     };
   }, []);
 

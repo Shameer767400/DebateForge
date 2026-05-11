@@ -10,6 +10,10 @@ __pycache__/
 venv/
 .venv/
 env/
+ml/faiss_data/
+
+# Corrupted git backup
+.git_corrupt/
 
 # Environment Variables — NEVER commit secrets
 .env

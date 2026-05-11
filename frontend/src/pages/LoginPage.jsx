@@ -27,7 +27,7 @@ export default function LoginPage() {
       const res = await axios.post(
         '/api/auth/login',
         { email, password },
-        { baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001', withCredentials: true }
+        { baseURL: process.env.REACT_APP_API_URL || '', withCredentials: true }
       );
       login(res.data.token, res.data.user);
       toast.success('Welcome back!');

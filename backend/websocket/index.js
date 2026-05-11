@@ -52,7 +52,7 @@
 const { Server } = require('socket.io');
 const jwt        = require('jsonwebtoken');
 const { Debate, User } = require('../models');
-const { streamDebateResponse, buildSystemPrompt, trimHistory, translateText, LANGUAGE_NAMES } = require('../services/llm.service');
+const { streamDebateResponse, buildSystemPrompt, trimHistory, translateText, checkRelevanceWithLLM, LANGUAGE_NAMES } = require('../services/llm.service');
 const DebateFormatEngine = require('../services/formatEngine.service');
 const axios      = require('axios');
 const redisClient = require('../config/redis');
@@ -434,7 +434,10 @@ function initWebSocket(server) {
       if (!wsRateLimiter(socket, 'set_language')) return;
       try {
         const sessionRaw = await redisClient.get(`session:${debateId}`);
-        if (!sessionRaw) return socket.emit('error', { message: 'Session expired' });
+        // If the session doesn't exist yet, silently return.
+        // This commonly happens when set_language fires before join_debate
+        // has finished creating the Redis session (race condition).
+        if (!sessionRaw) return;
 
         const session = JSON.parse(sessionRaw);
         if (session.userId !== socket.user.id) {
@@ -683,8 +686,20 @@ async function processTranscript(socket, session, debateId, transcript) {
       topic:       session.topic,
       context:     historyCtx,
       turn_number: session.round,
-    }).then((res) => {
+    }).then(async (res) => {
       if (res) {
+        // Evaluate semantic relevance rapidly via Groq
+        const isRelevant = await checkRelevanceWithLLM(transcript, session.topic);
+        if (!isRelevant) {
+          res.logic = 0;
+          res.evidence = 0;
+          res.clarity = 0;
+          res.overall = 0;
+          res.feedback.logic = "This argument is entirely off-topic.";
+          res.feedback.evidence = "Please provide an argument relevant to the debate topic.";
+          res.feedback.clarity = "Stay focused on the subject matter.";
+        }
+        
         socket.emit('scores_update', res);
         scoresResult = res;
       }
@@ -937,10 +952,41 @@ async function runJudgeScoring(socket, session, debateId, isForfeit = false, tzO
     if (!debate) return;
 
     // Extract fallacies from the debate arguments identified by ML
-    const userFallacies = debate.arguments
-      .filter(a => a.speaker === 'user' && a.fallacy && a.fallacy.detected && a.fallacy.type)
+    const userArgs = debate.arguments.filter(a => a.speaker === 'user');
+    const userFallacies = userArgs
+      .filter(a => a.fallacy && a.fallacy.detected && a.fallacy.type)
       .map(a => a.fallacy.type.replace(/_/g, ' '));
     const uniqueFallacies = [...new Set(userFallacies)];
+
+    // Calculate Average ML Scores for the user
+    const scoredArgs = userArgs.filter(a => a.scores && a.scores.overall != null);
+    let avgLogic = 0;
+    let avgEvidence = 0;
+    let avgClarity = 0;
+    let avgOverall = 0;
+
+    if (scoredArgs.length > 0) {
+      avgLogic = Math.round(scoredArgs.reduce((sum, a) => sum + (a.scores.logic || 0), 0) / scoredArgs.length);
+      avgEvidence = Math.round(scoredArgs.reduce((sum, a) => sum + (a.scores.evidence || 0), 0) / scoredArgs.length);
+      avgClarity = Math.round(scoredArgs.reduce((sum, a) => sum + (a.scores.clarity || 0), 0) / scoredArgs.length);
+      avgOverall = Math.round(scoredArgs.reduce((sum, a) => sum + (a.scores.overall || 0), 0) / scoredArgs.length);
+    }
+
+    let mlScoresText = '';
+    if (scoredArgs.length > 0) {
+      mlScoresText = `
+REAL-TIME ML SCORES (Out of 100):
+Our real-time analytics engine has already scored the user's arguments across the debate.
+- Logic Score: ${avgLogic}
+- Evidence Score: ${avgEvidence}
+- Clarity Score: ${avgClarity}
+- Overall ML Average: ${avgOverall}
+
+CRITICAL: Your final 'userScore' MUST be closely aligned with this Overall ML Average (${avgOverall}). Do not invent a vastly different score. Base your qualitative feedback (strengths/weaknesses) heavily on these dimensions (e.g., if the Evidence score is low, critique their lack of factual backing).`;
+    } else {
+      mlScoresText = `
+No real-time ML scores are available for this debate. You must determine the user's score entirely based on the transcript.`;
+    }
 
     let forfeitContext = '';
     if (isForfeit) {
@@ -959,12 +1005,7 @@ FULL TRANSCRIPT:
 ${debate.arguments.map(a =>
   `[${a.speaker.toUpperCase()}]: ${a.content}`
 ).join('\n\n')}
-
-Score each debater 0-100 on:
-- Argument quality
-- Use of evidence
-- Rebuttal effectiveness
-- Adherence to debate format
+${mlScoresText}
 
 Provide a strict but constructive report card for the user.
 Identify their strongest points, their weakest habits, grammatical mistakes, and the exact things they must improve next time.

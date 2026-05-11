@@ -1,9 +1,9 @@
 /* ─── Format selector cards ─── */
 .format-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
 }
 
 .format-card {
@@ -99,8 +99,8 @@
 
 .format-badge {
   position: absolute;
-  top: -9px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   padding: 3px 9px;
   border-radius: 6px;
   font-size: 0.6rem;
@@ -121,7 +121,7 @@
 }
 
 .format-icon {
-  font-size: 2.2rem;
+  font-size: 2.8rem;
   line-height: 1;
   margin-top: 4px;
   transition: transform 0.2s ease;
@@ -133,15 +133,15 @@
 }
 
 .format-name {
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #fff;
   margin-top: 2px;
 }
 
 .format-desc {
-  font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
 }
 

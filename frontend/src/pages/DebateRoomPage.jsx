@@ -525,29 +525,52 @@ export default function DebateRoomPage() {
   useEffect(() => { stopRecRef.current = stopRecording; }, [stopRecording]);
 
   /* ── fetch debate metadata on mount ── */
+  const debateFetchRetried = useRef(false);
   useEffect(() => {
     if (!debateId) return;
-    api
-      .get(`/api/debates/${debateId}`)
-      .then((r) => setDebateInfo(r.data?.debate ?? r.data))
-      .catch((err) => {
-        console.error('[DebateRoom] Failed to load debate info:', err);
-        toast.error('Could not load debate. Returning to lobby.');
-        navigate('/lobby');
-      });
+    let mounted = true;
+
+    const fetchDebate = () => {
+      api
+        .get(`/api/debates/${debateId}`)
+        .then((r) => { if (mounted) setDebateInfo(r.data?.debate ?? r.data); })
+        .catch((err) => {
+          if (!mounted) return;
+          console.error('[DebateRoom] Failed to load debate info:', err);
+
+          // Only redirect on confirmed 404 (debate truly doesn't exist).
+          // For network errors or 401s, show a toast but DON'T navigate away —
+          // the user may still have a valid session and the debate may load on retry.
+          if (err.response?.status === 404) {
+            toast.error('Debate not found. Returning to lobby.');
+            navigate('/lobby');
+          } else if (!debateFetchRetried.current) {
+            // Retry once after 2 seconds for transient errors
+            debateFetchRetried.current = true;
+            setTimeout(fetchDebate, 2000);
+          } else {
+            toast.error('Could not load debate info. Please try refreshing.');
+          }
+        });
+    };
+
+    fetchDebate();
+    return () => { mounted = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debateId]);
 
   /* ── Navigate to dashboard after debate ends ──
-       If judgeVerdict is showing, user navigates manually via the verdict buttons.
-       If there's no verdict (e.g. user pressed Esc), show a toast and let user navigate. ── */
+       Only auto-redirect when the user explicitly ended early (Esc / End button)
+       and there's no judge verdict to display. ── */
   useEffect(() => {
     if (phase !== 'ended') return;
     if (judgeVerdict) return; // Let user dismiss the verdict overlay manually
     if (endResult?.winner === 'user') toast.success('🏆 You won the debate!');
     else if (endResult?.winner === 'ai') toast.error('The AI won this round. Keep forging!');
-    else toast.info('Debate ended. Returning to dashboard...');
-    const t = setTimeout(() => navigate('/dashboard'), 5000);
+    else toast.info('Debate ended.');
+    // Give user 10 seconds before auto-redirect — longer than before to avoid
+    // accidental redirects when phase toggles unexpectedly.
+    const t = setTimeout(() => navigate('/dashboard'), 10000);
     return () => clearTimeout(t);
   }, [phase, navigate, endResult, toast, judgeVerdict]);
 
@@ -981,7 +1004,7 @@ export default function DebateRoomPage() {
               return (
                 <div key={key} className="score-ring-row">
                   <div className="score-ring-wrap">
-                    <svg className="score-ring-svg" width="60" height="60" viewBox="0 0 60 60">
+                    <svg className="score-ring-svg" width="60" height="60" viewBox="0 0 60 60" style={{ filter: `drop-shadow(0 0 6px ${color})` }}>
                       <circle className="score-ring-bg" cx="30" cy="30" r={SCORE_R} />
                       <circle
                         className="score-ring-fg"

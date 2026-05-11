@@ -313,7 +313,7 @@ async function generateOpenAIDirect(session, userArgument) {
         axios.post('https://api.openai.com/v1/chat/completions', {
           model: 'gpt-4o-mini',
           messages,
-          max_tokens: 300,
+          max_tokens: 1000,
           temperature: 0.7,
         }, {
           headers: {
@@ -347,6 +347,38 @@ async function generateOpenAIDirect(session, userArgument) {
   }
 
   return null;
+}
+
+/* ── Fast Relevance Check ── */
+async function checkRelevanceWithLLM(argument, topic) {
+  const keys = getGroqKeys();
+  if (keys.length === 0) return true; // Fail open if no Groq keys
+  
+  const prompt = `Debate Topic: "${topic}"\nUser Argument: "${argument}"\nIs the user's argument relevant to the debate topic (even loosely)? Consider that "I disagree" or "Yes" are relevant to an ongoing debate. Only flag complete spam or entirely unrelated statements. Reply ONLY with "YES" or "NO".`;
+  
+  try {
+    const response = await Promise.race([
+      axios.post('https://api.groq.com/openai/v1/chat/completions', {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: 'You are a relevance judge. Output ONLY "YES" or "NO".' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0,
+        max_tokens: 5,
+      }, {
+        headers: { Authorization: `Bearer ${keys[0]}` },
+        timeout: 4000
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Groq relevance timeout')), 4000))
+    ]);
+    
+    const text = response.data?.choices?.[0]?.message?.content?.trim().toUpperCase() || 'YES';
+    return !text.includes('NO');
+  } catch (e) {
+    console.warn(`[RELEVANCE] Groq check failed: ${e.message}`); // eslint-disable-line no-console
+    return true; // Fail open on error
+  }
 }
 
 /* ─── Sarvam AI generation (Indian languages — Telugu, Hindi, Tamil, etc.) ─── */
@@ -396,7 +428,7 @@ async function generateSarvamDirect(session, userArgument) {
     try {
       const response = await Promise.race([
         axios.post('https://api.sarvam.ai/v1/chat/completions', {
-          model: 'sarvam-m', messages, max_tokens: 300, temperature: 0.7,
+          model: 'sarvam-m', messages, max_tokens: 1000, temperature: 0.7,
         }, {
           headers: { 'Authorization': `Bearer ${keys[keyIdx]}`, 'Content-Type': 'application/json' },
           timeout: 15000,
@@ -462,7 +494,7 @@ async function generateGroqDirect(session, userArgument) {
     try {
       const response = await Promise.race([
         axios.post('https://api.groq.com/openai/v1/chat/completions', {
-          model: 'llama-3.3-70b-versatile', messages, max_tokens: 300, temperature: 0.7,
+          model: 'llama-3.3-70b-versatile', messages, max_tokens: 1000, temperature: 0.7,
         }, {
           headers: { 'Authorization': `Bearer ${keys[keyIdx]}`, 'Content-Type': 'application/json' },
           timeout: 10000,
@@ -709,5 +741,6 @@ module.exports = {
   buildSystemPrompt,
   trimHistory,
   translateText,
+  checkRelevanceWithLLM,
   LANGUAGE_NAMES,
 };

@@ -92,15 +92,19 @@ export default function LobbyPage() {
   const personaRef = useRef(null);
   const formatRef = useRef(null);
   const customInputRef = useRef(null);
+  const apiRef = useRef(api);
+  apiRef.current = api;
 
   /* ── Fetch topics on mount ── */
   useEffect(() => {
-    api
+    let mounted = true;
+    apiRef.current
       .get('/api/topics')
-      .then((res) => setTopics(res.data.topics ?? res.data))
-      .catch(() => setError('Failed to load topics.'))
-      .finally(() => setLoading(false));
-  }, [api]);
+      .then((res) => { if (mounted) setTopics(res.data.topics ?? res.data); })
+      .catch(() => { if (mounted) setError('Failed to load topics.'); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, []);
 
   /* ── Reset step-2 / step-3 when mode or topic changes ── */
   const resetSteps = () => {
