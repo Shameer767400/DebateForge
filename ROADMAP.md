@@ -61,7 +61,6 @@
 |----------------|-------------------|
 | P2P Debates | WebSocket room infrastructure already supports multi-user via `socket.join(debateId)` |
 | Mobile App | REST API + WebSocket protocol are platform-agnostic; JWT auth works from any client |
-| Video Debates | `webrtc.service.js` scaffold provides signaling logic, intentionally decoupled from V1 production loop |
 | Analytics | `timeSeries.service.js` provides Redis sorted-set foundations for real-time `Recharts` visualizations |
 | Custom AI | `llm.service.js` provider chain is pluggable — add new provider in ~50 LOC |
 | Tournament | ELO system + Debate model support multi-user extension via `participants[]` field |

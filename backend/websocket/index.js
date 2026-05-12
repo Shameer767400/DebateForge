@@ -1,3 +1,4 @@
+const secLogger = require('../services/security-logger.service');
 /**
  * @fileoverview Real-time WebSocket debate engine for DebateForge.
  *
@@ -325,7 +326,7 @@ function initWebSocket(server) {
           userId: socket.user.id,
         });
         if (!debate) {
-          console.error(`[WS] ERROR: Debate ${debateId} not found for user ${socket.user.id}`);
+          secLogger.error(`[WS] ERROR: Debate ${debateId} not found for user ${socket.user.id}`);
           return socket.emit('error', { message: 'Debate not found' });
         }
 
@@ -432,7 +433,7 @@ function initWebSocket(server) {
           });
         }
       } catch (e) {
-        console.error(`[WS] ERROR in join_debate:`, e);
+        secLogger.error(`[WS] ERROR in join_debate:`, e);
         socket.emit('error', { message: e.message });
       }
     });
@@ -474,7 +475,7 @@ function initWebSocket(server) {
         socket.audioBuffer.push(Buffer.from(chunk));
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.error('[WS] audio_chunk error:', e.message);
+        secLogger.error('[WS] audio_chunk error:', e.message);
       }
     });
 
@@ -641,7 +642,7 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
         detectedLanguage = result.language || detectedLanguage;
       } catch (mlErr) {
         // ML service is unreachable — fall through to transcriptFallback
-        console.warn(`[WS] ML transcription failed (${mlErr.message}), using browser fallback`);
+        secLogger.warn(`[WS] ML transcription failed (${mlErr.message}), using browser fallback`);
       }
     }
 
@@ -664,7 +665,7 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
     await processTranscript(socket, session, debateId, transcript);
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error('[WS] processTurn error:', e);
+    secLogger.error('[WS] processTurn error:', e);
     socket.emit('error', { message: 'Processing error. Please try again.' });
   }
 }
@@ -688,7 +689,7 @@ async function processTranscript(socket, session, debateId, transcript) {
     }).then((res) => {
       if (res?.detected) socket.emit('fallacy_detected', res);
       if (res) fallacyResult = res;
-    }).catch(err => console.error('[WS] Fallacy error:', err.message));
+    }).catch(err => secLogger.error('[WS] Fallacy error:', err.message));
 
     let scoresResult = {};
     const scorerPromise = scoringService.scoreArgument({
@@ -708,12 +709,12 @@ async function processTranscript(socket, session, debateId, transcript) {
         const overall = Math.round(((res.logic || 0) + (res.evidence || 0) + (res.clarity || 0)) / 3);
         timeSeries.recordDebateScore(session.userId, overall, session.format).catch(() => {});
       }
-    }).catch(err => console.error('[WS] Scorer error:', err.message));
+    }).catch(err => secLogger.error('[WS] Scorer error:', err.message));
 
     const weaknessPromise = callMLService(`/memory/weaknesses/${session.userId}`, null, 'GET')
       .then((res) => {
         if (res?.weakness_summary) session.weaknessSummary = res.weakness_summary;
-      }).catch(err => console.error('[WS] Weakness error:', err.message));
+      }).catch(err => secLogger.error('[WS] Weakness error:', err.message));
 
     // ensure errors don't crash
     Promise.allSettled([fallacyPromise, scorerPromise, weaknessPromise]);
@@ -767,7 +768,7 @@ async function processTranscript(socket, session, debateId, transcript) {
       // Use the AI Orchestrator for the response stream (handles failover)
       for await (const chunk of aiOrchestrator.streamResponse(session, transcript)) {
         if (streamTimedOut) {
-          console.warn('[WS] LLM stream exceeded 45s timeout, aborting');
+          secLogger.warn('[WS] LLM stream exceeded 45s timeout, aborting');
           break;
         }
         fullAiText += chunk; // keep raw text for conversation history
@@ -783,7 +784,7 @@ async function processTranscript(socket, session, debateId, transcript) {
         // *** Only do sentence-level TTS for English ***
         // For non-English, TTS happens AFTER translation below.
         if (!suppressRawStream && /[.!?]\s*$/.test(sentenceBuffer.trim())) {
-          streamTTSToSocket(socket, sentenceBuffer.trim()).catch(console.error);  // eslint-disable-line no-console
+          streamTTSToSocket(socket, sentenceBuffer.trim()).catch(secLogger.error);  // eslint-disable-line no-console
           sentenceBuffer = '';
         }
       }
@@ -875,11 +876,11 @@ async function processTranscript(socket, session, debateId, transcript) {
             finalText = translated.trim();
           }
         } catch (e) {
-          console.error('[WS] Translation failed, sending original response:', e.message); // eslint-disable-line no-console
+          secLogger.error('[WS] Translation failed, sending original response:', e.message); // eslint-disable-line no-console
         }
       }
       // Send TTS for the final text (whether translated or already in target language)
-      streamTTSToSocket(socket, finalText).catch(console.error); // eslint-disable-line no-console
+      streamTTSToSocket(socket, finalText).catch(secLogger.error); // eslint-disable-line no-console
     }
 
     session.conversationHistory[session.conversationHistory.length - 1] = {
@@ -911,7 +912,7 @@ async function processTranscript(socket, session, debateId, transcript) {
               totalClarityScore:  scoresResult.clarity  || 0,
               totalScoredTurns:   1,
             },
-          }).catch(console.error);  // eslint-disable-line no-console
+          }).catch(secLogger.error);  // eslint-disable-line no-console
         }
 
         callMLService('/memory/store', {
@@ -922,9 +923,9 @@ async function processTranscript(socket, session, debateId, transcript) {
           topic:         session.topic,
           debate_id:     debateId,
           turn_number:   session.round - 1,
-        }).catch(console.error);  // eslint-disable-line no-console
+        }).catch(secLogger.error);  // eslint-disable-line no-console
       } catch (persistErr) {
-        console.error('[WS] Deferred persistence error:', persistErr); // eslint-disable-line no-console
+        secLogger.error('[WS] Deferred persistence error:', persistErr); // eslint-disable-line no-console
       }
     });
 
@@ -936,7 +937,7 @@ async function processTranscript(socket, session, debateId, transcript) {
     }
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error('[WS] processTranscript error:', e);
+    secLogger.error('[WS] processTranscript error:', e);
     const isQuota   = e.message?.startsWith('QUOTA_EXHAUSTED');
     const isOffline = e.message?.includes('AI service is offline') || e.message?.includes('AI_SERVICE_OFFLINE');
     let userMessage = 'Error generating AI response. Please try again.';
@@ -1088,7 +1089,7 @@ Respond ONLY in this JSON format:
     });
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error('[WS] Judge scoring error:', e.message);
+    secLogger.error('[WS] Judge scoring error:', e.message);
     socket.emit('error', { message: 'Judge scoring failed.' });
   }
 }

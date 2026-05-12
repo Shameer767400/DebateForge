@@ -44,7 +44,6 @@ out_scope: Real-time multiplayer User vs. User debates (Multiplayer Rooms), WebR
 
 future_enhancements:
 Day 1-2: P2P Multiplayer Debates (WebSocket room infrastructure already supports multi-user via socket.join)
-Day 3: Video Debates (webrtc.service.js scaffold provides signaling logic, intentionally decoupled from V1 production loop)
 Day 4: Deep Analytics Dashboard (timeSeries.service.js provides Redis sorted-set foundations for real-time Recharts visualizations)
 
 conclusion: DebateForge is a well-architected educational tool demonstrating significant engineering discipline in managing real-time WebSocket state alongside asynchronous NLP processing. Its core challenge is scaling the ML service inference under heavy concurrent loads, successfully mitigated by the modular multi-provider LLM abstraction and lightweight TF-IDF algorithms.
