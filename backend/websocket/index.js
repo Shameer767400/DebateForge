@@ -66,6 +66,7 @@ const { trimHistory } = require('../utils/llm.utils');
 
 
 const { finalizeDebate } = require('../services/debateEngine.service');
+const timeSeries = require('../services/timeSeries.service');
 
 // Export immediately to prevent CommonJS circular dependency issues
 module.exports = initWebSocket;
@@ -702,6 +703,10 @@ async function processTranscript(socket, session, debateId, transcript) {
         // For now keep it as is but via orchestrator later.
         socket.emit('scores_update', res);
         scoresResult = res;
+
+        // Record score to time-series analytics
+        const overall = Math.round(((res.logic || 0) + (res.evidence || 0) + (res.clarity || 0)) / 3);
+        timeSeries.recordDebateScore(session.userId, overall, session.format).catch(() => {});
       }
     }).catch(err => console.error('[WS] Scorer error:', err.message));
 

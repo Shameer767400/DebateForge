@@ -193,12 +193,17 @@ debateforge/
 │   ├── routes/          # auth, debates, profile, topics, push
 │   ├── seeds/           # topics.seed.js (60+ curated topics), mark-existing-verified
 │   ├── services/
+│   │   ├── aiOrchestrator.service.js # Multi-provider failover chain
+│   │   ├── debateEngine.service.js   # Debate lifecycle (ELO, streaks, achievements)
 │   │   ├── email.service.js          # Nodemailer — verification & reset
 │   │   ├── formatEngine.service.js   # Debate format rules (Oxford, LD, Parl.)
-│   │   ├── llm.service.js            # GPT / Gemini integration
+│   │   ├── llm.service.js            # LLM unified interface (proxy to orchestrator)
 │   │   ├── push.service.js           # Web Push (VAPID) notifications
+│   │   ├── scoring.service.js        # ML scorer integration
 │   │   ├── security-logger.service.js # Structured auth/security logging
-│   │   └── streak.service.js         # Daily streak + freeze logic
+│   │   ├── streak.service.js         # Daily streak + freeze logic
+│   │   ├── timeSeries.service.js     # Redis time-series analytics metrics
+│   │   └── analytics.service.js      # User & platform analytics aggregation
 │   ├── websocket/       # Real-time debate engine
 │   ├── tests/           # Jest + Supertest API tests
 │   └── server.js

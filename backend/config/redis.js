@@ -65,6 +65,11 @@ const wrapper = {
     }
   },
 
+  /** Get the raw ioredis client (for advanced operations like sorted sets) */
+  getClient() {
+    return this._usingRedis && this._redisClient ? this._redisClient : null;
+  },
+
   /** Health check — returns { connected, using } */
   status() {
     if (this._usingRedis && this._redisClient) {
