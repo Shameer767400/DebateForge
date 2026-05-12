@@ -56,8 +56,6 @@ async function sendViaSmtp({ to, subject, html }) {
     subject,
     html,
   });
-  // eslint-disable-next-line no-console
-  console.log('📧 [SMTP] Email sent:', info.messageId, '→', to);
   return info;
 }
 

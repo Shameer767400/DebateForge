@@ -47,23 +47,16 @@ const METRICS = {
  * @returns {Promise<void>}
  */
 async function record(metricName, value, metadata = {}, retentionMs = DEFAULT_RETENTION_MS) {
-  const client = redisClient.getClient();
-  if (!client) return; // Gracefully degrade if Redis is unavailable
-
   const now = Date.now();
-  const dataPoint = JSON.stringify({
-    value,
-    metadata,
-    timestamp: now,
-  });
+  const dataPoint = JSON.stringify({ value, metadata, timestamp: now });
 
   try {
     // Add data point with timestamp as score for range queries
-    await client.zadd(metricName, now, dataPoint);
+    await redisClient.zadd(metricName, now, dataPoint);
 
     // Prune expired data points (older than retention window)
     const cutoff = now - retentionMs;
-    await client.zremrangebyscore(metricName, '-inf', cutoff);
+    await redisClient.zremrangebyscore(metricName, '-inf', cutoff);
   } catch (err) {
     // Non-critical: metrics should never crash the main application
     console.warn(`[TimeSeries] Failed to record ${metricName}:`, err.message); // eslint-disable-line no-console
@@ -79,15 +72,12 @@ async function record(metricName, value, metadata = {}, retentionMs = DEFAULT_RE
  * @returns {Promise<Array<{value: number, metadata: Object, timestamp: number}>>}
  */
 async function query(metricName, startMs, endMs) {
-  const client = redisClient.getClient();
-  if (!client) return [];
-
   const now = Date.now();
   const start = startMs || (now - 24 * 60 * 60 * 1000);
   const end = endMs || now;
 
   try {
-    const raw = await client.zrangebyscore(metricName, start, end);
+    const raw = await redisClient.zrangebyscore(metricName, start, end);
     return raw.map((item) => {
       try { return JSON.parse(item); } catch { return null; }
     }).filter(Boolean);

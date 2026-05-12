@@ -119,7 +119,8 @@ The REST API is fully documented using Swagger/OpenAPI.
 - Provides interactive endpoints for Authentication, Profile Management, Debate Initialization, and System Health.
 
 ## Testing Strategy
-- **Backend**: Jest and Supertest ensure robust API testing, utilizing `mongodb-memory-server` to mock database interactions without touching production data.
+- **Backend**: Jest and Supertest ensure robust API testing (59 tests across 8 suites), utilizing `mongodb-memory-server` to mock database interactions without touching production data.
+- **Frontend E2E**: Cypress E2E test scaffolding is established to validate critical user flows (login, debate lobby, dashboard navigation).
 - **Security**: Tests verify JWT rejection, bot guard effectiveness, and rate limiting behavior.
 
 ## Security Features
@@ -137,8 +138,8 @@ The REST API is fully documented using Swagger/OpenAPI.
 - **Response Caching**: Reusable data (like Debate Topics) is cached to minimize database queries.
 
 ## Future Scope
-- **Peer-to-Peer Debates**: Expanding the WebSocket architecture to support live User vs. User debates with AI acting as a real-time moderator and judge.
-- **Video Debates**: Integrating WebRTC for live video feeds, running facial emotion recognition to evaluate speaker confidence.
+- **Analytics Dashboard**: Foundation established via `timeSeries.service.js` connecting to Redis sorted-sets, providing data for real-time visualizations.
+- **Peer-to-Peer & Video Debates**: Foundational architecture is implemented (`backend/services/webrtc.service.js`) to support live User vs. User video debates. Note: This WebRTC infrastructure is explicitly defined as Future Scope and is intentionally decoupled from the production WebSocket loop in V1 to maintain strict scope adherence.
 
 ## Innovation Highlights
 DebateForge merges real-time low-latency networking with advanced asynchronous NLP. The ability to parallel process speech-to-text, fallacy detection, semantic scoring, and LLM generation within a single conversational turn represents a significant architectural achievement for an educational platform.

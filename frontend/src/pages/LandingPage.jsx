@@ -8,7 +8,6 @@ const FEATURES = [
   { icon: '🧠', title: 'AI Memory Engine', desc: 'Long-term memory of every argument so the AI actually learns your habits over time.' },
   { icon: '📊', title: 'Score Tracking', desc: 'Logic, evidence, clarity scores every round — with Elo-style rating for progress.' },
   { icon: '🏆', title: 'Global Leaderboard', desc: 'Compete with debaters worldwide and climb the ranks as your skills sharpen.' },
-  { icon: '👥', title: 'Multiplayer Rooms', desc: 'Challenge friends in live rooms with AI moderation and real-time scoring.' },
 ];
 
 const STATS = [

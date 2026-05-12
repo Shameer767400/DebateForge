@@ -139,9 +139,7 @@ async function register(req, res) {
 
     const IS_DEV = process.env.NODE_ENV !== 'production';
 
-    if (IS_DEV) console.log(`🔍 Checking existing user for email: ${email}, username: ${username}`);
     if (existingUser) {
-      if (IS_DEV) console.log(`📋 Found existing user: ${existingUser.username} (verified: ${existingUser.emailVerified})`);
       
       // If username exists, always block
       if (existingUser.username === username) {
@@ -151,7 +149,6 @@ async function register(req, res) {
       // If email exists but is not verified, allow re-registration by deleting the old account
       if (existingUser.email === email && !existingUser.emailVerified) {
         await User.deleteOne({ _id: existingUser._id });
-        if (IS_DEV) console.log(`🗑️ Deleted unverified account for re-registration`);
       } 
       // If email exists and is verified, block
       else if (existingUser.email === email && existingUser.emailVerified) {
@@ -170,9 +167,6 @@ async function register(req, res) {
 
     // Generate email verification OTP
     const verificationOTP = user.createEmailVerificationOTP();
-    if (IS_DEV) {
-      console.log(`🔐 OTP for ${email}: ${verificationOTP} (expires: ${new Date(user.emailVerificationOTPExpires).toISOString()})`);
-    }
     
     await user.save();
 

@@ -54,6 +54,11 @@ const wrapper = {
   async setex(key, ttl, val){ return this._backend.setex(key, ttl, val); },
   async del(key)            { return this._backend.del(key); },
 
+  // Sorted Set Operations
+  async zadd(key, score, val)                     { return this._backend.zadd ? this._backend.zadd(key, score, val) : null; },
+  async zrangebyscore(key, min, max)              { return this._backend.zrangebyscore ? this._backend.zrangebyscore(key, min, max) : []; },
+  async zremrangebyscore(key, min, max)           { return this._backend.zremrangebyscore ? this._backend.zremrangebyscore(key, min, max) : null; },
+
   /** Graceful shutdown — close Redis connection if one exists */
   async disconnect() {
     if (this._redisClient) {
