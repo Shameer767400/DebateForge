@@ -12,7 +12,7 @@ Authentication
 Debate Engine
 • Live voice or text debates against multi-provider AI opponents
 • Support for multiple formal debate formats (Freeform, Oxford, etc.)
-• Real-time speech-to-text (STT) and text-to-speech (TTS) streaming
+• Browser-based text-to-speech (TTS) streaming via Web Speech API
 Analytics & Scoring
 • Real-time logical fallacy detection and categorization (11 fallacies)
 • Granular objective scoring based on Logic, Evidence, and Clarity
