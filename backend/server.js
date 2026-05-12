@@ -13,10 +13,10 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const redisClient = require('./config/redis');
 
-const authRoutes = require('./routes/auth');
-const debateRoutes = require('./routes/debates');
-const profileRoutes = require('./routes/profile');
-const topicRoutes = require('./routes/topics');
+const authRoutes = require('./routes/auth.routes');
+const debateRoutes = require('./routes/debate.routes');
+const profileRoutes = require('./routes/profile.routes');
+const topicRoutes = require('./routes/topics.routes');
 const pushRoutes = require('./routes/push.routes');
 const statusRoutes = require('./routes/status.routes');
 const swaggerSpec = require('./config/swagger.config');

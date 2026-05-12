@@ -307,7 +307,7 @@ function initWebSocket(server) {
   /* ── Connection handler ── */
   io.on('connection', (socket) => {
     // eslint-disable-next-line no-console
-    console.log(`[WS] User connected: ${socket.user.username}`);
+
     socket._turnInFlight = false;
 
 
@@ -318,7 +318,7 @@ function initWebSocket(server) {
       if (!wsRateLimiter(socket, 'join_debate')) return;
       // Also reset turnInFlight on every join so reconnects don't stay blocked.
       socket._turnInFlight = false;
-      console.log(`[WS] INCOMING: join_debate for debateId: ${debateId} from user: ${socket.user.username}`);
+
       try {
         const debate = await Debate.findOne({
           _id:    debateId,
@@ -347,7 +347,7 @@ function initWebSocket(server) {
             }
             await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(existing));
             socket.join(debateId);
-            console.log(`[WS] RECONNECT: Restored existing session for debate ${debateId} at round ${existing.round}`);
+
             socket.emit('debate_joined', {
               topic:      debate.topicSnapshot,
               userSide:   debate.userSide,
@@ -410,7 +410,7 @@ function initWebSocket(server) {
         );
 
         socket.join(debateId);
-        console.log(`[WS] SUCCESS: User joined debate channel ${debateId}`);
+
         socket.emit('debate_joined', {
           topic:      debate.topicSnapshot,
           userSide:   debate.userSide,
@@ -486,7 +486,7 @@ function initWebSocket(server) {
       if (socket._turnInFlight) {
         return socket.emit('error', { message: 'Still processing your previous turn. Please wait.' });
       }
-      console.log(`[WS] INCOMING: audio_end for debate: ${debateId}`);
+
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
         return socket.emit('error', { message: 'Session expired' });
@@ -502,7 +502,7 @@ function initWebSocket(server) {
       socket.audioBuffer = []; // Clear current buffer
       
       if (chunks.length === 0) {
-        console.log(`[WS] WARNING: audio_end received but socket buffer was empty`);
+
         return;
       }
 
@@ -523,10 +523,10 @@ function initWebSocket(server) {
       if (socket._turnInFlight) {
         return socket.emit('error', { message: 'Still processing your previous turn. Please wait.' });
       }
-      console.log(`[WS] INCOMING: transcript_direct. Debate: ${debateId}, Text length: ${text?.length || 0}`);
+
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
-         console.log(`[WS] ERROR: Ignoring transcript_direct because session missing from Redis`);
+
          return;
       }
       const session = JSON.parse(sessionRaw);
@@ -615,7 +615,7 @@ function initWebSocket(server) {
         if (conns.size === 0) userConnections.delete(userId);
       }
       // eslint-disable-next-line no-console
-      console.log(`[WS] User disconnected: ${socket.user.username}`);
+
     });
   });
 }
@@ -648,7 +648,7 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
     if (!transcript.trim() && transcriptFallback) {
       transcript = transcriptFallback;
       detectedLanguage = detectLanguageFromText(transcriptFallback) || detectedLanguage;
-      console.log(`[WS] Using transcript fallback for debate ${debateId} | lang=${detectedLanguage}`);
+
     }
 
     if (!transcript.trim()) {
@@ -866,7 +866,7 @@ async function processTranscript(socket, session, debateId, transcript) {
       })();
 
       if (alreadyInTarget) {
-        console.log(`[WS] Response already in ${targetLang} — skipping translation`); // eslint-disable-line no-console
+
       } else {
         socket.emit('ai_translating', { language: translationService.getLanguageName(targetLang) });
         try {
