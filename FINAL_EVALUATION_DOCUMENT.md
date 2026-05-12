@@ -8,6 +8,7 @@ Functional Requirements
 Authentication
 • Register, login, logout with stateless JWT support
 • Account management and secure session handling
+• Role-based access control (admin, editor, viewer)
 Debate Engine
 • Live voice or text debates against multi-provider AI opponents
 • Support for multiple formal debate formats (Freeform, Oxford, etc.)
