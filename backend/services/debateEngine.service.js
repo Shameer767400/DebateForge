@@ -1,39 +1,17 @@
 'use strict';
 
 /**
- * @fileoverview Debate Engine service — lifecycle management for DebateForge debates.
- *
- * Encapsulates all debate lifecycle operations:
- *   - Create debate sessions with topic resolution
- *   - Finalize debate with ELO calculation
- *   - Achievement checking and awarding
- *   - Score aggregation and winner determination
- *
- * @module services/debateEngine.service
+ * @fileoverview Debate Engine service
  */
 
 const { User, Topic, Debate } = require('../models');
 const { updateStreak } = require('./streak.service');
 
-/** Score thresholds for win/draw/loss determination */
 const SCORE_THRESHOLDS = {
   WIN: 65,
   DRAW: 45,
 };
 
-/**
- * Create a new debate session.
- *
- * @param {Object} params
- * @param {string} params.userId — MongoDB ObjectId of the user
- * @param {string} [params.topicId] — preset topic ID (optional if customTopic provided)
- * @param {string} [params.customTopic] — custom topic text
- * @param {string} params.side — 'for' or 'against'
- * @param {string} params.difficulty — beginner|intermediate|expert|devils_advocate
- * @param {string} [params.persona] — balanced|socratic|aggressive|academic|casual
- * @param {string} [params.format] — freeform|oxford|lincoln_douglas|parliamentary
- * @returns {Promise<Object>} created debate document
- */
 async function createDebate({ userId, topicId, customTopic, side, difficulty, persona, format }) {
   let topicSnapshot;
   let resolvedTopicId = topicId || null;
@@ -62,16 +40,56 @@ async function createDebate({ userId, topicId, customTopic, side, difficulty, pe
   return debate;
 }
 
-/**
- * Finalize a completed debate — calculate scores, update ELO, award achievements.
- *
- * @param {string} userId
- * @param {string} debateId
- * @param {string} winner — 'user' | 'ai' | 'draw'
- * @param {number} [durationSecs=0]
- * @param {number} [tzOffsetMinutes=0]
- * @returns {Promise<Object>} finalization result
- */
+async function checkAchievements(userId, user, winner) {
+  if (!user) {
+    user = await User.findById(userId);
+    if (!user) return;
+  }
+  const achievementsToAdd = [];
+  if (user.totalDebates === 1) achievementsToAdd.push('first_debate');
+  if (user.wins === 10) achievementsToAdd.push('10_wins');
+
+  const recentDebates = await Debate.find({ userId, userFinalScore: { $ne: null } })
+    .sort({ endedAt: -1 }).limit(10);
+
+  const last5 = recentDebates.slice(0, 5);
+  if (last5.length > 0) {
+    const avgOverall = last5.reduce((sum, d) => sum + (d.userFinalScore || 0), 0) / last5.length;
+    if (avgOverall > 80) achievementsToAdd.push('logic_master');
+  }
+
+  const evidenceScores = last5.flatMap((d) => d.getUserArguments ? d.getUserArguments() : [])
+    .map((a) => a.scores?.evidence).filter((s) => s != null);
+  if (evidenceScores.length > 0) {
+    const avgEvidence = evidenceScores.reduce((s, v) => s + v, 0) / evidenceScores.length;
+    if (avgEvidence > 85) achievementsToAdd.push('evidence_king');
+  }
+
+  const last3 = recentDebates.slice(0, 3);
+  if (last3.length === 3) {
+    const allClean = last3.every((d) => {
+      const userArgs = d.getUserArguments ? d.getUserArguments() : [];
+      return userArgs.every((a) => !a.fallacy?.detected);
+    });
+    if (allClean) achievementsToAdd.push('no_fallacy_streak_3');
+  }
+
+  if (winner === 'user' && recentDebates.length > 0) {
+    const latestDebate = await Debate.findOne({ userId }).sort({ endedAt: -1 });
+    if (latestDebate) {
+      const userArgs = latestDebate.getUserArguments ? latestDebate.getUserArguments() : [];
+      const round3Arg = userArgs.find((a) => a.turnNumber === 3);
+      if (round3Arg && (round3Arg.scores?.overall ?? 100) < SCORE_THRESHOLDS.DRAW) {
+        achievementsToAdd.push('comeback_king');
+      }
+    }
+  }
+
+  if (achievementsToAdd.length > 0) {
+    await User.findByIdAndUpdate(userId, { $addToSet: { achievements: { $each: achievementsToAdd } } });
+  }
+}
+
 async function finalizeDebate(userId, debateId, winner, durationSecs = 0, tzOffsetMinutes = 0) {
   const debate = await Debate.findOne({ _id: debateId, userId });
   if (!debate) throw new Error('Debate not found');
@@ -80,16 +98,12 @@ async function finalizeDebate(userId, debateId, winner, durationSecs = 0, tzOffs
   const avgScore = debate.getAverageScore();
 
   await Debate.findByIdAndUpdate(debateId, {
-    winner,
-    userFinalScore: avgScore,
-    durationSecs,
-    endedAt: new Date(),
+    winner, userFinalScore: avgScore, durationSecs, endedAt: new Date(),
   });
 
   const user = await User.findById(userId);
   if (!user) throw new Error('User not found');
 
-  // ELO calculation with adaptive K-factor
   const K = user.totalDebates < 10 ? 32 : user.totalDebates < 50 ? 16 : 8;
   const { AI_ELO_RATING } = require('../config/constants');
   const expected = 1 / (1 + Math.pow(10, (AI_ELO_RATING - user.eloRating) / 400));
@@ -103,7 +117,6 @@ async function finalizeDebate(userId, debateId, winner, durationSecs = 0, tzOffs
 
   await User.findByIdAndUpdate(userId, { $inc: statUpdate });
 
-  // Update fallacy profile
   const fallacyInc = {};
   debate.getUserArguments().forEach((arg) => {
     if (arg.fallacy?.detected && arg.fallacy?.type) {
@@ -115,7 +128,8 @@ async function finalizeDebate(userId, debateId, winner, durationSecs = 0, tzOffs
     await User.findByIdAndUpdate(userId, { $inc: fallacyInc });
   }
 
-  // Streak update
+  await checkAchievements(userId, user, winner);
+
   const freshUser = await User.findById(userId);
   const streakResult = updateStreak(freshUser, tzOffsetMinutes);
   freshUser.markModified('streak');
@@ -124,12 +138,6 @@ async function finalizeDebate(userId, debateId, winner, durationSecs = 0, tzOffs
   return { avgScore, newElo, streakResult, freshUser };
 }
 
-/**
- * Get user's debate statistics summary.
- *
- * @param {string} userId
- * @returns {Promise<Object>} stats summary
- */
 async function getDebateStats(userId) {
   const [total, wins, losses, draws] = await Promise.all([
     Debate.countDocuments({ userId }),
@@ -137,15 +145,8 @@ async function getDebateStats(userId) {
     Debate.countDocuments({ userId, winner: 'ai' }),
     Debate.countDocuments({ userId, winner: 'draw' }),
   ]);
-
   const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-
   return { total, wins, losses, draws, winRate };
 }
 
-module.exports = {
-  createDebate,
-  finalizeDebate,
-  getDebateStats,
-  SCORE_THRESHOLDS,
-};
+module.exports = { createDebate, finalizeDebate, getDebateStats, SCORE_THRESHOLDS };

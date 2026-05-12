@@ -63,9 +63,9 @@ const fallacyService = require('../services/fallacyDetection.service');
 const scoringService = require('../services/scoring.service');
 const translationService = require('../services/translation.service');
 const { trimHistory } = require('../utils/llm.utils');
-const { registerWebRTCHandlers } = require('./webrtc');
 
-const { finalizeDebateStats } = require('../controllers/debate.controller');
+
+const { finalizeDebate } = require('../services/debateEngine.service');
 
 // Export immediately to prevent CommonJS circular dependency issues
 module.exports = initWebSocket;
@@ -309,8 +309,6 @@ function initWebSocket(server) {
     console.log(`[WS] User connected: ${socket.user.username}`);
     socket._turnInFlight = false;
 
-    // Register WebRTC signaling handlers for P2P debate mode
-    registerWebRTCHandlers(io, socket);
 
     /* ────────────────────────────────────────
        join_debate
@@ -593,7 +591,7 @@ function initWebSocket(server) {
         }
         /* Too few arguments for a proper judge evaluation — instant forfeit */
         const winner = 'ai';
-        const result = await finalizeDebateStats(socket.user.id, debateId, winner, 0, tzOffset);
+        const result = await finalizeDebate(socket.user.id, debateId, winner, 0, tzOffset);
         socket.emit('debate_ended', {
           winner,
           userFinalScore: result.avgScore,
@@ -1069,7 +1067,7 @@ Respond ONLY in this JSON format:
     });
     
     // Process final stats (wins, streaks, etc.)
-    const statsResult = await finalizeDebateStats(session.userId, debateId, judgeResponse.winner, 0, tzOffset);
+    const statsResult = await finalizeDebate(session.userId, debateId, judgeResponse.winner, 0, tzOffset);
     const streakResult = statsResult?.streakResult || {};
 
     // Emit judge results to client

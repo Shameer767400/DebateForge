@@ -228,7 +228,7 @@ def extract_features(argument: str, topic: str, context: List[str]):
         # Longer arguments tend to be more structured
         if word_count >= 20:
             logic_score += 10
-        logic_score = _clamp(logic_score + random.uniform(-5, 5))
+        logic_score = _clamp(logic_score)
 
         # EVIDENCE: numbers, years, percentages are universal
         has_percentage = bool(re.search(r'\d+\s*%', argument))
@@ -241,7 +241,7 @@ def extract_features(argument: str, topic: str, context: List[str]):
             evidence_score += 15
         if has_number:
             evidence_score += 10
-        evidence_score = _clamp(evidence_score + random.uniform(-5, 5))
+        evidence_score = _clamp(evidence_score)
 
         # CLARITY: use sentence length distribution (universal)
         avg_sent_len = word_count / sentence_count
@@ -250,7 +250,7 @@ def extract_features(argument: str, topic: str, context: List[str]):
         else:
             clarity_score = _clamp(75.0 - abs(avg_sent_len - 14) * 2.5)
         unique_ratio = len(set(words)) / word_count
-        clarity_score = _clamp((clarity_score * 0.7 + unique_ratio * 100 * 0.3) + random.uniform(-5, 5))
+        clarity_score = _clamp((clarity_score * 0.7 + unique_ratio * 100 * 0.3))
 
         return int(round(logic_score)), int(round(evidence_score)), int(round(clarity_score)), sentiment
 
@@ -289,7 +289,7 @@ def extract_features(argument: str, topic: str, context: List[str]):
     if sentiment and abs(sentiment.get("compound", 0)) > 0.7:
         logic_score -= 5  # Overly emotional = less logical
 
-    logic_score = _clamp(logic_score + random.uniform(-5, 5))
+    logic_score = _clamp(logic_score)
 
     # EVIDENCE FEATURES
     has_percentage = bool(re.search(r"\d+\s*%|\d+\s*percent", argument, re.IGNORECASE))
@@ -337,7 +337,7 @@ def extract_features(argument: str, topic: str, context: List[str]):
     if spacy_feats and spacy_feats.get("entity_count", 0) > 0:
         evidence_score += min(10, spacy_feats["entity_count"] * 5)
 
-    evidence_score = _clamp(evidence_score + random.uniform(-5, 5))
+    evidence_score = _clamp(evidence_score)
 
     # CLARITY FEATURES
     if textstat is not None:
@@ -361,7 +361,7 @@ def extract_features(argument: str, topic: str, context: List[str]):
     clarity_score = (
         flesch_score * 0.4 + length_score * 0.4 + repetition_score * 0.2
     )
-    clarity_score = _clamp(clarity_score + random.uniform(-5, 5))
+    clarity_score = _clamp(clarity_score)
 
     return int(round(logic_score)), int(round(evidence_score)), int(round(clarity_score)), sentiment
 

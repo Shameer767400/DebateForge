@@ -1,5 +1,6 @@
 const { User, Topic, Debate } = require('../models');
 const { updateStreak } = require('../services/streak.service');
+const debateEngine = require('../services/debateEngine.service');
 
 async function startDebate(req, res) {
   try {
@@ -104,137 +105,7 @@ async function getDebateById(req, res) {
   }
 }
 
-async function checkAchievements(userId, user, winner) {
-  if (!user) {
-    // eslint-disable-next-line no-param-reassign
-    user = await User.findById(userId);
-    if (!user) return;
-  }
 
-  const achievementsToAdd = [];
-
-  /* first_debate */
-  if (user.totalDebates === 1) {
-    achievementsToAdd.push('first_debate');
-  }
-
-  /* 10_wins */
-  if (user.wins === 10) {
-    achievementsToAdd.push('10_wins');
-  }
-
-  /* Fetch recent debates once for multi-achievement checks */
-  const recentDebates = await Debate.find({
-    userId,
-    userFinalScore: { $ne: null },
-  })
-    .sort({ endedAt: -1 })
-    .limit(10);
-
-  /* logic_master: avg overall score > 80 in last 5 debates */
-  const last5 = recentDebates.slice(0, 5);
-  if (last5.length > 0) {
-    const avgOverall = last5.reduce((sum, d) => sum + (d.userFinalScore || 0), 0) / last5.length;
-    if (avgOverall > 80) achievementsToAdd.push('logic_master');
-  }
-
-  /* evidence_king: avg evidence score > 85 in last 5 debates */
-  const evidenceScores = last5
-    .flatMap((d) => d.getUserArguments ? d.getUserArguments() : [])
-    .map((a) => a.scores?.evidence)
-    .filter((s) => s != null);
-  if (evidenceScores.length > 0) {
-    const avgEvidence = evidenceScores.reduce((s, v) => s + v, 0) / evidenceScores.length;
-    if (avgEvidence > 85) achievementsToAdd.push('evidence_king');
-  }
-
-  /* no_fallacy_streak_3: last 3 completed debates had zero fallacies */
-  const last3 = recentDebates.slice(0, 3);
-  if (last3.length === 3) {
-    const allClean = last3.every((d) => {
-      const userArgs = d.getUserArguments ? d.getUserArguments() : [];
-      return userArgs.every((a) => !a.fallacy?.detected);
-    });
-    if (allClean) achievementsToAdd.push('no_fallacy_streak_3');
-  }
-
-  /* comeback_king: won this debate after having a score < DRAW threshold in round 3 */
-  if (winner === 'user' && recentDebates.length > 0) {
-    const latestDebate = await Debate.findOne({ userId }).sort({ endedAt: -1 });
-    if (latestDebate) {
-      const userArgs = latestDebate.getUserArguments ? latestDebate.getUserArguments() : [];
-      const round3Arg = userArgs.find((a) => a.turnNumber === 3);
-      if (round3Arg && (round3Arg.scores?.overall ?? 100) < SCORE_THRESHOLDS.DRAW) {
-        achievementsToAdd.push('comeback_king');
-      }
-    }
-  }
-
-  if (achievementsToAdd.length > 0) {
-    await User.findByIdAndUpdate(userId, {
-      $addToSet: { achievements: { $each: achievementsToAdd } },
-    });
-  }
-}
-
-async function finalizeDebateStats(userId, debateId, winner, durationSecs = 0, tzOffsetMinutes = 0) {
-  const debate = await Debate.findOne({ _id: debateId, userId });
-  if (!debate) throw new Error('Debate not found');
-
-  // Do not double-finalize
-  if (debate.endedAt) return debate;
-
-  const avgScore = debate.getAverageScore();
-
-  await Debate.findByIdAndUpdate(debateId, {
-    winner,
-    userFinalScore: avgScore,
-    durationSecs,
-    endedAt: new Date(),
-  });
-
-  const user = await User.findById(userId);
-  if (!user) throw new Error('User not found');
-
-  const K = user.totalDebates < 10 ? 32 : user.totalDebates < 50 ? 16 : 8;
-  const { AI_ELO_RATING } = require('../config/constants');
-  const expected = 1 / (1 + Math.pow(10, (AI_ELO_RATING - user.eloRating) / 400));
-  const actual = winner === 'user' ? 1 : winner === 'draw' ? 0.5 : 0;
-  const newElo = Math.round(user.eloRating + K * (actual - expected));
-
-  const statUpdate = {
-    totalDebates: 1,
-    eloRating: newElo - user.eloRating,
-  };
-
-  if (winner === 'user') statUpdate.wins = 1;
-  else if (winner === 'ai') statUpdate.losses = 1;
-  else if (winner === 'draw') statUpdate.draws = 1;
-
-  await User.findByIdAndUpdate(userId, { $inc: statUpdate });
-
-  const fallacyInc = {};
-  debate.getUserArguments().forEach((arg) => {
-    if (arg.fallacy && arg.fallacy.detected && arg.fallacy.type) {
-      const key = `fallacyProfile.${arg.fallacy.type}`;
-      fallacyInc[key] = (fallacyInc[key] || 0) + 1;
-    }
-  });
-
-  if (Object.keys(fallacyInc).length > 0) {
-    await User.findByIdAndUpdate(userId, { $inc: fallacyInc });
-  }
-
-  await checkAchievements(userId, user, winner);
-
-  // Update streak — pass user's timezone offset so dates match their local calendar
-  const freshUser = await User.findById(userId);
-  const streakResult = updateStreak(freshUser, tzOffsetMinutes);
-  freshUser.markModified('streak');
-  await freshUser.save();
-
-  return { avgScore, newElo, streakResult, freshUser };
-}
 
 async function endDebate(req, res) {
   try {
@@ -242,7 +113,7 @@ async function endDebate(req, res) {
     const debateId = req.params.id;
     const tzOffset = typeof tzOffsetMinutes === 'number' ? tzOffsetMinutes : 0;
 
-    const result = await finalizeDebateStats(req.user.id, debateId, winner, durationSecs, tzOffset);
+    const result = await debateEngine.finalizeDebate(req.user.id, debateId, winner, durationSecs, tzOffset);
 
     return res.status(200).json({
       winner,
@@ -271,6 +142,6 @@ module.exports = {
   getDebateHistory,
   getDebateById,
   endDebate,
-  finalizeDebateStats,
+
 };
 
