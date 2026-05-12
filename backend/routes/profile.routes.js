@@ -9,6 +9,7 @@ const {
   updateBio,
 } = require('../controllers/profile.controller');
 const { protect } = require('../middleware/auth.middleware');
+const { requireRole } = require('../middleware/rbac.middleware');
 
 const router = express.Router();
 
@@ -126,5 +127,21 @@ router.delete('/avatar', protect, removeProfilePic);
  *         description: Bio updated
  */
 router.put('/bio', protect, updateBio);
+
+/**
+ * @swagger
+ * /api/profile/admin/system-stats:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get system statistics (Admin only)
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: System statistics
+ */
+router.get('/admin/system-stats', protect, requireRole(['admin']), (req, res) => {
+  res.json({ message: 'Admin access granted', status: 'healthy' });
+});
 
 module.exports = router;

@@ -25,6 +25,11 @@ const userSchema = new Schema(
       type: String,
       required: true,
     },
+    role: {
+      type: String,
+      enum: ['admin', 'editor', 'viewer', 'user'],
+      default: 'user',
+    },
     /* ── Email verification with OTP ── */
     emailVerified: {
       type: Boolean,
