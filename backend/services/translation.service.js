@@ -6,7 +6,104 @@
  * @module services/translation.service
  */
 
-const { translateText, LANGUAGE_NAMES } = require('./llm.service');
+const { LANGUAGE_NAMES } = require('../utils/llm.utils');
+const axios = require('axios');
+
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
+
+let _geminiModel = null;
+function getGeminiModel() {
+  if (_geminiModel) return _geminiModel;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    _geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    return _geminiModel;
+  } catch (e) {
+    console.error('[GEMINI] Failed to initialize:', e.message);
+    return null;
+  }
+}
+
+async function translateText(text, langCode) {
+  if (!text || !langCode || langCode === 'en') return text;
+  const langName = LANGUAGE_NAMES[langCode] || langCode;
+
+  function stripEnglishLeakage(output) {
+    const pattern = SCRIPT_PATTERNS[langCode];
+    if (!pattern) return output;
+    const lines = output.split(/\n/).filter(l => l.trim());
+    return lines.filter(line => pattern.test(line)).join('\n') || output;
+  }
+
+  const primaryPrompt = `You are a professional translator. Translate the following text into ${langName}.
+CRITICAL RULES:
+1. Output ONLY the ${langName} translation. Nothing else.
+2. Every single word must be in ${langName}. ZERO English words allowed.
+3. Do NOT include the original English text.
+4. Do NOT add notes, explanations, or labels like "Translation:".
+TEXT:
+${text}`;
+
+  const retryPrompt = `TRANSLATE TO ${langName.toUpperCase()} ONLY. Your previous translation contained English. This time output ONLY ${langName} text. No English at all.
+${text}`;
+
+  async function attemptGemini(prompt) {
+    const model = getGeminiModel();
+    if (!model) return null;
+    try {
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini timed out')), 15000)),
+      ]);
+      const translated = result.response?.text?.() || result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+      return translated?.trim() || null;
+    } catch (e) {
+      console.warn(`[GEMINI] Translation failed: ${e.message?.slice(0, 120)}`);
+      return null;
+    }
+  }
+
+  async function attemptOllama(prompt) {
+    try {
+      const response = await axios.post(
+        `${OLLAMA_URL}/api/chat`,
+        {
+          model: OLLAMA_MODEL,
+          messages: [
+            { role: 'system', content: `You are a translator. Output ONLY the ${langName} translation. No English.` },
+            { role: 'user', content: prompt },
+          ],
+          stream: false,
+          options: { temperature: 0.3, num_predict: 500 },
+        },
+        { timeout: 45000 }
+      );
+      return response.data?.message?.content?.trim() || null;
+    } catch (e) {
+      console.error(`[OLLAMA] Translation failed:`, e.message?.slice(0, 120));
+      return null;
+    }
+  }
+
+  let translated = await attemptGemini(primaryPrompt);
+  if (translated && translated.length > 0) {
+    if (isInTargetScript(translated, langCode)) return stripEnglishLeakage(translated);
+    const retry = await attemptGemini(retryPrompt);
+    if (retry && isInTargetScript(retry, langCode)) return stripEnglishLeakage(retry);
+  }
+
+  const ollamaResult = await attemptOllama(primaryPrompt);
+  if (ollamaResult && isInTargetScript(ollamaResult, langCode)) return stripEnglishLeakage(ollamaResult);
+
+  const bestAttempt = translated || ollamaResult;
+  if (bestAttempt && bestAttempt !== text) return stripEnglishLeakage(bestAttempt);
+
+  return text;
+}
 
 const SCRIPT_PATTERNS = {
   te: /[\u0C00-\u0C7F]/, ta: /[\u0B80-\u0BFF]/, kn: /[\u0C80-\u0CFF]/,

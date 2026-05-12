@@ -62,7 +62,8 @@ const aiOrchestrator = require('../services/aiOrchestrator.service');
 const fallacyService = require('../services/fallacyDetection.service');
 const scoringService = require('../services/scoring.service');
 const translationService = require('../services/translation.service');
-const { trimHistory } = require('../services/llm.service');
+const { trimHistory } = require('../utils/llm.utils');
+const { registerWebRTCHandlers } = require('./webrtc');
 
 const { finalizeDebateStats } = require('../controllers/debate.controller');
 
@@ -307,6 +308,9 @@ function initWebSocket(server) {
     // eslint-disable-next-line no-console
     console.log(`[WS] User connected: ${socket.user.username}`);
     socket._turnInFlight = false;
+
+    // Register WebRTC signaling handlers for P2P debate mode
+    registerWebRTCHandlers(io, socket);
 
     /* ────────────────────────────────────────
        join_debate

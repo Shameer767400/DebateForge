@@ -163,7 +163,7 @@ describe('Format Engine', () => {
 });
 
 describe('LLM Service', () => {
-  const { buildSystemPrompt, trimHistory, LANGUAGE_NAMES } = require('../services/llm.service');
+  const { buildSystemPrompt, trimHistory, LANGUAGE_NAMES } = require('../utils/llm.utils');
 
   it('should build a system prompt with all required sections', () => {
     const session = {

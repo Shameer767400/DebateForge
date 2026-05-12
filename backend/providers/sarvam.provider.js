@@ -14,7 +14,7 @@
 
 const axios = require('axios');
 const BaseProvider = require('./base.provider');
-const { buildSystemPrompt } = require('../services/llm.service');
+const { buildSystemPrompt } = require('../utils/llm.utils');
 
 /** Indian languages supported by Sarvam AI */
 const INDIAN_LANGUAGES = new Set([
