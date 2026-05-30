@@ -27,6 +27,7 @@ function protect(req, res, next) {
       id: decoded.id,
       username: decoded.username,
       email: decoded.email,
+      role: decoded.role,
     };
 
     return next();

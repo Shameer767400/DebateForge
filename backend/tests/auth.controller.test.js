@@ -257,4 +257,50 @@ describe('Auth Endpoints', () => {
       expect(res.statusCode).toBe(401);
     });
   });
+
+  /* ── Role-Based Access Control (RBAC) ── */
+  describe('RBAC Authorization', () => {
+    it('should deny access to admin routes for standard users', async () => {
+      const cookie = await registerAndGetCookie({
+        username: 'standarduser',
+        email: 'standard@example.com',
+      });
+
+      const res = await withUA(request(app)
+        .get('/api/profile/admin/system-stats')
+        .set('Cookie', cookie));
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.error).toMatch(/access denied/i);
+    });
+
+    it('should allow access to admin routes for admin users', async () => {
+      const cookie = await registerAndGetCookie({
+        username: 'adminuser',
+        email: 'admin@example.com',
+      });
+
+      // Update the user role in MongoDB directly to admin
+      await User.updateOne({ username: 'adminuser' }, { role: 'admin' });
+
+      // Mint a fresh token/cookie for the user now that they are admin
+      const loginRes = await withUA(request(app)
+        .post('/api/auth/login')
+        .send({
+          email: 'admin@example.com',
+          password: 'SecurePass1!',
+        }));
+
+      const newCookie = loginRes.headers['set-cookie']
+        .map((c) => c.split(';')[0])
+        .join('; ');
+
+      const res = await withUA(request(app)
+        .get('/api/profile/admin/system-stats')
+        .set('Cookie', newCookie));
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.message).toMatch(/admin access granted/i);
+    });
+  });
 });
