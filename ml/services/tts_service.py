@@ -9,7 +9,6 @@ USE_LOCAL_TTS = os.getenv("USE_LOCAL_TTS", "false").lower() == "true"
 
 _tts_model = None
 
-
 def get_tts_model():
     """Load Coqui TTS model once (singleton)."""
     global _tts_model
@@ -20,7 +19,6 @@ def get_tts_model():
         _tts_model = CoquiTTS("tts_models/en/ljspeech/tacotron2-DDC")
         logging.info("[TTS LOCAL] Model loaded ✅")
     return _tts_model
-
 
 async def synthesize_full(text: str) -> bytes:
     """
@@ -39,7 +37,6 @@ async def synthesize_full(text: str) -> bytes:
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = tmp.name
-
         # Run in thread to avoid blocking async event loop
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
@@ -66,7 +63,6 @@ async def stream_speech(text: str) -> AsyncIterator[bytes]:
     """
     if not USE_LOCAL_TTS:
         return
-
     audio_bytes = await synthesize_full(text)
     if not audio_bytes:
         return
