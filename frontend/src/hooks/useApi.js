@@ -31,6 +31,18 @@ export function useApi() {
       withCredentials: true, // Automatically send HTTP-only cookies
     });
 
+    // Request interceptor: append JWT token if present in localStorage
+    instance.interceptors.request.use(
+      (config) => {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
     // Response interceptor: handle 401s with token refresh
     instance.interceptors.response.use(
       (response) => response,

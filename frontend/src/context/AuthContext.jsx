@@ -16,6 +16,30 @@ const authApi = axios.create({
   withCredentials: true,
 });
 
+// Configure global Axios request interceptor to append JWT token if present in localStorage
+axios.interceptors.request.use(
+  (config) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Configure authApi request interceptor
+authApi.interceptors.request.use(
+  (config) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,8 +50,7 @@ export function AuthProvider({ children }) {
   /**
    * Check session validity by calling /api/auth/session.
    * Returns the user object on success, or null on failure.
-   * Retries once on network error to handle transient failures
-   * (e.g. slow cold-start, brief connectivity blip).
+   * Retries once on network error to handle transient failures.
    */
   const checkSession = useCallback(async (retryCount = 0) => {
     try {
@@ -37,6 +60,7 @@ export function AuthProvider({ children }) {
         return res.data.user;
       }
       setUser(null);
+      if (typeof window !== 'undefined') localStorage.removeItem('token');
       return null;
     } catch (err) {
       // Network error or server down — retry once before giving up
@@ -47,6 +71,7 @@ export function AuthProvider({ children }) {
       }
       // After retry, silently treat as unauthenticated
       setUser(null);
+      if (typeof window !== 'undefined') localStorage.removeItem('token');
       return null;
     }
   }, []);
@@ -58,16 +83,17 @@ export function AuthProvider({ children }) {
 
   /**
    * Called after successful login/register.
-   * The server already set the HTTP-only cookie via Set-Cookie header.
-   * We just store the user in React state.
+   * Stores the token in localStorage to bypass third-party cookie blocks on mobile.
    */
-  const login = useCallback((_token, newUser) => {
+  const login = useCallback((token, newUser) => {
     setUser(newUser);
+    if (token && typeof window !== 'undefined') {
+      localStorage.setItem('token', token);
+    }
   }, []);
 
   /**
    * Logout: call the server to clear the cookie, then reset state.
-   * Uses a guard to prevent multiple concurrent logout calls.
    */
   const logout = useCallback(async () => {
     if (logoutInProgress.current) return;
@@ -80,22 +106,21 @@ export function AuthProvider({ children }) {
     }
 
     setUser(null);
+    if (typeof window !== 'undefined') localStorage.removeItem('token');
     logoutInProgress.current = false;
-
-    // Don't do window.location.href = '/' here — it causes a full page reload
-    // that destroys React state (e.g. mid-debate). The ProtectedRoute component
-    // will detect isAuthenticated=false and redirect to /login via React Router.
   }, []);
 
   /**
-   * Silently refresh the session cookie.
-   * Called when a 401 is received on an authenticated request.
-   * Returns true if refresh succeeded, false otherwise.
+   * Silently refresh the session cookie/token.
    */
   const refreshSession = useCallback(async () => {
     try {
       const res = await authApi.post('/api/auth/refresh');
       const userData = res.data?.user ?? null;
+      const newToken = res.data?.token ?? null;
+      if (newToken && typeof window !== 'undefined') {
+        localStorage.setItem('token', newToken);
+      }
       if (userData) {
         setUser(userData);
         return true;
@@ -104,6 +129,7 @@ export function AuthProvider({ children }) {
     } catch {
       // Refresh failed — session is truly expired
       setUser(null);
+      if (typeof window !== 'undefined') localStorage.removeItem('token');
       return false;
     }
   }, []);
