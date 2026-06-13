@@ -158,7 +158,6 @@ app.use(morgan(IS_PROD ? 'combined' : 'dev'));
 const BLOCKED_USER_AGENTS = [
   /curl/i, /wget/i, /python-requests/i, /scrapy/i, /httpclient/i,
   /bot(?!.*googlebot)/i, /spider/i, /crawler/i, /scraper/i,
-  /phantom/i, /headless/i, /selenium/i, /puppeteer/i,
 ];
 
 function botGuard(req, res, next) {
