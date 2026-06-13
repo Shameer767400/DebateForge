@@ -263,10 +263,14 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   useEffect(() => {
     if (!debateId) return;
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const socket = io(resolveSocketUrl(), {
       path: '/socket.io',
       transports: ['polling', 'websocket'],
       withCredentials: true, // Send HTTP-only cookie with handshake
+      auth: {
+        token: token || undefined,
+      },
     });
 
     socketRef.current = socket;
