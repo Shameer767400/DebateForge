@@ -189,6 +189,19 @@ const DebateSchema = new Schema(
 
 DebateSchema.index({ userId: 1, startedAt: -1 });
 
+// Winner filter (win/loss stats, admin analytics)
+DebateSchema.index({ winner: 1 });
+
+// Topic analytics (which topics get debated most)
+DebateSchema.index({ topicId: 1 });
+
+// Format analytics (institution reporting: Oxford vs parliamentary usage)
+DebateSchema.index({ format: 1, startedAt: -1 });
+
+// organizationId placeholder — add this when multi-tenancy is implemented
+// DebateSchema.index({ organizationId: 1, startedAt: -1 });
+
+
 DebateSchema.methods.getUserArguments = function getUserArguments() {
   return this.arguments.filter((a) => a.speaker === 'user');
 };

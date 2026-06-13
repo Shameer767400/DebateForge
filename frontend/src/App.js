@@ -21,6 +21,7 @@ const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const DebateHistoryPage = lazy(() => import('./pages/DebateHistoryPage'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
 
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                   <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
                   <Route path="/verify-email/:token" element={<VerifyEmailPage />} />

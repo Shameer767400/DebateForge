@@ -12,6 +12,13 @@ const axios = require('axios');
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
+const groqKeys = [];
+if (process.env.GROQ_API_KEY) groqKeys.push(process.env.GROQ_API_KEY);
+for (let i = 2; i <= 5; i++) {
+  const k = process.env[`GROQ_API_KEY_${i}`];
+  if (k) groqKeys.push(k);
+}
+
 let _geminiModel = null;
 function getGeminiModel() {
   if (_geminiModel) return _geminiModel;
@@ -67,6 +74,37 @@ ${text}`;
     }
   }
 
+  async function attemptGroq(prompt) {
+    if (groqKeys.length === 0) return null;
+    for (const key of groqKeys) {
+      try {
+        const response = await Promise.race([
+          axios.post('https://api.groq.com/openai/v1/chat/completions', {
+            model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: `You are a translator. Output ONLY the ${langName} translation. No English.` },
+              { role: 'user', content: prompt },
+            ],
+            max_tokens: 500,
+            temperature: 0.3,
+          }, {
+            headers: {
+              'Authorization': `Bearer ${key}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Groq timed out')), 10000)),
+        ]);
+        const content = response.data?.choices?.[0]?.message?.content?.trim();
+        if (content) return content;
+      } catch (e) {
+        console.warn(`[GROQ] Translation failed: ${e.message?.slice(0, 120)}`);
+      }
+    }
+    return null;
+  }
+
   async function attemptOllama(prompt) {
     try {
       const response = await axios.post(
@@ -96,10 +134,13 @@ ${text}`;
     if (retry && isInTargetScript(retry, langCode)) return stripEnglishLeakage(retry);
   }
 
+  const groqResult = await attemptGroq(primaryPrompt);
+  if (groqResult && isInTargetScript(groqResult, langCode)) return stripEnglishLeakage(groqResult);
+
   const ollamaResult = await attemptOllama(primaryPrompt);
   if (ollamaResult && isInTargetScript(ollamaResult, langCode)) return stripEnglishLeakage(ollamaResult);
 
-  const bestAttempt = translated || ollamaResult;
+  const bestAttempt = translated || groqResult || ollamaResult;
   if (bestAttempt && bestAttempt !== text) return stripEnglishLeakage(bestAttempt);
 
   return text;

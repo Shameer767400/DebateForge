@@ -784,7 +784,7 @@ async function processTranscript(socket, session, debateId, transcript) {
         // *** Only do sentence-level TTS for English ***
         // For non-English, TTS happens AFTER translation below.
         if (!suppressRawStream && /[.!?]\s*$/.test(sentenceBuffer.trim())) {
-          streamTTSToSocket(socket, sentenceBuffer.trim()).catch(secLogger.error);  // eslint-disable-line no-console
+          streamTTSToSocket(socket, sentenceBuffer.trim()).catch((e) => secLogger.error(e.message, e));  // eslint-disable-line no-console
           sentenceBuffer = '';
         }
       }
@@ -880,7 +880,7 @@ async function processTranscript(socket, session, debateId, transcript) {
         }
       }
       // Send TTS for the final text (whether translated or already in target language)
-      streamTTSToSocket(socket, finalText).catch(secLogger.error); // eslint-disable-line no-console
+      streamTTSToSocket(socket, finalText).catch((e) => secLogger.error(e.message, e)); // eslint-disable-line no-console
     }
 
     session.conversationHistory[session.conversationHistory.length - 1] = {
@@ -888,9 +888,14 @@ async function processTranscript(socket, session, debateId, transcript) {
       content: finalText,
     };
 
-    await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
+    // Save session — wrapped so Redis failure never blocks ai_turn_complete
+    try {
+      await redisClient.setex(`session:${debateId}`, 3600, JSON.stringify(session));
+    } catch (redisErr) {
+      secLogger.warn('[WS] Redis session save failed (non-fatal):', redisErr.message);
+    }
 
-    /* ── 9. Signal turn complete before slow persistence work finishes ── */
+    /* ── 9. Signal turn complete — ALWAYS fires regardless of upstream errors ── */
     socket.emit('ai_turn_complete', {
       fullText: finalText,
       round: session.round,
@@ -912,7 +917,7 @@ async function processTranscript(socket, session, debateId, transcript) {
               totalClarityScore:  scoresResult.clarity  || 0,
               totalScoredTurns:   1,
             },
-          }).catch(secLogger.error);  // eslint-disable-line no-console
+          }).catch((e) => secLogger.error(e.message, e));  // eslint-disable-line no-console
         }
 
         callMLService('/memory/store', {
@@ -923,7 +928,7 @@ async function processTranscript(socket, session, debateId, transcript) {
           topic:         session.topic,
           debate_id:     debateId,
           turn_number:   session.round - 1,
-        }).catch(secLogger.error);  // eslint-disable-line no-console
+        }).catch((e) => secLogger.error(e.message, e));  // eslint-disable-line no-console
       } catch (persistErr) {
         secLogger.error('[WS] Deferred persistence error:', persistErr); // eslint-disable-line no-console
       }

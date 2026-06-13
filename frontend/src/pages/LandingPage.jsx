@@ -11,11 +11,12 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: '10K+', label: 'Active Debaters' },
-  { value: '250K+', label: 'Debates Completed' },
-  { value: '98%', label: 'Improved Win Rate' },
-  { value: '40+', label: 'Debate Formats' },
+  { value: '1,000+', label: 'Debates Completed' },
+  { value: '10+', label: 'Debate Formats' },
+  { value: '10', label: 'Indian Languages' },
+  { value: '4', label: 'AI Providers' },
 ];
+
 
 const TESTIMONIALS = [
   { quote: '"After two weeks my coach stopped asking generic questions and started asking if I was secretly scrimming against a team."', author: 'Maya', role: 'HS Policy Debater' },
@@ -255,6 +256,7 @@ export default function LandingPage() {
           <a href="#top" className="lp-footer-link">Home</a>
           <a href="#features" className="lp-footer-link">Features</a>
           <a href="#how" className="lp-footer-link">How It Works</a>
+          <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/pricing')}>Pricing</button>
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/login')}>Sign In</button>
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/register')}>Register</button>
         </div>

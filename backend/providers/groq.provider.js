@@ -52,7 +52,7 @@ class GroqProvider extends BaseProvider {
           axios.post(this.apiUrl, {
             model: this.model,
             messages,
-            max_tokens: 300,
+            max_tokens: 500,
             temperature: 0.7,
           }, {
             headers: {
@@ -87,13 +87,27 @@ class GroqProvider extends BaseProvider {
   }
 
   _buildMessages(session, userArgument) {
+    const lang = session.currentLanguage || 'en';
+    const langNames = {
+      te: 'Telugu', hi: 'Hindi', ta: 'Tamil', kn: 'Kannada',
+      ml: 'Malayalam', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati',
+      pa: 'Punjabi', ur: 'Urdu', es: 'Spanish', fr: 'French',
+      de: 'German', pt: 'Portuguese', ar: 'Arabic', zh: 'Chinese',
+      ja: 'Japanese', ko: 'Korean', ru: 'Russian',
+    };
     const history = (session.conversationHistory || []).slice(-6);
     const previousAiReplies = history
       .filter(m => m.role === 'assistant')
       .map(m => m.content)
       .slice(-3);
 
+    // For non-English debates: strongly instruct Groq to respond in target language
+    const langInstruction = lang !== 'en' && langNames[lang]
+      ? `\n\nIMPORTANT: The user is debating in ${langNames[lang]}. Respond in ${langNames[lang]} if possible.`
+      : '';
+
     const systemPrompt = buildSystemPrompt(session) +
+      langInstruction +
       (previousAiReplies.length > 0
         ? `\n\n=== YOUR PREVIOUS RESPONSES (DO NOT REPEAT THESE) ===\n${previousAiReplies.map((r, i) => `Round ${i + 1}: ${r.slice(0, 100)}...`).join('\n')}`
         : '');

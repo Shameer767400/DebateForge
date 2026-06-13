@@ -214,10 +214,39 @@ function logShutdown(signal) {
   log(LEVELS.INFO, 'SYSTEM', `Server shutting down (${signal})`);
 }
 
+/* ── Generic convenience methods (used by websocket/index.js and other services) ── */
+
+function error(message, meta) {
+  if (meta instanceof Error) {
+    log(LEVELS.ALERT, 'API_ERROR', message, { error: meta.message, stack: IS_PROD ? undefined : meta.stack?.split('\n').slice(0, 3).join(' | ') });
+  } else if (typeof meta === 'string') {
+    log(LEVELS.ALERT, 'API_ERROR', `${message} ${meta}`);
+  } else {
+    log(LEVELS.ALERT, 'API_ERROR', message, meta || {});
+  }
+}
+
+function warn(message, meta) {
+  if (typeof meta === 'string') {
+    log(LEVELS.WARN, 'SYSTEM', `${message} ${meta}`);
+  } else {
+    log(LEVELS.WARN, 'SYSTEM', message, meta || {});
+  }
+}
+
+function info(message, meta) {
+  log(LEVELS.INFO, 'SYSTEM', message, meta || {});
+}
+
 module.exports = {
   log,
   LEVELS,
   getClientIP,
+  // Generic methods (used by websocket, AI services)
+  error,
+  warn,
+  info,
+  // Named auth/security event methods
   logLoginSuccess,
   logLoginFailed,
   logAccountLocked,

@@ -7,8 +7,8 @@ import React from 'react';
 // Mock axios globally
 vi.mock('axios', () => {
   const create = vi.fn(() => ({
-    get: vi.fn(),
-    post: vi.fn(),
+    get: vi.fn(() => Promise.resolve({ data: {} })),
+    post: vi.fn(() => Promise.resolve({ data: {} })),
     interceptors: {
       request: { use: vi.fn() },
       response: { use: vi.fn() },
@@ -18,8 +18,8 @@ vi.mock('axios', () => {
   return {
     default: {
       create,
-      get: vi.fn(),
-      post: vi.fn(),
+      get: vi.fn(() => Promise.resolve({ data: {} })),
+      post: vi.fn(() => Promise.resolve({ data: {} })),
       interceptors: {
         request: { use: vi.fn() },
         response: { use: vi.fn() },

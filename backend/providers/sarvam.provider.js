@@ -25,9 +25,10 @@ class SarvamProvider extends BaseProvider {
   constructor() {
     super();
     this.keys = this._loadKeys('SARVAM_API_KEY', 5);
-    this.model = 'sarvam-m';
+    // sarvam-m and sarvam-2 are deprecated. Valid models: sarvam-30b, sarvam-105b
+    this.model = process.env.SARVAM_MODEL || 'sarvam-30b';
     this.apiUrl = 'https://api.sarvam.ai/v1/chat/completions';
-    this.timeout = 15_000;
+    this.timeout = 20_000; // Indian lang generation can be slower
   }
 
   getName() { return 'Sarvam AI'; }
@@ -65,8 +66,9 @@ class SarvamProvider extends BaseProvider {
           axios.post(this.apiUrl, {
             model: this.model,
             messages,
-            max_tokens: 300,
+            max_tokens: 500,
             temperature: 0.7,
+            reasoning_effort: null
           }, {
             headers: {
               'Authorization': `Bearer ${this.keys[keyIndex]}`,
@@ -86,8 +88,14 @@ class SarvamProvider extends BaseProvider {
         }
       } catch (e) {
         const status = e.response?.status;
-        console.warn(`[SARVAM] ${keyLabel} failed (${status || 'timeout'}): ${(e.response?.data?.error?.message || e.message).slice(0, 120)}`); // eslint-disable-line no-console
+        const errMsg = (e.response?.data?.error?.message || e.message).slice(0, 200);
+        console.warn(`[SARVAM] ${keyLabel} failed (${status || 'timeout'}): ${errMsg}`); // eslint-disable-line no-console
 
+        if (status === 400) {
+          // Model error (e.g. deprecated model name) — no point retrying with other keys
+          console.error(`[SARVAM] Model '${this.model}' error. Check SARVAM_MODEL env var. Available: sarvam-2, sarvam-30b, sarvam-105b`); // eslint-disable-line no-console
+          break;
+        }
         if (status === 429 || status === 401 || status === 403) {
           this._markKeyLimited(keyIndex);
           continue;
@@ -100,13 +108,22 @@ class SarvamProvider extends BaseProvider {
   }
 
   _buildMessages(session, userArgument) {
+    const lang = session.currentLanguage || 'te';
+    const langNames = {
+      te: 'Telugu', hi: 'Hindi', ta: 'Tamil', kn: 'Kannada',
+      ml: 'Malayalam', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati',
+      pa: 'Punjabi', ur: 'Urdu',
+    };
+    const langName = langNames[lang] || 'the target language';
     const history = (session.conversationHistory || []).slice(-6);
     const previousAiReplies = history
       .filter(m => m.role === 'assistant')
       .map(m => m.content)
       .slice(-3);
 
+    // Force native language — critical for Sarvam to not fall back to English
     const systemPrompt = buildSystemPrompt(session) +
+      `\n\nCRITICAL: You MUST respond entirely in ${langName}. Every word must be in ${langName}. Do NOT use English under any circumstances.` +
       (previousAiReplies.length > 0
         ? `\n\n=== YOUR PREVIOUS RESPONSES (DO NOT REPEAT THESE) ===\n${previousAiReplies.map((r, i) => `Round ${i + 1}: ${r.slice(0, 100)}...`).join('\n')}`
         : '');

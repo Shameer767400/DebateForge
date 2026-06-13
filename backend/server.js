@@ -13,13 +13,16 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const redisClient = require('./config/redis');
 
-const authRoutes = require('./routes/auth.routes');
-const debateRoutes = require('./routes/debate.routes');
+const authRoutes    = require('./routes/auth.routes');
+const debateRoutes  = require('./routes/debate.routes');
 const profileRoutes = require('./routes/profile.routes');
-const topicRoutes = require('./routes/topics.routes');
-const pushRoutes = require('./routes/push.routes');
-const statusRoutes = require('./routes/status.routes');
-const swaggerSpec = require('./config/swagger.config');
+const topicRoutes   = require('./routes/topics.routes');
+const pushRoutes    = require('./routes/push.routes');
+const statusRoutes  = require('./routes/status.routes');
+const billingRoutes = require('./routes/billing.routes');
+const swaggerSpec   = require('./config/swagger.config');
+
+const { checkDebateQuota } = require('./controllers/billing.controller');
 
 const { scheduleNotificationJobs } = require('./jobs/notifications.job');
 const secLogger = require('./services/security-logger.service');
@@ -126,6 +129,17 @@ app.use(
 );
 
 /* ═══════════════════════════════════════════
+   2b. STRIPE WEBHOOK — raw body required.
+   MUST be mounted BEFORE express.json().
+   Stripe sends raw octet-stream; signature
+   verification fails if body is parsed first.
+═══════════════════════════════════════════ */
+app.post('/api/billing/webhook',
+  express.raw({ type: 'application/json' }),
+  require('./controllers/billing.controller').handleWebhook
+);
+
+/* ═══════════════════════════════════════════
    3. BODY PARSING — limit payload sizes to
       prevent DoS via large payloads
 ═══════════════════════════════════════════ */
@@ -185,30 +199,37 @@ function rateLimitHandler(endpoint) {
   };
 }
 
-// 5a. Global limiter: 2000 requests per 15 minutes per IP
+// Skip rate limiting entirely in test env (Jest / supertest)
+const IS_TEST = NODE_ENV === 'test';
+const skipInTest = () => IS_TEST;
+
+// 5a. Global limiter: 300 requests per 15 minutes per IP (production-safe)
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 2000,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => IS_TEST || req.path === '/health', // never rate-limit health check or tests
   handler: rateLimitHandler('global'),
 }));
 
-// 5b. Auth routes: 500 attempts per 15 min
+// 5b. Auth routes: 30 attempts per 15 min (brute-force protection)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInTest,
   handler: rateLimitHandler('auth'),
 });
 
-// 5c. Account creation: 100 registrations per hour per IP
+// 5c. Account creation: 5 registrations per hour per IP (mass account creation prevention)
 const registrationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 100,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInTest,
   handler: rateLimitHandler('registration'),
 });
 
@@ -218,6 +239,7 @@ const passwordResetLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInTest,
   handler: rateLimitHandler('password-reset'),
 });
 
@@ -227,6 +249,7 @@ const debateCreationLimiter = rateLimit({
   max: 50,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInTest,
   handler: rateLimitHandler('debate-creation'),
 });
 
@@ -236,6 +259,7 @@ const topicProposalLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInTest,
   handler: rateLimitHandler('topic-proposal'),
 });
 
@@ -245,6 +269,7 @@ const uploadLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipInTest,
   handler: rateLimitHandler('avatar-upload'),
 });
 
@@ -263,7 +288,8 @@ app.use('/api/auth/reset-password', passwordResetLimiter);
 app.use('/api/auth/register', registrationLimiter);
 app.use('/api/auth', authLimiter, authRoutes);
 
-app.use('/api/debates/start', debateCreationLimiter);
+// Debate creation: rate limit + free tier quota check
+app.use('/api/debates/start', debateCreationLimiter, checkDebateQuota);
 app.use('/api/debates', debateRoutes);
 
 app.use('/api/profile/avatar', uploadLimiter);
@@ -273,6 +299,9 @@ app.use('/api/topics/propose', topicProposalLimiter);
 app.use('/api/topics', topicRoutes);
 
 app.use('/api/push', pushRoutes);
+
+// Billing / Stripe (webhook already mounted above before JSON middleware)
+app.use('/api/billing', billingRoutes);
 
 app.use('/api/status', statusRoutes);
 

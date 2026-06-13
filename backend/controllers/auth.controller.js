@@ -535,8 +535,9 @@ async function verifyEmailOTP(req, res) {
       return res.status(200).json({ message: 'Email already verified' });
     }
 
-    // Check if OTP matches and is not expired
-    if (user.emailVerificationOTP !== otp || !user.emailVerificationOTPExpires || user.emailVerificationOTPExpires < Date.now()) {
+    // Hash the incoming OTP and compare with stored hash (OTPs are never stored in plain text)
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+    if (user.emailVerificationOTP !== otpHash || !user.emailVerificationOTPExpires || user.emailVerificationOTPExpires < Date.now()) {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
