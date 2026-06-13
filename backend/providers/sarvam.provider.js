@@ -24,7 +24,7 @@ const INDIAN_LANGUAGES = new Set([
 class SarvamProvider extends BaseProvider {
   constructor() {
     super();
-    this.keys = this._loadKeys('SARVAM_API_KEY', 5);
+    this.keys = this._loadKeys('SARVAM_API_KEY', 10);
     // sarvam-m and sarvam-2 are deprecated. Valid models: sarvam-30b, sarvam-105b
     this.model = process.env.SARVAM_MODEL || 'sarvam-30b';
     this.apiUrl = 'https://api.sarvam.ai/v1/chat/completions';

@@ -19,7 +19,7 @@ const { buildSystemPrompt } = require('../utils/llm.utils');
 class GroqProvider extends BaseProvider {
   constructor() {
     super();
-    this.keys = this._loadKeys('GROQ_API_KEY', 5);
+    this.keys = this._loadKeys('GROQ_API_KEY', 10);
     this.model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
     this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
     this.timeout = 10_000;

@@ -14,7 +14,7 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3';
 
 const groqKeys = [];
 if (process.env.GROQ_API_KEY) groqKeys.push(process.env.GROQ_API_KEY);
-for (let i = 2; i <= 5; i++) {
+for (let i = 2; i <= 10; i++) {
   const k = process.env[`GROQ_API_KEY_${i}`];
   if (k) groqKeys.push(k);
 }
