@@ -70,7 +70,7 @@ export default function AnimatedPasswordInput({ value, onChange, className = '',
   return (
     <div className="field-wrap">
       <div
-        className={`char-display ${className}`}
+        className={`char-display ${className} ${isFocused ? 'focused' : ''}`}
         onClick={() => inputRef.current?.focus()}
       >
         {value.length === 0 && placeholder && !isFocused && (
@@ -85,7 +85,7 @@ export default function AnimatedPasswordInput({ value, onChange, className = '',
         ref={inputRef}
         id={id}
         className="real-input"
-        type="text"
+        type={revealed ? 'text' : 'password'}
         value={value}
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
