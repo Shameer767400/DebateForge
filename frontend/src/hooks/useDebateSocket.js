@@ -573,6 +573,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
         socketRef.current?.emit('audio_end', {
           debateId,
           transcriptFallback: finalTranscript || '',
+          mimeType: recorder.mimeType || 'audio/webm',
         });
       };
       recorder.stop();

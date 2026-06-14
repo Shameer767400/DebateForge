@@ -482,7 +482,7 @@ function initWebSocket(server) {
     /* ────────────────────────────────────────
        audio_end — transcribe + process turn
     ─────────────────────────────────────── */
-    socket.on('audio_end', async ({ debateId, transcriptFallback } = {}) => {
+    socket.on('audio_end', async ({ debateId, transcriptFallback, mimeType } = {}) => {
       if (!wsRateLimiter(socket, 'audio_end')) return;
       if (socket._turnInFlight) {
         return socket.emit('error', { message: 'Still processing your previous turn. Please wait.' });
@@ -508,6 +508,7 @@ function initWebSocket(server) {
       }
 
       session.audioBuffer = chunks;
+      session.mimeType = mimeType || 'audio/webm';
       socket._turnInFlight = true;
       try {
         await processTurn(socket, session, debateId, String(transcriptFallback || '').trim());
@@ -637,7 +638,7 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
     /* Try ML transcription first; gracefully fall back to browser transcript */
     if (audioBuffer.length > 1000) {
       try {
-        const result = await transcribeAudio(audioBuffer, session.topic);
+        const result = await transcribeAudio(audioBuffer, session.topic, session.mimeType);
         transcript   = result.text;
         detectedLanguage = result.language || detectedLanguage;
       } catch (mlErr) {
@@ -1102,13 +1103,20 @@ Respond ONLY in this JSON format:
 /* ═══════════════════════════════════════════════════════════════
    Helper: Whisper transcription
 ═══════════════════════════════════════════════════════════════ */
-async function transcribeAudio(audioBuffer, topic) {
+async function transcribeAudio(audioBuffer, topic, mimeType = 'audio/webm') {
   const FormData = require('form-data');
   const form     = new FormData();
 
+  let ext = 'webm';
+  const cleanMime = String(mimeType || '').toLowerCase();
+  if (cleanMime.includes('mp4') || cleanMime.includes('m4a')) ext = 'mp4';
+  else if (cleanMime.includes('wav')) ext = 'wav';
+  else if (cleanMime.includes('mpeg') || cleanMime.includes('mp3')) ext = 'mp3';
+  else if (cleanMime.includes('aac')) ext = 'aac';
+
   form.append('file', audioBuffer, {
-    filename:    'debate.webm',
-    contentType: 'audio/webm',
+    filename:    `debate.${ext}`,
+    contentType: mimeType || 'audio/webm',
   });
   if (topic) {
     form.append('topic', topic);

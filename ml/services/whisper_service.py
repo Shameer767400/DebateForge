@@ -30,13 +30,26 @@ def get_whisper_model():
     return _whisper_model
 
 
-async def _transcribe_local(audio_bytes: bytes, topic: str = "") -> dict:
+async def _transcribe_local(audio_bytes: bytes, topic: str = "", mime_type: str = "audio/webm") -> dict:
     """Transcribe audio using local Whisper model. Auto-detects language."""
     start = time.time()
 
     try:
+        # Determine file suffix based on mime_type
+        ext = ".webm"
+        if "mp4" in mime_type or "m4a" in mime_type:
+            ext = ".mp4"
+        elif "wav" in mime_type:
+            ext = ".wav"
+        elif "mpeg" in mime_type or "mp3" in mime_type:
+            ext = ".mp3"
+        elif "ogg" in mime_type:
+            ext = ".ogg"
+        elif "aac" in mime_type:
+            ext = ".aac"
+
         # Whisper needs a file path, not raw bytes
-        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             tmp.write(audio_bytes)
             tmp_path = tmp.name
 
@@ -90,14 +103,29 @@ async def _transcribe_local(audio_bytes: bytes, topic: str = "") -> dict:
         }
 
 
-async def _transcribe_gemini(audio_bytes: bytes, topic: str = "") -> dict:
+async def _transcribe_gemini(audio_bytes: bytes, topic: str = "", mime_type: str = "audio/webm") -> dict:
     """Transcribe using Google Gemini API with language detection."""
     start = time.time()
 
     try:
         model = genai.GenerativeModel("gemini-2.0-flash")
 
-        audio_part = {"mime_type": "audio/webm", "data": audio_bytes}
+        # Map typical content types to standard ones supported by Gemini API
+        gemini_mime = mime_type
+        if "mp4" in mime_type or "m4a" in mime_type:
+            gemini_mime = "audio/mp4"
+        elif "wav" in mime_type:
+            gemini_mime = "audio/wav"
+        elif "mpeg" in mime_type or "mp3" in mime_type:
+            gemini_mime = "audio/mp3"
+        elif "ogg" in mime_type:
+            gemini_mime = "audio/ogg"
+        elif "aac" in mime_type:
+            gemini_mime = "audio/aac"
+        else:
+            gemini_mime = "audio/webm"
+
+        audio_part = {"mime_type": gemini_mime, "data": audio_bytes}
 
         prompt = (
             f"Transcribe this audio. Context: This is a formal debate argument about: {topic}. "
@@ -159,7 +187,7 @@ async def _transcribe_gemini(audio_bytes: bytes, topic: str = "") -> dict:
         }
 
 
-async def transcribe_audio(audio_bytes: bytes, topic: str = "") -> dict:
+async def transcribe_audio(audio_bytes: bytes, topic: str = "", mime_type: str = "audio/webm") -> dict:
     """
     Transcribe user's spoken debate argument.
     Uses local Whisper when USE_LOCAL_STT=true, otherwise Gemini API.
@@ -174,6 +202,6 @@ async def transcribe_audio(audio_bytes: bytes, topic: str = "") -> dict:
         }
 
     if USE_LOCAL_STT:
-        return await _transcribe_local(audio_bytes, topic)
+        return await _transcribe_local(audio_bytes, topic, mime_type)
     else:
-        return await _transcribe_gemini(audio_bytes, topic)
+        return await _transcribe_gemini(audio_bytes, topic, mime_type)

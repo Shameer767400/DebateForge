@@ -43,7 +43,8 @@ async def transcribe(
     if len(audio_bytes) < 500:
         raise HTTPException(status_code=400, detail="Audio file too short or empty")
 
-    result = await transcribe_audio(audio_bytes, topic)
+    content_type = file.content_type or "audio/webm"
+    result = await transcribe_audio(audio_bytes, topic, content_type)
 
     if not result.get("success"):
         logging.warning(f"[TRANSCRIPTION] Failed: {result.get('error', 'unknown')}")
@@ -66,7 +67,8 @@ async def detect_language(
     if len(audio_bytes) < 500:
         raise HTTPException(status_code=400, detail="Audio file too short")
 
-    result = await transcribe_audio(audio_bytes, "")
+    content_type = file.content_type or "audio/webm"
+    result = await transcribe_audio(audio_bytes, "", content_type)
 
     return {
         "language": result.get("language", "en"),

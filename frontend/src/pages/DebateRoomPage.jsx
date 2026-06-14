@@ -758,18 +758,11 @@ export default function DebateRoomPage() {
               {debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? 'Loading topic…'}
             </span>
             <span className="debate-round">Round {round}</span>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div className="debate-topbar-controls">
               <select 
                 value={selectedVoiceURI} 
                 onChange={(e) => setSelectedVoiceURI(e.target.value)}
-                style={{
-                  background: 'var(--surface-color)',
-                  color: 'var(--text-color)',
-                  border: '1px solid var(--border-color)',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '0.85rem'
-                }}
+                className="debate-voice-select"
               >
                 <option value="">Default AI Voice</option>
                 {availableVoices.map(v => (
@@ -777,7 +770,7 @@ export default function DebateRoomPage() {
                 ))}
               </select>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label className="debate-voice-label">
                 <input
                   type="checkbox"
                   checked={voiceEnabled}
@@ -785,7 +778,7 @@ export default function DebateRoomPage() {
                   disabled={phase !== 'user_turn' || judgeVerdict}
                   aria-label="AI voice"
                 />
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                <span className="debate-voice-label-text">
                   AI voice
                 </span>
               </label>
@@ -795,14 +788,7 @@ export default function DebateRoomPage() {
                 onChange={(e) => setDebateLanguage(e.target.value)}
                 disabled={phase !== 'user_turn' || judgeVerdict}
                 aria-label="Debate language"
-                style={{
-                  background: 'var(--surface-color)',
-                  color: 'var(--text-color)',
-                  border: '1px solid var(--border-color)',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '0.85rem',
-                }}
+                className="debate-lang-select"
               >
                 {LANGUAGE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -816,7 +802,7 @@ export default function DebateRoomPage() {
                   setPhase('ended');
                 }}
               >
-                End Debate <span style={{ opacity: 0.5, fontSize: '0.7em' }}>(Esc)</span>
+                End Debate <span className="debate-esc-text">(Esc)</span>
               </button>
             </div>
           </div>
