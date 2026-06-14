@@ -14,8 +14,10 @@ async function sendViaResend({ to, subject, html }) {
   const { Resend } = require('resend');
   const resend = new Resend(RESEND_API_KEY);
 
+  const fromAddress = process.env.FROM_EMAIL || 'DebateForge <noreply@send.debateforge.com>';
+
   const { data, error } = await resend.emails.send({
-    from: 'DebateForge <onboarding@resend.dev>', // Use your verified domain here once you add one
+    from: fromAddress,
     to,
     subject,
     html,
