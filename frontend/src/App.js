@@ -22,6 +22,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const DebateHistoryPage = lazy(() => import('./pages/DebateHistoryPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
+import BottomNav from './components/BottomNav';
 
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
         <AuthProvider>
           <BrowserRouter>
             <ToastContainer />
+            <BottomNav />
             <PageLoader>
               <Suspense fallback={null}>
                 <Routes>

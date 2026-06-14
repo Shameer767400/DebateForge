@@ -889,3 +889,10 @@
     right: 12px;
   }
 }
+
+@media (max-width: 768px) {
+  .prof-page {
+    padding-bottom: 80px !important; /* spacing for bottom nav */
+  }
+}
+

@@ -599,3 +599,33 @@
     font-size: 0.95rem;
   }
 }
+
+/* Desktop-only navigation links in Dashboard */
+.dash-desktop-links {
+  display: flex;
+  gap: 16px;
+  margin-right: 16px;
+  align-items: center;
+}
+
+.dash-nav-desktop-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.dash-nav-desktop-link:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .dash-desktop-links {
+    display: none !important;
+  }
+  .dash {
+    padding-bottom: 80px !important; /* spacing for bottom nav */
+  }
+}
+

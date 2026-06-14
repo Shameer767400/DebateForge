@@ -206,6 +206,11 @@ export default function LobbyPage() {
       <header className="lobby-header">
         <h1 className="lobby-heading">Choose Your Debate</h1>
         <div className="lobby-user" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="lobby-desktop-links">
+            <Link to="/dashboard" className="lobby-nav-desktop-link">Dashboard</Link>
+            <Link to="/leaderboard" className="lobby-nav-desktop-link">Leaderboard</Link>
+            <Link to="/history" className="lobby-nav-desktop-link">History</Link>
+          </div>
           <Link to="/profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="lobby-elo">{user?.eloRating ?? 1000}</span>
             <span className="lobby-username">{user?.username ?? 'Debater'}</span>

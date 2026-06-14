@@ -681,3 +681,33 @@
   }
 }
 
+/* Desktop-only navigation links in Lobby */
+.lobby-desktop-links {
+  display: flex;
+  gap: 16px;
+  margin-right: 16px;
+  align-items: center;
+}
+
+.lobby-nav-desktop-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.lobby-nav-desktop-link:hover {
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .lobby-desktop-links {
+    display: none !important;
+  }
+  .lobby {
+    padding-bottom: 80px !important; /* spacing for bottom nav */
+  }
+}
+
+

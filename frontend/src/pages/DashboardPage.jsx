@@ -280,6 +280,12 @@ export default function DashboardPage() {
           </h1>
         </div>
         <div className="dash-header-right">
+          <div className="dash-desktop-links">
+            <Link to="/lobby" className="dash-nav-desktop-link">Lobby</Link>
+            <Link to="/leaderboard" className="dash-nav-desktop-link">Leaderboard</Link>
+            <Link to="/history" className="dash-nav-desktop-link">History</Link>
+            <Link to="/profile" className="dash-nav-desktop-link">Profile</Link>
+          </div>
           <span className="dash-elo-badge">{elo} ELO</span>
           <button className="dash-new-btn" onClick={() => navigate('/lobby')}>
             ⚔ New Debate

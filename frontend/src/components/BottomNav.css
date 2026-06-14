@@ -1,0 +1,86 @@
+/* ══════════════════════════════════════════
+   Mobile Bottom Navigation Bar
+   ══════════════════════════════════════════ */
+
+/* Hidden on desktop */
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9000;
+    align-items: stretch;
+    justify-content: space-around;
+    height: 64px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(10, 10, 15, 0.88);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 3px;
+    padding: 6px 0;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: var(--font-ui, monospace);
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+    transition: color 0.2s, transform 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    position: relative;
+  }
+
+  .bottom-nav-item:active {
+    transform: scale(0.92);
+  }
+
+  .bottom-nav-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: transform 0.2s;
+  }
+
+  .bottom-nav-label {
+    font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ── Active state ── */
+  .bottom-nav-item--active {
+    color: var(--accent-user, #00ff87);
+  }
+
+  .bottom-nav-item--active .bottom-nav-icon {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 6px var(--accent-user, #00ff87));
+  }
+
+  .bottom-nav-item--active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 2px;
+    border-radius: 0 0 4px 4px;
+    background: var(--accent-user, #00ff87);
+    box-shadow: 0 0 8px var(--accent-user, #00ff87);
+  }
+}

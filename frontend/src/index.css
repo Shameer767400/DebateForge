@@ -33,3 +33,12 @@ code {
     monospace;
 }
 
+/* ── Mobile bottom nav space ── */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: 72px !important;
+    scroll-padding-bottom: 80px;
+  }
+}
+
+

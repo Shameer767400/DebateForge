@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/theme.css';
+import '../styles/history.css';
 
 const API = process.env.REACT_APP_API_URL;
 
@@ -182,58 +183,39 @@ export default function DebateHistoryPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'radial-gradient(ellipse at top, #181826 0%, #050508 60%)',
-      color: 'var(--text-primary)',
-      fontFamily: 'var(--font-ui)',
-      padding: '32px clamp(16px, 4vw, 48px)',
-      maxWidth: '900px',
-      margin: '0 auto',
-    }}>
+    <div className="history-container">
 
       {/* ── Nav ── */}
-      <nav style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+      <nav className="history-nav">
         <Link to="/lobby" className="retro-back-link">
           ← Back to Lobby
         </Link>
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem' }}>Dashboard</Link>
-          <Link to="/leaderboard" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.85rem' }}>Leaderboard</Link>
+        <div className="history-nav-links">
+          <Link to="/dashboard" className="history-nav-link">Dashboard</Link>
+          <Link to="/leaderboard" className="history-nav-link">Leaderboard</Link>
         </div>
       </nav>
 
       {/* ── Header ── */}
-      <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: 'clamp(1.3rem, 3vw, 1.9rem)', fontWeight: 800, marginBottom: '8px' }}>⚔ Debate History</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+      <div className="history-header">
+        <h1 className="history-title">⚔ Debate History</h1>
+        <p className="history-subtitle">
           All your past debates — click any row to expand and download a report card
         </p>
       </div>
 
       {/* ── Filter tabs ── */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+      <div className="history-filters">
         {['all', 'win', 'loss', 'draw'].map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            style={{
-              padding: '6px 16px',
-              borderRadius: '999px',
-              border: `1px solid ${filter === f ? 'var(--accent-blue)' : 'var(--border)'}`,
-              background: filter === f ? 'rgba(0,170,255,0.12)' : 'transparent',
-              color: filter === f ? '#00aaff' : 'var(--text-secondary)',
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-ui)',
-              textTransform: 'capitalize',
-              transition: 'all 0.2s',
-            }}
+            className={`filter-btn ${filter === f ? 'filter-btn--active' : ''}`}
           >
             {f === 'all' ? 'All' : f === 'win' ? '🏆 Wins' : f === 'loss' ? '💀 Losses' : '🤝 Draws'}
           </button>
         ))}
-        <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.78rem', alignSelf: 'center' }}>
+        <span className="filter-count">
           {filtered.length} debate{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -251,7 +233,7 @@ export default function DebateHistoryPage() {
           No debates found. <Link to="/lobby" style={{ color: 'var(--accent-user)' }}>Start your first →</Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div className="history-list">
           {filtered.map((d, i) => {
             const id = d._id ?? d.id ?? i;
             const isExpanded = expandedId === id;
@@ -263,17 +245,14 @@ export default function DebateHistoryPage() {
             return (
               <div
                 key={id}
+                className="history-item"
                 style={{
-                  background: 'var(--bg-card)',
                   border: `1px solid ${isExpanded ? (isWin ? 'rgba(0,255,135,0.4)' : isLoss ? 'rgba(255,51,102,0.35)' : 'rgba(255,204,0,0.35)') : borderColor}`,
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  transition: 'border-color 0.2s',
                 }}
               >
                 {/* ── Summary row ── */}
                 <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', cursor: 'pointer', flexWrap: 'wrap' }}
+                  className="history-item-summary"
                   onClick={() => {
                     if (isExpanded) { setExpandedId(null); return; }
                     setExpandedId(id);
@@ -281,18 +260,16 @@ export default function DebateHistoryPage() {
                   }}
                 >
                   {/* Result indicator */}
-                  <div style={{
-                    width: 4, height: 44, borderRadius: 2,
+                  <div className="item-indicator" style={{
                     background: isWin ? 'var(--accent-user)' : isLoss ? 'var(--accent-ai)' : 'var(--accent-score)',
-                    flexShrink: 0,
                   }} />
 
                   {/* Topic + meta */}
-                  <div style={{ flex: 1, minWidth: 200 }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>
+                  <div className="item-meta-info">
+                    <div className="item-title">
                       {d.topicSnapshot ?? 'Custom Topic'}
                     </div>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.73rem', color: 'var(--text-muted)' }}>
+                    <div className="item-badge-row">
                       {d.userSide && <span>Side: {d.userSide}</span>}
                       {d.difficulty && <span>Difficulty: {d.difficulty}</span>}
                       {d.format && <span>Format: {d.format}</span>}
@@ -302,11 +279,11 @@ export default function DebateHistoryPage() {
 
                   {/* Score */}
                   {d.userFinalScore != null && (
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: isWin ? 'var(--accent-user)' : isLoss ? 'var(--accent-ai)' : 'var(--accent-score)' }}>
+                    <div className="item-score">
+                      <div className="score-value" style={{ color: isWin ? 'var(--accent-user)' : isLoss ? 'var(--accent-ai)' : 'var(--accent-score)' }}>
                         {d.userFinalScore}
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>Score</div>
+                      <div className="score-lbl">Score</div>
                     </div>
                   )}
 
@@ -314,13 +291,13 @@ export default function DebateHistoryPage() {
                   <ResultBadge winner={d.winner} />
 
                   {/* Expand chevron */}
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                  <span className="expand-chevron" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
                 </div>
 
                 {/* ── Expanded section ── */}
                 {isExpanded && (
                   <div
-                    style={{ borderTop: '1px solid var(--border)', padding: '16px 20px', background: 'rgba(0,0,0,0.2)' }}
+                    className="history-detail-box"
                     onClick={e => e.stopPropagation()}
                   >
                     {!detail ? (
@@ -330,29 +307,16 @@ export default function DebateHistoryPage() {
                     ) : (
                       <>
                         {/* ── Action buttons ── */}
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                        <div className="history-actions">
                           <button
                             onClick={() => downloadReport(detail)}
-                            style={{
-                              padding: '8px 18px', borderRadius: '8px',
-                              background: 'rgba(0,170,255,0.12)',
-                              border: '1px solid rgba(0,170,255,0.3)',
-                              color: '#00aaff', fontSize: '0.82rem', cursor: 'pointer',
-                              fontFamily: 'var(--font-ui)', fontWeight: 700,
-                              transition: 'all 0.2s',
-                            }}
+                            className="action-btn action-btn--download"
                           >
                             📥 Download Report Card
                           </button>
                           <button
                             onClick={() => navigate('/lobby')}
-                            style={{
-                              padding: '8px 18px', borderRadius: '8px',
-                              background: 'rgba(0,255,135,0.1)',
-                              border: '1px solid rgba(0,255,135,0.25)',
-                              color: 'var(--accent-user)', fontSize: '0.82rem', cursor: 'pointer',
-                              fontFamily: 'var(--font-ui)', fontWeight: 700,
-                            }}
+                            className="action-btn action-btn--again"
                           >
                             ⚔ Debate Again
                           </button>
@@ -360,49 +324,48 @@ export default function DebateHistoryPage() {
 
                         {/* ── Stats row ── */}
                         {(detail.totalRounds || detail.durationSecs) && (
-                          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                          <div className="history-stats-row">
                             {detail.totalRounds && (
-                              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{detail.totalRounds}</div>
-                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Rounds</div>
+                              <div className="stat-card">
+                                <div className="stat-val">{detail.totalRounds}</div>
+                                <div className="stat-lbl">Rounds</div>
                               </div>
                             )}
                             {detail.durationSecs && (
-                              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 14px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{Math.round(detail.durationSecs / 60)}m</div>
-                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Duration</div>
+                              <div className="stat-card">
+                                <div className="stat-val">{Math.round(detail.durationSecs / 60)}m</div>
+                                <div className="stat-lbl">Duration</div>
                               </div>
                             )}
                           </div>
                         )}
 
                         {/* ── Argument transcript ── */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '340px', overflowY: 'auto' }}>
+                        <div className="history-transcript">
                           {(detail.arguments ?? []).map((arg, ai) => {
                             const isUser = arg.speaker === 'user';
                             return (
-                              <div key={ai} style={{
-                                padding: '10px 14px', borderRadius: '10px',
+                              <div key={ai} className="transcript-bubble" style={{
                                 background: isUser ? 'rgba(0,255,135,0.05)' : 'rgba(255,51,102,0.04)',
                                 border: `1px solid ${isUser ? 'rgba(0,255,135,0.14)' : 'rgba(255,51,102,0.11)'}`,
                               }}>
-                                <div style={{ fontSize: '0.7rem', fontWeight: 700, marginBottom: '5px', color: isUser ? 'var(--accent-user)' : 'var(--accent-ai)' }}>
+                                <div className="bubble-header" style={{ color: isUser ? 'var(--accent-user)' : 'var(--accent-ai)' }}>
                                   {isUser ? '🎤 You' : '🤖 AI'} · Round {arg.turnNumber ?? ai + 1}
                                 </div>
-                                <div style={{ fontSize: '0.84rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.55 }}>
+                                <div className="bubble-content">
                                   {arg.content}
                                 </div>
                                 {arg.scores?.overall != null && (
-                                  <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                  <div className="bubble-scores">
                                     {[['Logic', arg.scores.logic], ['Evidence', arg.scores.evidence], ['Clarity', arg.scores.clarity], ['Overall', arg.scores.overall]].map(([label, val]) => (
-                                      <span key={label} style={{ fontSize: '0.68rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+                                      <span key={label} className="bubble-score-badge">
                                         {label}: {val ?? '—'}
                                       </span>
                                     ))}
                                   </div>
                                 )}
                                 {arg.fallacy?.detected && (
-                                  <div style={{ marginTop: '4px', fontSize: '0.7rem', color: '#ffbb33' }}>
+                                  <div className="bubble-fallacy">
                                     ⚠ {arg.fallacy.type} ({Math.round((arg.fallacy.confidence ?? 0) * 100)}%)
                                   </div>
                                 )}
@@ -427,21 +390,21 @@ export default function DebateHistoryPage() {
 
       {/* ── Pagination ── */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '28px' }}>
+        <div className="history-pagination">
           <button
             disabled={page === 1}
             onClick={() => setPage(p => p - 1)}
-            style={{ padding: '8px 18px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border)', color: page === 1 ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-ui)', fontSize: '0.85rem' }}
+            className="pagi-btn"
           >
             ← Previous
           </button>
-          <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+          <span className="pagi-info">
             Page {page} of {totalPages}
           </span>
           <button
             disabled={page === totalPages}
             onClick={() => setPage(p => p + 1)}
-            style={{ padding: '8px 18px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border)', color: page === totalPages ? 'var(--text-muted)' : 'var(--text-primary)', cursor: page === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-ui)', fontSize: '0.85rem' }}
+            className="pagi-btn"
           >
             Next →
           </button>

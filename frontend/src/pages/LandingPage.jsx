@@ -29,6 +29,7 @@ export default function LandingPage() {
   const pageRef = useRef(null);
   const canvasRef = useRef(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [menuOpen, setMenuOpen] = useState(false);
 
   /* ── Particle canvas ── */
   useEffect(() => {
@@ -98,6 +99,30 @@ export default function LandingPage() {
     <div className="lp-page" ref={pageRef}>
       {/* Particle canvas background */}
       <canvas ref={canvasRef} className="lp-canvas" />
+
+      {/* ── Navbar ── */}
+      <header className="lp-nav">
+        <div className="lp-nav-logo">
+          <span className="lp-nav-logo-icon">⚔</span>
+          <span className="lp-nav-logo-text">DebateForge</span>
+        </div>
+        <div className={`lp-nav-links ${menuOpen ? 'lp-nav-links--open' : ''}`}>
+          <a href="#how" className="lp-nav-link" onClick={() => setMenuOpen(false)}>How It Works</a>
+          <a href="#features" className="lp-nav-link" onClick={() => setMenuOpen(false)}>Features</a>
+          <button className="lp-nav-link lp-footer-btn" onClick={() => { navigate('/pricing'); setMenuOpen(false); }}>Pricing</button>
+          <div className="lp-nav-mobile-only">
+            <button className="lp-nav-signin" onClick={() => { navigate('/login'); setMenuOpen(false); }}>Sign In</button>
+            <button className="lp-nav-cta" onClick={() => { navigate('/register'); setMenuOpen(false); }}>Start Free</button>
+          </div>
+        </div>
+        <div className="lp-nav-actions">
+          <button className="lp-nav-signin" onClick={() => navigate('/login')}>Sign In</button>
+          <button className="lp-nav-cta" onClick={() => navigate('/register')}>Start Free</button>
+          <button className="lp-hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle Navigation">
+            {menuOpen ? '✕' : '☰'}
+          </button>
+        </div>
+      </header>
 
       {/* ══════════ HERO ══════════ */}
       <section className="lp-hero" id="top">

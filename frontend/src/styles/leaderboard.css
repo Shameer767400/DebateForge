@@ -393,3 +393,10 @@
   }
 }
 
+@media (max-width: 768px) {
+  .lb-page {
+    padding-bottom: 80px !important; /* spacing for bottom nav */
+  }
+}
+
+

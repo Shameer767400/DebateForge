@@ -454,3 +454,67 @@
     padding: 20px 16px 0;
   }
 }
+
+@media (max-width: 480px) {
+  .pricing-card {
+    padding: 20px 16px;
+  }
+
+  .toggle-btn {
+    padding: 8px 14px;
+    font-size: 0.8rem;
+  }
+
+  .faq-question {
+    padding: 14px 16px;
+    font-size: 0.88rem;
+  }
+
+  .faq-answer {
+    padding: 0 16px 14px;
+    font-size: 0.82rem;
+  }
+
+  .pricing-faq {
+    padding: 40px 16px;
+  }
+
+  .faq-title {
+    font-size: 1.4rem;
+    margin-bottom: 24px;
+  }
+
+  .pricing-enterprise-cta {
+    padding: 40px 16px;
+  }
+
+  .enterprise-cta-title {
+    font-size: 1.5rem;
+  }
+
+  .enterprise-cta-sub {
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+  }
+
+  .enterprise-cta-btn {
+    padding: 14px 28px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .toggle-btn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  .pricing-card-title {
+    font-size: 1.1rem;
+  }
+
+  .pricing-card-price {
+    font-size: 1.8rem;
+  }
+}
+
