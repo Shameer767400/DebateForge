@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import '../styles/profile.css';
 import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
 
-const API = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
+const API = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 const ACHIEVEMENTS_CATALOGUE = [
   { id: 'first_debate',      icon: '⚔️',  name: 'First Blood',      desc: 'Complete your first debate' },
@@ -31,8 +32,9 @@ function StatCard({ value, label, color }) {
 
 export default function ProfilePage() {
   const api = useApi();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshSession } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
   const fileInputRef = useRef(null);
 
   const [profile, setProfile] = useState(null);
@@ -43,12 +45,10 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    const opts = { baseURL: API, withCredentials: true };
-
     Promise.allSettled([
-      api.get('/api/profile/me', opts),
-      api.get('/api/profile/fallacies', opts),
-      api.get('/api/debates/history?limit=10', opts),
+      api.get('/api/profile/me'),
+      api.get('/api/profile/fallacies'),
+      api.get('/api/debates/history?limit=10'),
     ]).then(([prof, fall, hist]) => {
       if (prof.status === 'fulfilled') {
         setProfile(prof.value.data);
@@ -59,8 +59,11 @@ export default function ProfilePage() {
       if (fall.status === 'fulfilled') setFallacies(fall.value.data?.fallacies ?? []);
       if (hist.status === 'fulfilled') setHistory(hist.value.data?.debates ?? []);
       setLoading(false);
+    }).catch((err) => {
+      console.error('Failed to load profile details:', err);
+      toast.error('Failed to load profile details.');
     });
-  }, []);
+  }, [api, toast]);
 
   const profileUser = profile?.user ?? user;
   const wins = profileUser?.wins ?? 0;
@@ -75,6 +78,7 @@ export default function ProfilePage() {
   const earnedSet = new Set(profileUser?.achievements ?? []);
 
   const handleLogout = () => {
+    navigate('/', { replace: true });
     logout();
   };
 
@@ -86,15 +90,16 @@ export default function ProfilePage() {
       const formData = new FormData();
       formData.append('avatar', file);
       const res = await api.post('/api/profile/avatar', formData, {
-        baseURL: API,
-        withCredentials: true,
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       setAvatarUrl(res.data.profilePicUrl);
+      await refreshSession();
+      toast.success('Profile picture updated successfully!');
     } catch (err) {
       console.error('Avatar upload failed:', err);
+      toast.error('Failed to upload profile picture.');
     } finally {
       setUploading(false);
     }
@@ -102,13 +107,13 @@ export default function ProfilePage() {
 
   const handleRemoveAvatar = async () => {
     try {
-      await api.delete('/api/profile/avatar', {
-        baseURL: API,
-        withCredentials: true,
-      });
+      await api.delete('/api/profile/avatar');
       setAvatarUrl(null);
+      await refreshSession();
+      toast.success('Profile picture removed.');
     } catch (err) {
       console.error('Avatar remove failed:', err);
+      toast.error('Failed to remove profile picture.');
     }
   };
 
@@ -124,13 +129,13 @@ export default function ProfilePage() {
   const handleSaveBio = async () => {
     setSavingBio(true);
     try {
-      await api.put('/api/profile/bio', { bio }, {
-        baseURL: API,
-        withCredentials: true,
-      });
+      await api.put('/api/profile/bio', { bio });
       setEditingBio(false);
+      await refreshSession();
+      toast.success('Bio updated successfully!');
     } catch (err) {
-      console.error('Bio save failed:', err);
+      console.error('Failed to save bio:', err);
+      toast.error('Failed to update bio.');
     } finally {
       setSavingBio(false);
     }
@@ -166,17 +171,17 @@ export default function ProfilePage() {
 
     setSavingPassword(true);
     try {
-      await api.post('/api/auth/change-password', { currentPassword, newPassword }, {
-        baseURL: API,
-        withCredentials: true,
-      });
+      await api.post('/api/auth/change-password', { currentPassword, newPassword });
       setPasswordMsg({ type: 'success', text: 'Password changed successfully!' });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
       setTimeout(() => setChangingPassword(false), 2000);
+      toast.success('Password changed successfully!');
     } catch (err) {
-      setPasswordMsg({ type: 'error', text: err.response?.data?.error || 'Failed to change password' });
+      const errMsg = err.response?.data?.error || 'Failed to change password';
+      setPasswordMsg({ type: 'error', text: errMsg });
+      toast.error(errMsg);
     } finally {
       setSavingPassword(false);
     }
