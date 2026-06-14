@@ -187,6 +187,116 @@ async def _transcribe_gemini(audio_bytes: bytes, topic: str = "", mime_type: str
         }
 
 
+async def _transcribe_openai_whisper(audio_bytes: bytes, topic: str = "", mime_type: str = "audio/webm") -> dict:
+    """Transcribe using OpenAI Whisper API as a fallback."""
+    start = time.time()
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return {
+            "text": "",
+            "language": "en",
+            "duration_ms": 0,
+            "word_count": 0,
+            "success": False,
+            "error": "No OpenAI API key configured",
+        }
+
+    try:
+        import httpx
+
+        # Determine clean extension
+        ext = "webm"
+        clean_mime = mime_type.lower()
+        if "mp4" in clean_mime or "m4a" in clean_mime:
+            ext = "mp4"
+        elif "wav" in clean_mime:
+            ext = "wav"
+        elif "mpeg" in clean_mime or "mp3" in clean_mime:
+            ext = "mp3"
+        elif "ogg" in clean_mime:
+            ext = "ogg"
+        elif "aac" in clean_mime:
+            ext = "aac"
+
+        files = {
+            "file": (f"audio.{ext}", audio_bytes, mime_type)
+        }
+        data = {
+            "model": "whisper-1",
+            "response_format": "verbose_json",
+        }
+        if topic:
+            data["prompt"] = f"Formal debate about: {topic}"
+
+        headers = {
+            "Authorization": f"Bearer {api_key}"
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/audio/transcriptions",
+                headers=headers,
+                data=data,
+                files=files,
+                timeout=30.0
+            )
+
+        if response.status_code != 200:
+            logging.error(f"[OPENAI-TRANSCRIPTION] API error: {response.text}")
+            return {
+                "text": "",
+                "language": "en",
+                "duration_ms": 0,
+                "word_count": 0,
+                "success": False,
+                "error": f"OpenAI API error: {response.text}",
+            }
+
+        res_json = response.json()
+        text = res_json.get("text", "").strip()
+
+        # Extract language from verbose_json response
+        detected_lang = res_json.get("language", "en").lower()
+        # Normalize language code to ISO 639-1 if full name returned
+        if len(detected_lang) > 2:
+            mapping = {
+                "english": "en", "spanish": "es", "french": "fr", "german": "de",
+                "italian": "it", "portuguese": "pt", "chinese": "zh", "japanese": "ja",
+                "korean": "ko", "russian": "ru", "hindi": "hi", "telugu": "te"
+            }
+            detected_lang = mapping.get(detected_lang, "en")
+
+        # Clean filler words
+        text = re.sub(
+            r"^(um+,?\s*|uh+,?\s*|like,?\s*|you know,?\s*)+",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        elapsed = round((time.time() - start) * 1000)
+        words = len(text.split())
+        logging.info(f"[OPENAI-TRANSCRIPTION] {words} words transcribed in {elapsed}ms | lang={detected_lang}")
+
+        return {
+            "text": text,
+            "language": detected_lang,
+            "duration_ms": elapsed,
+            "word_count": words,
+            "success": True,
+        }
+    except Exception as e:
+        logging.error(f"[OPENAI-TRANSCRIPTION] Exception: {e}")
+        return {
+            "text": "",
+            "language": "en",
+            "duration_ms": 0,
+            "word_count": 0,
+            "success": False,
+            "error": str(e),
+        }
+
+
 async def transcribe_audio(audio_bytes: bytes, topic: str = "", mime_type: str = "audio/webm") -> dict:
     """
     Transcribe user's spoken debate argument.
@@ -204,4 +314,10 @@ async def transcribe_audio(audio_bytes: bytes, topic: str = "", mime_type: str =
     if USE_LOCAL_STT:
         return await _transcribe_local(audio_bytes, topic, mime_type)
     else:
-        return await _transcribe_gemini(audio_bytes, topic, mime_type)
+        res = await _transcribe_gemini(audio_bytes, topic, mime_type)
+        if not res.get("success"):
+            logging.warning("[TRANSCRIPTION] Gemini failed, falling back to OpenAI Whisper API")
+            openai_res = await _transcribe_openai_whisper(audio_bytes, topic, mime_type)
+            if openai_res.get("success"):
+                return openai_res
+        return res

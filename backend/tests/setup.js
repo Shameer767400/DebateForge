@@ -5,6 +5,9 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key-for-jest-32chars!!';
 process.env.NODE_ENV = 'test';
 
+// Increase default timeout for slow startup in CI/local runs
+jest.setTimeout(30000);
+
 let mongoServer;
 
 beforeAll(async () => {
