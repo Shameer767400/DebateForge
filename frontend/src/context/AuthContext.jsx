@@ -69,9 +69,12 @@ export function AuthProvider({ children }) {
         await new Promise((r) => setTimeout(r, 1000));
         return checkSession(retryCount + 1);
       }
-      // After retry, silently treat as unauthenticated
+      // After retry, silently treat as unauthenticated but preserve token on network/server errors
       setUser(null);
-      if (typeof window !== 'undefined') localStorage.removeItem('token');
+      const isClientError = err.response && err.response.status >= 400 && err.response.status < 500;
+      if (isClientError && typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+      }
       return null;
     }
   }, []);
@@ -126,11 +129,15 @@ export function AuthProvider({ children }) {
         return true;
       }
       return false;
-    } catch {
-      // Refresh failed — session is truly expired
-      setUser(null);
-      if (typeof window !== 'undefined') localStorage.removeItem('token');
-      return false;
+    } catch (err) {
+      const isClientError = err.response && err.response.status >= 400 && err.response.status < 500;
+      if (isClientError) {
+        setUser(null);
+        if (typeof window !== 'undefined') localStorage.removeItem('token');
+        return false;
+      }
+      // Re-throw network or server errors so the interceptor knows the session didn't expire
+      throw err;
     }
   }, []);
 

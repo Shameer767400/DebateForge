@@ -577,7 +577,15 @@ async function resendVerificationOTP(req, res) {
     const verificationOTP = user.createEmailVerificationOTP();
     await user.save();
 
-    await sendVerificationEmail(user.email, verificationOTP);
+    try {
+      await sendVerificationEmail(user.email, verificationOTP);
+    } catch (emailErr) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to send verification email during resend:', emailErr.message);
+      return res.status(502).json({
+        error: `Failed to send verification email: ${emailErr.message}. If you are the owner, please check your RESEND_API_KEY environment variable.`,
+      });
+    }
 
     return res.status(200).json({ message: 'Verification OTP sent' });
   } catch (error) {

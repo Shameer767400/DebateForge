@@ -50,6 +50,13 @@ export default function AnimatedPasswordInput({ value, onChange, className = '',
   const [animState, setAnimState] = useState('none');
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef(null);
+  const charDisplayRef = useRef(null);
+
+  const syncScroll = () => {
+    if (charDisplayRef.current && inputRef.current) {
+      charDisplayRef.current.scrollLeft = inputRef.current.scrollLeft;
+    }
+  };
 
   const toggleReveal = (e) => {
     e.preventDefault();
@@ -60,16 +67,19 @@ export default function AnimatedPasswordInput({ value, onChange, className = '',
       setRevealed(true);
       setAnimState('revealing');
     }
+    requestAnimationFrame(syncScroll);
   };
 
   const handleChange = (e) => {
     setAnimState('none');
     onChange(e);
+    requestAnimationFrame(syncScroll);
   };
 
   return (
     <div className="field-wrap">
       <div
+        ref={charDisplayRef}
         className={`char-display ${className} ${isFocused ? 'focused' : ''}`}
         onClick={() => inputRef.current?.focus()}
       >
@@ -88,8 +98,14 @@ export default function AnimatedPasswordInput({ value, onChange, className = '',
         type={revealed ? 'text' : 'password'}
         value={value}
         onChange={handleChange}
-        onFocus={() => setIsFocused(true)}
+        onFocus={() => {
+          setIsFocused(true);
+          requestAnimationFrame(syncScroll);
+        }}
         onBlur={() => setIsFocused(false)}
+        onScroll={syncScroll}
+        onClick={syncScroll}
+        onKeyUp={syncScroll}
         spellCheck="false"
         autoCapitalize="off"
         autoCorrect="off"

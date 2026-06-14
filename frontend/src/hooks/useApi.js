@@ -107,12 +107,16 @@ export function useApi() {
             logoutRef.current();
             return Promise.reject(error);
           }
-        } catch {
+        } catch (err) {
           failedQueue.current.forEach(({ reject }) => reject(new Error('Session expired')));
           failedQueue.current = [];
           isRefreshing.current = false;
-
-          logoutRef.current();
+          // Do NOT log out on network or server errors.
+          // Only log out if it is explicitly a client authentication error.
+          const isClientError = err.response && err.response.status >= 400 && err.response.status < 500;
+          if (isClientError) {
+            logoutRef.current();
+          }
           return Promise.reject(error);
         }
       }
