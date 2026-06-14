@@ -23,6 +23,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const DebateHistoryPage = lazy(() => import('./pages/DebateHistoryPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 import BottomNav from './components/BottomNav';
+import { Analytics } from '@vercel/analytics/react';
 
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
           <BrowserRouter>
             <ToastContainer />
             <BottomNav />
+            <Analytics />
             <PageLoader>
               <Suspense fallback={null}>
                 <Routes>
