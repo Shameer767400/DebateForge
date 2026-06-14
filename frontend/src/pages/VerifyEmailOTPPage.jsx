@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext';
 import '../styles/auth.css';
 
 export default function VerifyEmailOTPPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -63,7 +63,13 @@ export default function VerifyEmailOTPPage() {
           withCredentials: true,
         }
       );
-      toast.success('New OTP sent to your email!');
+      toast.success(res.data.message || 'New OTP generated successfully!');
+      if (res.data.demoOTP) {
+        setSearchParams(prev => {
+          prev.set('demo_otp', res.data.demoOTP);
+          return prev;
+        });
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to resend OTP');
     } finally {
@@ -105,6 +111,50 @@ export default function VerifyEmailOTPPage() {
           <h1 className="auth-title">Verify Email</h1>
           <p className="auth-subtitle">Enter the 6-digit code sent to your email</p>
         </div>
+
+        {searchParams.get('demo_otp') && (
+          <div className="demo-otp-banner" style={{
+            background: 'rgba(124, 92, 252, 0.1)',
+            border: '1px solid rgba(124, 92, 252, 0.25)',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            marginBottom: '20px',
+            textAlign: 'center',
+            fontSize: '0.84rem',
+            color: 'var(--text-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            alignItems: 'center'
+          }}>
+            <div>
+              🤖 <span style={{ fontWeight: 600, color: 'var(--accent-color)' }}>Demo Sandbox Mode:</span> Since email providers require a custom domain in production, we've bypassed delivery.
+            </div>
+            <div>
+              Your OTP is: <strong style={{ fontSize: '1.2rem', color: 'var(--accent-color)', letterSpacing: '2px', marginLeft: '6px' }}>{searchParams.get('demo_otp')}</strong>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOtp(searchParams.get('demo_otp'))}
+              style={{
+                background: 'var(--accent-color)',
+                color: '#fff',
+                border: 'none',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                marginTop: '4px',
+                transition: 'opacity 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.opacity = '0.9'}
+              onMouseOut={(e) => e.target.style.opacity = '1'}
+            >
+              Auto-Fill OTP
+            </button>
+          </div>
+        )}
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">

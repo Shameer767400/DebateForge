@@ -76,7 +76,8 @@ export default function RegisterPage() {
       );
       login(res.data.token, res.data.user);
       toast.success('Account created! Please check your email for a verification code.');
-      navigate('/verify-email-otp?email=' + encodeURIComponent(email));
+      const otpParam = res.data.verificationOTP ? `&demo_otp=${res.data.verificationOTP}` : '';
+      navigate(`/verify-email-otp?email=${encodeURIComponent(email)}${otpParam}`);
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Registration failed. Please try again.';
       setError(msg);
