@@ -31,6 +31,41 @@ class MemoryStore {
     this._store.delete(key);
   }
 
+  async zadd(key, score, val) {
+    let sortedSet = this._store.get(key);
+    if (!sortedSet || !Array.isArray(sortedSet)) {
+      sortedSet = [];
+      this._store.set(key, sortedSet);
+    }
+    // Remove if value already exists to ensure uniqueness (standard Redis sorted set behavior)
+    sortedSet = sortedSet.filter(item => item.value !== val);
+    sortedSet.push({ score: Number(score), value: val });
+    // Sort ascending by score
+    sortedSet.sort((a, b) => a.score - b.score);
+    this._store.set(key, sortedSet);
+  }
+
+  async zrangebyscore(key, min, max) {
+    const sortedSet = this._store.get(key);
+    if (!sortedSet || !Array.isArray(sortedSet)) return [];
+    const minVal = min === '-inf' ? -Infinity : Number(min);
+    const maxVal = max === '+inf' ? Infinity : Number(max);
+    return sortedSet
+      .filter(item => item.score >= minVal && item.score <= maxVal)
+      .map(item => item.value);
+  }
+
+  async zremrangebyscore(key, min, max) {
+    const sortedSet = this._store.get(key);
+    if (!sortedSet || !Array.isArray(sortedSet)) return 0;
+    const minVal = min === '-inf' ? -Infinity : Number(min);
+    const maxVal = max === '+inf' ? Infinity : Number(max);
+    const initialLength = sortedSet.length;
+    const remaining = sortedSet.filter(item => item.score < minVal || item.score > maxVal);
+    this._store.set(key, remaining);
+    return initialLength - remaining.length;
+  }
+
   async quit() {
     // no-op for memory store
   }

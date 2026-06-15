@@ -35,7 +35,12 @@ async function scoreArgument({ argument, topic, context = [], turnNumber = 1 }) 
       topic,
       context,
       turn_number: turnNumber,
-    }, { timeout: 10_000 });
+    }, {
+      timeout: 10_000,
+      headers: {
+        'X-ML-API-Key': process.env.ML_API_KEY,
+      },
+    });
 
     return response.data;
   } catch (e) {

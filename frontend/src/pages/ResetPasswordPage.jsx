@@ -44,7 +44,7 @@ export default function ResetPasswordPage() {
       const res = await axios.post(
         `/api/auth/reset-password/${token}`,
         { password },
-        { baseURL: process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001' }
+        { baseURL: process.env.REACT_APP_API_URL || '' }
       );
       toast.success(res.data.message || 'Password reset successfully!');
       navigate('/login');

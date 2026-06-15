@@ -109,14 +109,31 @@ async function getDebateById(req, res) {
 
 async function endDebate(req, res) {
   try {
-    const { winner, durationSecs, tzOffsetMinutes } = req.body;
+    const { durationSecs, tzOffsetMinutes } = req.body;
     const debateId = req.params.id;
     const tzOffset = typeof tzOffsetMinutes === 'number' ? tzOffsetMinutes : 0;
 
-    const result = await debateEngine.finalizeDebate(req.user.id, debateId, winner, durationSecs, tzOffset);
+    const debate = await Debate.findOne({ _id: debateId, userId: req.user.id });
+    if (!debate) {
+      return res.status(404).json({ error: 'Debate not found' });
+    }
+
+    if (debate.endedAt) {
+      return res.status(400).json({ error: 'Debate already ended' });
+    }
+
+    // Determine winner securely:
+    // If debate already has a judge verdict (from the WebSocket AI judge), use it.
+    // Otherwise, this is a forfeit or early exit via HTTP endpoint, so force 'ai' as winner.
+    let resolvedWinner = 'ai';
+    if (debate.judgeScore && debate.judgeScore.winner) {
+      resolvedWinner = debate.judgeScore.winner;
+    }
+
+    const result = await debateEngine.finalizeDebate(req.user.id, debateId, resolvedWinner, durationSecs, tzOffset);
 
     return res.status(200).json({
-      winner,
+      winner: resolvedWinner,
       userFinalScore: result.avgScore,
       newElo: result.newElo,
       streak: {

@@ -1140,10 +1140,18 @@ async function streamTTSToSocket(_socket, _text) {
 async function callMLService(path, data, method = 'POST') {
   const baseUrl = (process.env.ML_SERVICE_URL || 'http://localhost:8001').replace(/\/$/, '');
   const url = `${baseUrl}${path}`;
-  const config = { timeout: 10000 }; // Prevent infinite hangs if ML service freezes
+  const config = {
+    timeout: 10000,
+    headers: {
+      'X-ML-API-Key': process.env.ML_API_KEY,
+    },
+  };
 
   if (data && typeof data.getHeaders === 'function') {
-    config.headers = data.getHeaders();
+    config.headers = {
+      ...config.headers,
+      ...data.getHeaders(),
+    };
   }
 
   const response = method === 'GET'

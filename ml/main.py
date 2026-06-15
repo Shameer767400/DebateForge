@@ -26,8 +26,8 @@ from dotenv import load_dotenv
 load_dotenv()
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Depends, Header, HTTPException, status
+from typing import Optional
 
 from models.store import model_store
 
@@ -53,6 +53,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def verify_ml_api_key(x_ml_api_key: Optional[str] = Header(None)):
+    expected_key = os.getenv("ML_API_KEY")
+    if not expected_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="ML_API_KEY environment variable is not configured."
+        )
+    if x_ml_api_key != expected_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing X-ML-API-Key header."
+        )
 
 
 @app.on_event("startup")
@@ -94,10 +108,10 @@ async def startup_event() -> None:
     print("✅ ML Service ready (lightweight mode — TF-IDF embeddings, SpaCy NLP, NLTK sentiment)")
 
 
-app.include_router(fallacy_router, prefix="/fallacy")
-app.include_router(scorer_router, prefix="/scorer")
-app.include_router(memory_router, prefix="/memory")
-app.include_router(transcription_router, prefix="/transcription")
+app.include_router(fallacy_router, prefix="/fallacy", dependencies=[Depends(verify_ml_api_key)])
+app.include_router(scorer_router, prefix="/scorer", dependencies=[Depends(verify_ml_api_key)])
+app.include_router(memory_router, prefix="/memory", dependencies=[Depends(verify_ml_api_key)])
+app.include_router(transcription_router, prefix="/transcription", dependencies=[Depends(verify_ml_api_key)])
 
 
 @app.get("/health")

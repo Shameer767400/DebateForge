@@ -484,12 +484,74 @@ async function checkDebateQuota(req, res, next) {
     // Paid users: unlimited
     if (isPaid) return next();
 
-    // Free users: check monthly quota
-    const currentMonth   = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
-    const isNewMonth     = user.freeUsage?.resetMonth !== currentMonth;
-    const debatesUsed    = isNewMonth ? 0 : (user.freeUsage?.debatesThisMonth || 0);
+    // Free users: check monthly quota atomically
+    const currentMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    const isNewMonth = user.freeUsage?.resetMonth !== currentMonth;
 
-    if (debatesUsed >= FREE_DEBATE_LIMIT) {
+    let updatedUser;
+    if (isNewMonth) {
+      // Rollover to new month atomically.
+      updatedUser = await User.findOneAndUpdate(
+        {
+          _id: user._id,
+          $or: [
+            { 'freeUsage.resetMonth': { $ne: currentMonth } },
+            { 'freeUsage.resetMonth': { $exists: false } }
+          ]
+        },
+        {
+          $set: {
+            'freeUsage.debatesThisMonth': 1,
+            'freeUsage.resetMonth': currentMonth
+          }
+        },
+        { new: true }
+      );
+
+      // If another request beat us to the month transition, refetch and run increment logic
+      if (!updatedUser) {
+        const refetched = await User.findById(user._id).select('freeUsage');
+        const debatesUsed = refetched?.freeUsage?.debatesThisMonth || 0;
+        if (debatesUsed >= FREE_DEBATE_LIMIT) {
+          return res.status(402).json({
+            error: `Free plan limit reached. You've used ${debatesUsed}/${FREE_DEBATE_LIMIT} debates this month.`,
+            code:  'FREE_LIMIT_REACHED',
+            upgradeUrl: '/pricing',
+            limit: FREE_DEBATE_LIMIT,
+            used:  debatesUsed,
+          });
+        }
+        updatedUser = await User.findOneAndUpdate(
+          {
+            _id: user._id,
+            'freeUsage.resetMonth': currentMonth,
+            'freeUsage.debatesThisMonth': { $lt: FREE_DEBATE_LIMIT }
+          },
+          {
+            $inc: { 'freeUsage.debatesThisMonth': 1 }
+          },
+          { new: true }
+        );
+      }
+    } else {
+      // Same month: increment counter atomically if strictly below FREE_DEBATE_LIMIT
+      updatedUser = await User.findOneAndUpdate(
+        {
+          _id: user._id,
+          'freeUsage.resetMonth': currentMonth,
+          'freeUsage.debatesThisMonth': { $lt: FREE_DEBATE_LIMIT }
+        },
+        {
+          $inc: { 'freeUsage.debatesThisMonth': 1 }
+        },
+        { new: true }
+      );
+    }
+
+    if (!updatedUser) {
+      // Refetch current state to display exact usage count
+      const refetched = await User.findById(user._id).select('freeUsage');
+      const debatesUsed = refetched?.freeUsage?.debatesThisMonth || 0;
       return res.status(402).json({
         error: `Free plan limit reached. You've used ${debatesUsed}/${FREE_DEBATE_LIMIT} debates this month.`,
         code:  'FREE_LIMIT_REACHED',
@@ -499,22 +561,13 @@ async function checkDebateQuota(req, res, next) {
       });
     }
 
-    // Increment counter (atomic — reset if new month)
-    const updateOp = isNewMonth
-      ? { 'freeUsage.debatesThisMonth': 1, 'freeUsage.resetMonth': currentMonth }
-      : { $inc: { 'freeUsage.debatesThisMonth': 1 } };
-
-    if (isNewMonth) {
-      await User.findByIdAndUpdate(user._id, { $set: updateOp });
-    } else {
-      await User.findByIdAndUpdate(user._id, updateOp);
-    }
+    const currentUsed = updatedUser.freeUsage?.debatesThisMonth || 0;
 
     // Attach usage info to request for downstream use
     req.debateUsage = {
-      used:      debatesUsed + 1,
+      used:      currentUsed,
       limit:     FREE_DEBATE_LIMIT,
-      remaining: Math.max(0, FREE_DEBATE_LIMIT - debatesUsed - 1),
+      remaining: Math.max(0, FREE_DEBATE_LIMIT - currentUsed),
     };
 
     return next();

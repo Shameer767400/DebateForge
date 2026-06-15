@@ -36,7 +36,12 @@ async function detectFallacy({ argument, context = [], userId = '' }) {
       argument,
       context,
       user_id: userId,
-    }, { timeout: 10_000 });
+    }, {
+      timeout: 10_000,
+      headers: {
+        'X-ML-API-Key': process.env.ML_API_KEY,
+      },
+    });
 
     return response.data;
   } catch (e) {

@@ -252,6 +252,10 @@ def extract_features(argument: str, topic: str, context: List[str]):
         unique_ratio = len(set(words)) / word_count
         clarity_score = _clamp((clarity_score * 0.7 + unique_ratio * 100 * 0.3))
 
+        if word_count < 10:
+            logic_score = min(30.0, logic_score)
+            evidence_score = min(20.0, evidence_score)
+
         return int(round(logic_score)), int(round(evidence_score)), int(round(clarity_score)), sentiment
 
     # ── Latin-script (English, French, Spanish, etc.) ──────────────────────
@@ -362,6 +366,10 @@ def extract_features(argument: str, topic: str, context: List[str]):
         flesch_score * 0.4 + length_score * 0.4 + repetition_score * 0.2
     )
     clarity_score = _clamp(clarity_score)
+
+    if word_count < 10:
+        logic_score = min(30.0, logic_score)
+        evidence_score = min(20.0, evidence_score)
 
     return int(round(logic_score)), int(round(evidence_score)), int(round(clarity_score)), sentiment
 

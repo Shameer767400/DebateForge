@@ -12,7 +12,6 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
-const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 const VerifyEmailOTPPage = lazy(() => import('./pages/VerifyEmailOTPPage'));
 const LobbyPage = lazy(() => import('./pages/LobbyPage'));
 const DebateRoomPage = lazy(() => import('./pages/DebateRoomPage'));
@@ -44,7 +43,6 @@ function App() {
                   <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                   <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-                  <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
                   <Route path="/verify-email-otp" element={<VerifyEmailOTPPage />} />
                   <Route
                     path="/lobby"
