@@ -27,6 +27,7 @@ load_dotenv()
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, Header, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 
 from models.store import model_store
