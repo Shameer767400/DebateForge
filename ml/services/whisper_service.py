@@ -7,6 +7,39 @@ import time
 
 import google.generativeai as genai
 
+def detect_lang_from_text(text: str) -> str:
+    raw = text.strip()
+    if not raw:
+        return 'en'
+    # Telugu
+    if re.search(r'[\u0C00-\u0C7F]', raw):
+        return 'te'
+    # Tamil
+    if re.search(r'[\u0B80-\u0BFF]', raw):
+        return 'ta'
+    # Kannada
+    if re.search(r'[\u0C80-\u0CFF]', raw):
+        return 'kn'
+    # Malayalam
+    if re.search(r'[\u0D00-\u0D7F]', raw):
+        return 'ml'
+    # Hindi/Devanagari
+    if re.search(r'[\u0900-\u097F]', raw):
+        return 'hi'
+    # Bengali
+    if re.search(r'[\u0980-\u09FF]', raw):
+        return 'bn'
+    # Gujarati
+    if re.search(r'[\u0A80-\u0AFF]', raw):
+        return 'gu'
+    # Punjabi
+    if re.search(r'[\u0A00-\u0A7F]', raw):
+        return 'pa'
+    # Urdu/Arabic script
+    if re.search(r'[\u0600-\u06FF]', raw):
+        return 'ur'
+    return 'en'
+
 # ── Toggle: local Whisper vs Gemini API ──
 USE_LOCAL_STT = os.getenv("USE_LOCAL_STT", "false").lower() == "true"
 
@@ -146,14 +179,25 @@ async def _transcribe_gemini(audio_bytes: bytes, topic: str = "", mime_type: str
         # Parse LANG: and TEXT: from response
         detected_lang = "en"
         text = raw_text
-        if "LANG:" in raw_text and "TEXT:" in raw_text:
+        raw_upper = raw_text.upper()
+        if "LANG:" in raw_upper or "TEXT:" in raw_upper:
             import re as _re
-            lang_match = _re.search(r'LANG:\s*(\w{2,3})', raw_text)
-            text_match = _re.search(r'TEXT:\s*(.+)', raw_text, _re.DOTALL)
+            lang_match = _re.search(r'LANG:\s*([a-zA-Z]{2,3})', raw_text, _re.IGNORECASE)
+            text_match = _re.search(r'TEXT:\s*(.+)', raw_text, _re.IGNORECASE | _re.DOTALL)
             if lang_match:
                 detected_lang = lang_match.group(1).lower()
             if text_match:
                 text = text_match.group(1).strip()
+            else:
+                if lang_match:
+                    text = raw_text.replace(lang_match.group(0), "").strip()
+        else:
+            detected_lang = detect_lang_from_text(raw_text)
+
+        # Secondary verification: if detected_lang is 'en' but text contains non-Latin characters
+        text_detected = detect_lang_from_text(text)
+        if text_detected != 'en':
+            detected_lang = text_detected
 
         # Clean filler words
         text = re.sub(
@@ -265,6 +309,11 @@ async def _transcribe_openai_whisper(audio_bytes: bytes, topic: str = "", mime_t
                 "korean": "ko", "russian": "ru", "hindi": "hi", "telugu": "te"
             }
             detected_lang = mapping.get(detected_lang, "en")
+
+        # Secondary verification: if detected_lang is 'en' but text contains non-Latin characters
+        text_detected = detect_lang_from_text(text)
+        if text_detected != 'en':
+            detected_lang = text_detected
 
         # Clean filler words
         text = re.sub(

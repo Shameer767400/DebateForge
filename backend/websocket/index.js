@@ -641,6 +641,13 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
         const result = await transcribeAudio(audioBuffer, session.topic, session.mimeType);
         transcript   = result.text;
         detectedLanguage = result.language || detectedLanguage;
+        // Second-pass text script check for non-English characters
+        if (transcript) {
+          const textDetected = detectLanguageFromText(transcript);
+          if (textDetected !== 'en') {
+            detectedLanguage = textDetected;
+          }
+        }
       } catch (mlErr) {
         // ML service is unreachable — fall through to transcriptFallback
         secLogger.warn(`[WS] ML transcription failed (${mlErr.message}), using browser fallback`);
