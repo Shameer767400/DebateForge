@@ -40,7 +40,7 @@
     "ioredis": "^5.9.3",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.2.2",
-    "morgan": "^1.10.1",
+    "morgan": "^1.11.0",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.4",
