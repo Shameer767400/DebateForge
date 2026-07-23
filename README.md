@@ -11,7 +11,6 @@
 📖 **[API Documentation](API_DOCS.md)** · 🏗️ **[Architecture](ARCHITECTURE.md)** · 🗺️ **[Roadmap](ROADMAP.md)** · 🔧 **[Swagger UI](https://debateforge-backend.onrender.com/api-docs)**
 
 ---
-
 ## ✨ Features
 
 ### 🎤 Core Debate
@@ -294,9 +293,7 @@ DebateForge supports four structured formats with automatic phase transitions:
 | **British Parliamentary** | 7 | Government vs Opposition with formal speaking order |
 
 Each phase has a configurable time limit and AI instructions tuned for that phase type.
-
 ---
-
 ## 🔒 Security
 
 - JWT token authentication on all protected routes
