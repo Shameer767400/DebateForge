@@ -48,7 +48,7 @@
     "resend": "^6.12.3",
     "socket.io": "^4.8.3",
     "stripe": "^22.2.0",
-    "swagger-jsdoc": "^6.2.8",
+    "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "web-push": "^3.6.7"
   },
