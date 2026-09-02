@@ -7,7 +7,7 @@ pydantic_core==2.33.2
 
 # NLP — lightweight (no PyTorch/torch dependency)
 spacy==3.8.4
-nltk==3.9.2
+nltk==3.10.3
 numpy==1.26.4
 scikit-learn==1.4.2      # TF-IDF embeddings (replaces sentence-transformers)
 faiss-cpu==1.9.0
