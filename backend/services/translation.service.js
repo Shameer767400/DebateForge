@@ -80,7 +80,7 @@ ${text}`;
       try {
         const response = await Promise.race([
           axios.post('https://api.groq.com/openai/v1/chat/completions', {
-            model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+            model: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
             messages: [
               { role: 'system', content: `You are a translator. Output ONLY the ${langName} translation. No English.` },
               { role: 'user', content: prompt },

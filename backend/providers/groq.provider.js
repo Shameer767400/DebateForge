@@ -3,7 +3,7 @@
 /**
  * @fileoverview Groq provider for DebateForge AI debates.
  *
- * Model: llama-3.3-70b-versatile
+ * Model: qwen/qwen3.8-27b (default; overridden by GROQ_MODEL env)
  * Key advantages:
  *   - FREE tier with generous rate limits
  *   - Ultra-fast inference (~500ms response time)
@@ -20,7 +20,7 @@ class GroqProvider extends BaseProvider {
   constructor() {
     super();
     this.keys = this._loadKeys('GROQ_API_KEY', 10);
-    this.model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    this.model = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
     this.apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
     this.timeout = 10_000;
   }
