@@ -9,6 +9,12 @@
 *(Contains comprehensive System Design, Architecture, Features, and Dev API alignmnent details)*
 
 📖 **[API Documentation](API_DOCS.md)** · 🏗️ **[Architecture](ARCHITECTURE.md)** · 🗺️ **[Roadmap](ROADMAP.md)** · 🔧 **[Swagger UI](https://debateforge-backend.onrender.com/api-docs)**
+---
+
+## 🏆 Awards & Recognition
+
+* **Best AI-Integrated Project** — Awarded at **Project Space (Season-8)** builder cohort.
+* **AI Excellence Cup** — Recognized for outstanding and robust AI integration.
 
 ---
 ## ✨ Features

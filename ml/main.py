@@ -55,7 +55,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 def verify_ml_api_key(x_ml_api_key: Optional[str] = Header(None)):
     expected_key = os.getenv("ML_API_KEY")
     if not expected_key:
@@ -68,8 +67,7 @@ def verify_ml_api_key(x_ml_api_key: Optional[str] = Header(None)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing X-ML-API-Key header."
         )
-
-
+ 
 @app.on_event("startup")
 async def startup_event() -> None:
     """
