@@ -14,7 +14,7 @@
     "@vercel/analytics": "^2.0.1",
     "axios": "^1.13.5",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react-dom": "^19.2.6",
     "react-router-dom": "^6.28.0",
     "recharts": "^3.7.0",
     "socket.io-client": "^4.8.3",
