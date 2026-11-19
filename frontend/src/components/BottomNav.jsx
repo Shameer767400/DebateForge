@@ -22,7 +22,7 @@ export default function BottomNav() {
 
   // Don't render during auth loading, or when not logged in,
   // or on public pages (login, register, landing, verify, etc.)
-  const publicPaths = ['/', '/login', '/register', '/forgot-password', '/pricing', '/verify-email-otp'];
+  const publicPaths = ['/', '/login', '/register', '/forgot-password', '/verify-email-otp'];
   const isPublicPage = publicPaths.includes(location.pathname) || location.pathname.startsWith('/reset-password') || location.pathname.startsWith('/verify-email');
   const isDebatePage = location.pathname.startsWith('/debate/');
 

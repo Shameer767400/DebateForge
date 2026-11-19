@@ -284,6 +284,7 @@ export default function DashboardPage() {
             <Link to="/lobby" className="dash-nav-desktop-link">Lobby</Link>
             <Link to="/leaderboard" className="dash-nav-desktop-link">Leaderboard</Link>
             <Link to="/history" className="dash-nav-desktop-link">History</Link>
+            <Link to="/pricing" className="dash-nav-desktop-link">Pricing</Link>
             <Link to="/profile" className="dash-nav-desktop-link">Profile</Link>
           </div>
           <span className="dash-elo-badge">{elo} ELO</span>

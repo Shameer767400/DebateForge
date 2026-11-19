@@ -210,6 +210,7 @@ export default function LobbyPage() {
             <Link to="/dashboard" className="lobby-nav-desktop-link">Dashboard</Link>
             <Link to="/leaderboard" className="lobby-nav-desktop-link">Leaderboard</Link>
             <Link to="/history" className="lobby-nav-desktop-link">History</Link>
+            <Link to="/pricing" className="lobby-nav-desktop-link">Pricing</Link>
           </div>
           <Link to="/profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="lobby-elo">{user?.eloRating ?? 1000}</span>

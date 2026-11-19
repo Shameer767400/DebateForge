@@ -195,6 +195,7 @@ export default function ProfilePage() {
         <div className="prof-nav-links">
           <Link to="/dashboard" className="prof-nav-link">Dashboard</Link>
           <Link to="/leaderboard" className="prof-nav-link">Leaderboard</Link>
+          <Link to="/pricing" className="prof-nav-link">Pricing</Link>
           <button className="prof-logout-btn" onClick={handleLogout}>Log Out</button>
         </div>
       </nav>

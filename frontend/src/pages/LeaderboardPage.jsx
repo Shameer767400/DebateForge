@@ -113,6 +113,7 @@ export default function LeaderboardPage() {
           <Link to="/dashboard" className="lb-nav-link">Dashboard</Link>
           <Link to="/profile" className="lb-nav-link">Profile</Link>
           <Link to="/history" className="lb-nav-link">History</Link>
+          <Link to="/pricing" className="lb-nav-link">Pricing</Link>
         </div>
       </nav>
 

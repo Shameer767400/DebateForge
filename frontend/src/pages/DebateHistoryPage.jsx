@@ -193,6 +193,7 @@ export default function DebateHistoryPage() {
         <div className="history-nav-links">
           <Link to="/dashboard" className="history-nav-link">Dashboard</Link>
           <Link to="/leaderboard" className="history-nav-link">Leaderboard</Link>
+          <Link to="/pricing" className="history-nav-link">Pricing</Link>
         </div>
       </nav>
 

@@ -221,7 +221,7 @@ export default function PricingPage() {
     <div className="pricing-page">
       {/* ── HEADER ── */}
       <header className="pricing-header">
-        <button className="pricing-back" onClick={() => navigate('/')}>
+        <button className="pricing-back" onClick={() => navigate(user ? '/dashboard' : '/')}>
           ← Back
         </button>
         <div className="pricing-hero">
