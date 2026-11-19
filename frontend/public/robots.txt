@@ -1,3 +1,19 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Allow: /pricing
+Allow: /about
+Allow: /feedback
+
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /lobby
+Disallow: /debate/
+Disallow: /history
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email-otp
+Disallow: /admin/
+
+Sitemap: https://debateforge.tech/sitemap.xml

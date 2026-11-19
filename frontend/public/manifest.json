@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "DebateForge",
+  "name": "DebateForge — AI Debate Coach",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#0a0a0f",
+  "background_color": "#0a0a0f",
+  "description": "Practice debates against AI opponents. Real-time fallacy detection, scoring, and analytics."
 }

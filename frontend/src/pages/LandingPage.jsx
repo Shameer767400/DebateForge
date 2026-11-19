@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiService } from '../services/api.service';
 import '../styles/landing.css';
 
 const FEATURES = [
@@ -30,6 +31,7 @@ export default function LandingPage() {
   const canvasRef = useRef(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [liveReviews, setLiveReviews] = useState([]);
 
   /* ── Particle canvas ── */
   useEffect(() => {
@@ -94,6 +96,25 @@ export default function LandingPage() {
     window.addEventListener('mousemove', handler);
     return () => window.removeEventListener('mousemove', handler);
   }, []);
+
+  /* ── Fetch live community reviews ── */
+  useEffect(() => {
+    apiService.get('/api/feedback/public?limit=6')
+      .then((res) => {
+        if (res.data?.feedback?.length) setLiveReviews(res.data.feedback);
+      })
+      .catch(() => {}); // silent fail — static TESTIMONIALS used as fallback
+  }, []);
+
+  // Use live reviews if available, otherwise fall back to static testimonials
+  const displayTestimonials = liveReviews.length > 0
+    ? liveReviews.map((r) => ({
+        quote: `"${r.reviewText}"`,
+        author: r.username,
+        role: 'DebateForge User',
+        stars: r.rating,
+      }))
+    : TESTIMONIALS.map((t) => ({ ...t, stars: 5 }));
 
   return (
     <div className="lp-page" ref={pageRef}>
@@ -240,12 +261,14 @@ export default function LandingPage() {
       {/* ══════════ TESTIMONIALS ══════════ */}
       <section className="lp-section" id="social">
         <div className="lp-section-label landing-reveal">Community</div>
-        <h2 className="lp-section-title landing-reveal">Join 10,000+ debaters improving daily.</h2>
+        <h2 className="lp-section-title landing-reveal">What debaters are saying.</h2>
 
         <div className="lp-testimonials-grid">
-          {TESTIMONIALS.map((t, i) => (
+          {displayTestimonials.map((t, i) => (
             <div key={i} className="lp-testimonial-card landing-reveal">
-              <div className="lp-testimonial-stars">★★★★★</div>
+              <div className="lp-testimonial-stars">
+                {'★'.repeat(t.stars || 5)}{'☆'.repeat(5 - (t.stars || 5))}
+              </div>
               <p className="lp-testimonial-quote">{t.quote}</p>
               <div className="lp-testimonial-author">
                 <div className="lp-testimonial-avatar">{t.author[0]}</div>
@@ -256,6 +279,16 @@ export default function LandingPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: '28px' }} className="landing-reveal">
+          <button
+            className="lp-btn-secondary"
+            onClick={() => navigate('/feedback')}
+            style={{ fontSize: '0.85rem' }}
+          >
+            💬 Share Your Experience
+          </button>
         </div>
       </section>
 
@@ -282,10 +315,15 @@ export default function LandingPage() {
           <a href="#features" className="lp-footer-link">Features</a>
           <a href="#how" className="lp-footer-link">How It Works</a>
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/pricing')}>Pricing</button>
+          <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/about')}>About</button>
+          <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/feedback')}>Feedback</button>
+          <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/privacy')}>Privacy</button>
+          <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/terms')}>Terms</button>
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/login')}>Sign In</button>
-          <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/register')}>Register</button>
         </div>
-        <div className="lp-footer-copy">© {new Date().getFullYear()} DebateForge. Built for relentless debaters.</div>
+        <div className="lp-footer-copy">
+          © {new Date().getFullYear()} DebateForge. Built by Meerambigari Shameer.
+        </div>
       </footer>
     </div>
   );

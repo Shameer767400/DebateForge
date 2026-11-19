@@ -20,6 +20,7 @@ const topicRoutes   = require('./routes/topics.routes');
 const pushRoutes    = require('./routes/push.routes');
 const statusRoutes  = require('./routes/status.routes');
 const billingRoutes = require('./routes/billing.routes');
+const feedbackRoutes = require('./routes/feedback.routes');
 const swaggerSpec   = require('./config/swagger.config');
 
 const { checkDebateQuota } = require('./controllers/billing.controller');
@@ -272,6 +273,17 @@ const uploadLimiter = rateLimit({
   handler: rateLimitHandler('avatar-upload'),
 });
 
+// 5h. Feedback submissions: 10 per hour
+const feedbackLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTest,
+  handler: rateLimitHandler('feedback'),
+  message: { error: 'Too many feedback submissions' },
+});
+
 /* ═══════════════════════════════════════════
    6. ROUTES — with targeted rate limiters
 ═══════════════════════════════════════════ */
@@ -303,6 +315,8 @@ app.use('/api/push', pushRoutes);
 app.use('/api/billing', billingRoutes);
 
 app.use('/api/status', statusRoutes);
+
+app.use('/api/feedback', feedbackLimiter, feedbackRoutes);
 
 /* ═══════════════════════════════════════════
    6a. SWAGGER / OPENAPI DOCUMENTATION

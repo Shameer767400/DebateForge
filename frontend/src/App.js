@@ -21,6 +21,12 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const DebateHistoryPage = lazy(() => import('./pages/DebateHistoryPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
+const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
+const AdminFeedbackPage = lazy(() => import('./pages/AdminFeedbackPage'));
+import AdminRoute from './components/AdminRoute';
 import BottomNav from './components/BottomNav';
 import { Analytics } from '@vercel/analytics/react';
 
@@ -90,6 +96,19 @@ function App() {
                       <ProtectedRoute>
                         <DebateHistoryPage />
                       </ProtectedRoute>
+                    }
+                  />
+
+                  <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms" element={<TermsOfServicePage />} />
+                  <Route
+                    path="/admin/feedback"
+                    element={
+                      <AdminRoute>
+                        <AdminFeedbackPage />
+                      </AdminRoute>
                     }
                   />
 
