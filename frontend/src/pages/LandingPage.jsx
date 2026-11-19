@@ -131,6 +131,7 @@ export default function LandingPage() {
           <a href="#how" className="lp-nav-link" onClick={() => setMenuOpen(false)}>How It Works</a>
           <a href="#features" className="lp-nav-link" onClick={() => setMenuOpen(false)}>Features</a>
           <button className="lp-nav-link lp-footer-btn" onClick={() => { navigate('/pricing'); setMenuOpen(false); }}>Pricing</button>
+          <button className="lp-nav-link lp-footer-btn" onClick={() => { navigate('/about'); setMenuOpen(false); }}>About</button>
           <div className="lp-nav-mobile-only">
             <button className="lp-nav-signin" onClick={() => { navigate('/login'); setMenuOpen(false); }}>Sign In</button>
             <button className="lp-nav-cta" onClick={() => { navigate('/register'); setMenuOpen(false); }}>Start Free</button>
