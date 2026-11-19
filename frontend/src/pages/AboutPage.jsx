@@ -82,8 +82,11 @@ export default function AboutPage() {
         {/* Founder */}
         <div className="about-founder">
           <div className="about-section-label">Founder</div>
-          {/* Replace this div with an <img src="/your-photo.jpg" alt="Meerambigari Shameer" className="about-founder-avatar" /> */}
-          <div className="about-founder-avatar">MS</div>
+          <img
+            src="/founder.jpg"
+            alt="Meerambigari Shameer"
+            className="about-founder-avatar"
+          />
           <div className="about-founder-name">Meerambigari Shameer</div>
           <div className="about-founder-role">Founder & Creator of DebateForge</div>
           <p className="about-founder-bio">
@@ -91,9 +94,8 @@ export default function AboutPage() {
             Building DebateForge to empower students, professionals, and lifelong learners
             to become better thinkers and communicators.
           </p>
-          {/* Replace # with your actual LinkedIn URL */}
           <a
-            href="#linkedin-placeholder"
+            href="https://www.linkedin.com/in/shameer-meerambigari-53009b291/"
             className="about-linkedin"
             target="_blank"
             rel="noopener noreferrer"

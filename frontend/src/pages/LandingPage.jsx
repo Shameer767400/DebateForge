@@ -322,7 +322,16 @@ export default function LandingPage() {
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/login')}>Sign In</button>
         </div>
         <div className="lp-footer-copy">
-          © {new Date().getFullYear()} DebateForge. Built by Meerambigari Shameer.
+          © {new Date().getFullYear()} DebateForge. Built by{' '}
+          <a
+            href="https://www.linkedin.com/in/shameer-meerambigari-53009b291/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--accent-user, #00ff87)', textDecoration: 'none' }}
+          >
+            Meerambigari Shameer
+          </a>
+          .
         </div>
       </footer>
     </div>
