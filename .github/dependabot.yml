@@ -1,5 +1,5 @@
-# Dependabot version updates configuration
-# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+# Dependabot configuration — grouped weekly updates to minimize PR/email noise
+# Instead of 1 PR per package, dependencies are grouped into a single PR per ecosystem.
 
 version: 2
 updates:
@@ -8,35 +8,73 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+      day: "monday"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "backend"
+    groups:
+      backend-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
 
   # Frontend Node.js dependencies
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+      day: "monday"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "frontend"
+    groups:
+      frontend-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
 
   # ML service Python dependencies
   - package-ecosystem: "pip"
     directory: "/ml"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+      day: "monday"
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
       - "ml"
+    groups:
+      ml-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "chore(deps)"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
     labels:
       - "ci"
+    groups:
+      actions-all:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore(ci)"
