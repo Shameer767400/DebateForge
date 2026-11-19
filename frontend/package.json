@@ -49,5 +49,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "cypress@15.21.2": true,
+    "fsevents@2.3.3": true
   }
 }

@@ -58,5 +58,10 @@
     "mongodb-memory-server": "^11.0.1",
     "nodemon": "^3.1.11",
     "supertest": "^7.2.2"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "mongodb-memory-server@11.3.0": true,
+    "@scarf/scarf": false
   }
 }
