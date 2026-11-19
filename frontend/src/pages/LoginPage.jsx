@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -16,6 +16,8 @@ export default function LoginPage() {
   const { login } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/lobby';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,7 +34,7 @@ export default function LoginPage() {
       );
       login(res.data.token, res.data.user);
       toast.success('Welcome back!');
-      navigate('/lobby');
+      navigate(redirectPath);
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed. Please try again.';
       setError(msg);

@@ -206,12 +206,12 @@ export default function FeedbackPage() {
         <div className="fb-form-card">
           {authLoading ? (
             <div className="fb-signin-prompt">
-              <p>Loading...</p>
+              <p>Checking authentication...</p>
             </div>
           ) : !isAuthenticated ? (
             <div className="fb-signin-prompt">
               <p>
-                <Link to="/login" className="fb-signin-link">Sign in</Link> to share your feedback
+                <Link to="/login?redirect=/feedback" className="fb-signin-link">Sign in</Link> to share your feedback
               </p>
             </div>
           ) : myFeedback && !editing ? (

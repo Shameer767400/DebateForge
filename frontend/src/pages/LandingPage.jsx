@@ -259,19 +259,26 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ══════════ TESTIMONIALS ══════════ */}
-      <section className="lp-section" id="social">
-        <div className="lp-section-label landing-reveal">Community</div>
-        <h2 className="lp-section-title landing-reveal">What debaters are saying.</h2>
-        <p className="lp-section-sub landing-reveal">
-          Real feedback from the DebateForge community. Join them and sharpen your skills.
+      {/* ══════════ TESTIMONIALS & COMMUNITY FEEDBACK ══════════ */}
+      <section className="lp-section lp-section--testimonials" id="social">
+        <div className="lp-testimonials-badge landing-reveal">
+          ⭐ Community Reviews
+        </div>
+        <h2 className="lp-section-title lp-testimonials-title landing-reveal">
+          Loved by Debaters Worldwide
+        </h2>
+        <p className="lp-section-sub lp-testimonials-sub landing-reveal">
+          Real feedback from students, competitive speakers, and coaches honing their arguments every day.
         </p>
 
         <div className="lp-testimonials-grid">
           {displayTestimonials.map((t, i) => (
             <div key={i} className="lp-testimonial-card landing-reveal">
-              <div className="lp-testimonial-stars">
-                {'★'.repeat(t.stars || 5)}{'☆'.repeat(5 - (t.stars || 5))}
+              <div className="lp-testimonial-card-top">
+                <div className="lp-testimonial-stars">
+                  {'★'.repeat(t.stars || 5)}{'☆'.repeat(5 - (t.stars || 5))}
+                </div>
+                <span className="lp-testimonial-verified">✓ Verified Debater</span>
               </div>
               <p className="lp-testimonial-quote">{t.quote}</p>
               <div className="lp-testimonial-author">
@@ -285,14 +292,20 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div className="lp-testimonial-cta landing-reveal">
+        {/* High-visibility interactive feedback banner */}
+        <div className="lp-feedback-banner landing-reveal">
+          <div className="lp-feedback-banner-text">
+            <h3>Have thoughts on DebateForge?</h3>
+            <p>
+              Your reviews and feature suggestions directly guide our product roadmap. Rate your experience or suggest what we should build next!
+            </p>
+          </div>
           <button
-            className="lp-btn-primary lp-btn-large"
+            className="lp-feedback-banner-btn"
             onClick={() => navigate('/feedback')}
           >
-            💬 Share Your Experience
+            💬 Share Your Feedback →
           </button>
-          <p className="lp-testimonial-cta-sub">Your feedback helps us build a better platform</p>
         </div>
       </section>
 

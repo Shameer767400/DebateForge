@@ -50,7 +50,6 @@ const feedbackSchema = new mongoose.Schema(
 );
 
 // Indexes
-feedbackSchema.index({ userId: 1 }, { unique: true });
 feedbackSchema.index({ isPublic: 1, isApproved: 1, isHidden: 1 });
 feedbackSchema.index({ createdAt: -1 });
 

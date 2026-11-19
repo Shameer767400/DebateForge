@@ -593,38 +593,96 @@ html, body {
   margin: 0;
 }
 
-/* ── Testimonials ── */
+/* ── Testimonials & Community Feedback ── */
+.lp-section--testimonials {
+  position: relative;
+  background: radial-gradient(ellipse at 50% 20%, rgba(0, 255, 135, 0.08) 0%, rgba(0, 170, 255, 0.04) 50%, transparent 80%), rgba(3, 4, 10, 0.6);
+  border-top: 1px solid rgba(0, 255, 135, 0.15);
+  border-bottom: 1px solid rgba(0, 255, 135, 0.15);
+  padding: 120px 48px;
+}
+
+.lp-testimonials-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 255, 135, 0.1);
+  border: 1px solid rgba(0, 255, 135, 0.35);
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #00ff87;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  box-shadow: 0 0 20px rgba(0, 255, 135, 0.15);
+}
+
+.lp-testimonials-title {
+  font-size: clamp(2.2rem, 4.5vw, 3.4rem);
+  font-weight: 900;
+  line-height: 1.15;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+
+.lp-testimonials-sub {
+  font-size: 1.15rem;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 660px;
+  line-height: 1.7;
+}
+
 .lp-testimonials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 24px;
-  margin-top: 56px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 28px;
+  margin-top: 60px;
 }
 
 .lp-testimonial-card {
-  background: rgba(6,6,14,0.92);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 20px;
-  padding: 36px 32px;
+  background: rgba(8, 9, 20, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  padding: 38px 34px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  transition: all 0.35s;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  gap: 22px;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
 .lp-testimonial-card:hover {
-  border-color: rgba(0,255,135,0.35);
-  transform: translateY(-6px);
-  box-shadow: 0 20px 50px rgba(0,0,0,0.6), 0 0 30px rgba(0,255,135,0.08);
-  background: rgba(8,8,16,0.98);
+  border-color: rgba(0, 255, 135, 0.45);
+  transform: translateY(-8px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 255, 135, 0.12);
+  background: rgba(12, 14, 26, 0.98);
 }
 
-.lp-testimonial-stars { color: #ffcc00; font-size: 1.1rem; letter-spacing: 3px; }
+.lp-testimonial-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lp-testimonial-stars { color: #ffcc00; font-size: 1.2rem; letter-spacing: 3px; }
+
+.lp-testimonial-verified {
+  font-size: 0.74rem;
+  color: #00ff87;
+  background: rgba(0, 255, 135, 0.08);
+  border: 1px solid rgba(0, 255, 135, 0.25);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
 
 .lp-testimonial-quote {
-  font-size: 1rem;
-  color: rgba(255,255,255,0.72);
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.78);
   line-height: 1.8;
   margin: 0;
   font-style: italic;
@@ -633,42 +691,97 @@ html, body {
 .lp-testimonial-author {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .lp-testimonial-avatar {
-  width: 46px; height: 46px;
+  width: 50px; height: 50px;
   border-radius: 50%;
   background: linear-gradient(135deg, #00ff87, #00aaff);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 1rem;
+  font-size: 1.1rem;
   color: #020309;
   flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 255, 135, 0.3);
 }
 
 .lp-testimonial-name {
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .lp-testimonial-role {
-  font-size: 0.78rem;
-  color: rgba(255,255,255,0.4);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.45);
 }
 
-.lp-testimonial-cta {
-  text-align: center;
-  margin-top: 48px;
+/* ── Interactive Feedback Banner ── */
+.lp-feedback-banner {
+  margin-top: 64px;
+  padding: 40px 48px;
+  background: linear-gradient(135deg, rgba(0, 255, 135, 0.12) 0%, rgba(0, 170, 255, 0.1) 100%), rgba(8, 10, 22, 0.96);
+  border: 1.5px solid rgba(0, 255, 135, 0.35);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 36px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), 0 0 50px rgba(0, 255, 135, 0.12);
 }
 
-.lp-testimonial-cta-sub {
-  margin-top: 12px;
-  font-size: 0.85rem;
-  color: rgba(255,255,255,0.4);
+.lp-feedback-banner-text h3 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.lp-feedback-banner-text p {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  line-height: 1.6;
+  max-width: 600px;
+}
+
+.lp-feedback-banner-btn {
+  padding: 18px 40px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border-radius: 14px;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #00ff87 0%, #00d4ff 100%);
+  color: #050508;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 32px rgba(0, 255, 135, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lp-feedback-banner-btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 16px 42px rgba(0, 255, 135, 0.55);
+}
+
+@media (max-width: 768px) {
+  .lp-feedback-banner {
+    flex-direction: column;
+    text-align: center;
+    padding: 32px 24px;
+    gap: 24px;
+  }
+  .lp-feedback-banner-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* ── CTA Banner ── */
