@@ -111,13 +111,13 @@ app.use((req, _res, next) => {
 /* ═══════════════════════════════════════════
    2. CORS — only allow trusted origins
 ═══════════════════════════════════════════ */
-const { ALLOWED_ORIGINS } = require('./config/cors');
+const { ALLOWED_ORIGINS, isOriginAllowed } = require('./config/cors');
 
 app.use(
   cors({
     origin: (origin, cb) => {
       // Allow requests with no origin (e.g. mobile apps, curl, Postman)
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      if (isOriginAllowed(origin)) return cb(null, true);
       secLogger.logSuspiciousActivity(
         { headers: {}, originalUrl: '/cors', method: 'OPTIONS', ip: 'unknown' },
         `CORS violation from origin: ${origin}`,

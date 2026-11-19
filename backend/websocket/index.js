@@ -257,12 +257,12 @@ const MAX_CONNECTIONS_PER_USER = 5;
 ───────────────────────────────────────────────────────────── */
 function initWebSocket(server) {
   // Reuse the same CORS origins as the HTTP server (from shared config)
-  const { ALLOWED_ORIGINS } = require('../config/cors');
+  const { isOriginAllowed } = require('../config/cors');
 
   const io = new Server(server, {
     cors: {
       origin: (origin, cb) => {
-        if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+        if (isOriginAllowed(origin)) return cb(null, true);
         cb(new Error(`WebSocket CORS: origin ${origin} not allowed`));
       },
       credentials: true,
