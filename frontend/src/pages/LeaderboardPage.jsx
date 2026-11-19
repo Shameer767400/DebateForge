@@ -114,6 +114,7 @@ export default function LeaderboardPage() {
           <Link to="/profile" className="lb-nav-link">Profile</Link>
           <Link to="/history" className="lb-nav-link">History</Link>
           <Link to="/pricing" className="lb-nav-link">Pricing</Link>
+          <Link to="/feedback" className="lb-nav-link">Feedback</Link>
         </div>
       </nav>
 

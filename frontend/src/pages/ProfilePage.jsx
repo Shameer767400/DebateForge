@@ -196,6 +196,7 @@ export default function ProfilePage() {
           <Link to="/dashboard" className="prof-nav-link">Dashboard</Link>
           <Link to="/leaderboard" className="prof-nav-link">Leaderboard</Link>
           <Link to="/pricing" className="prof-nav-link">Pricing</Link>
+          <Link to="/feedback" className="prof-nav-link">Feedback</Link>
           <button className="prof-logout-btn" onClick={handleLogout}>Log Out</button>
         </div>
       </nav>
@@ -516,6 +517,42 @@ export default function ProfilePage() {
                 })}
               </div>
             )}
+          </section>
+
+          {/* ── Community Feedback & Reviews Section ── */}
+          <section className="prof-section">
+            <h2 className="prof-section-title">⭐ Community Reviews & Feedback</h2>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '16px',
+              padding: '12px 0'
+            }}>
+              <div>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.6 }}>
+                  Read what other debaters are saying about DebateForge, share your own review, or suggest features after practicing.
+                </p>
+              </div>
+              <Link
+                to="/feedback"
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '10px',
+                  background: 'rgba(0, 255, 135, 0.12)',
+                  border: '1px solid rgba(0, 255, 135, 0.35)',
+                  color: 'var(--accent-user)',
+                  textDecoration: 'none',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Feedback & Reviews →
+              </Link>
+            </div>
           </section>
         </>
       )}

@@ -72,6 +72,7 @@ export default function FeedbackPage() {
   const toast = useToast();
 
   const [myFeedback, setMyFeedback] = useState(null);
+  const [isEligible, setIsEligible] = useState(true);
   const [publicReviews, setPublicReviews] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,6 +99,9 @@ export default function FeedbackPage() {
           const meRes = await api.get('/api/feedback/me');
           if (meRes.data?.feedback) {
             setMyFeedback(meRes.data.feedback);
+          }
+          if (typeof meRes.data?.eligible === 'boolean') {
+            setIsEligible(meRes.data.eligible);
           }
         } catch (err) {
           if (err.response?.status !== 404) console.error(err);
@@ -206,13 +210,29 @@ export default function FeedbackPage() {
         <div className="fb-form-card">
           {authLoading ? (
             <div className="fb-signin-prompt">
-              <p>Checking authentication...</p>
+              <p>Loading...</p>
             </div>
           ) : !isAuthenticated ? (
             <div className="fb-signin-prompt">
               <p>
-                <Link to="/login?redirect=/feedback" className="fb-signin-link">Sign in</Link> to share your feedback
+                <Link to="/login" className="fb-signin-link">Sign in</Link> to share your feedback
               </p>
+            </div>
+          ) : !isEligible && !myFeedback ? (
+            <div className="fb-eligibility-card">
+              <div className="fb-eligibility-icon">⚔️</div>
+              <h2 className="fb-form-title">Explore DebateForge First</h2>
+              <p className="fb-eligibility-text">
+                To keep our community reviews genuine and helpful, you can submit a review after participating in at least one debate session. Explore the lobby, try a debate with AI, and come back to share your thoughts!
+              </p>
+              <button
+                type="button"
+                className="fb-submit"
+                onClick={() => navigate('/lobby')}
+                style={{ maxWidth: '280px', margin: '0 auto', display: 'block' }}
+              >
+                Go to Debate Lobby →
+              </button>
             </div>
           ) : myFeedback && !editing ? (
             <>

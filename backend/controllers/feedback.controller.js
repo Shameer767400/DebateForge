@@ -1,4 +1,5 @@
 const Feedback = require('../models/Feedback');
+const { Debate, User } = require('../models');
 
 /**
  * Strip HTML tags from a string.
@@ -9,10 +10,23 @@ function stripHtml(str) {
 
 /**
  * POST / — Submit feedback (one per user).
+ * Requires the user to have actually used the platform (at least 1 debate).
  */
 exports.submitFeedback = async (req, res) => {
   try {
     const { rating, reviewText, category, isPublic } = req.body;
+
+    // Validate that the user has actually used the platform
+    const user = await User.findById(req.user.id);
+    const debatesCount = await Debate.countDocuments({ userId: req.user.id });
+    const hasUsedApp = (user && user.totalDebates > 0) || debatesCount > 0;
+
+    if (!hasUsedApp) {
+      return res.status(403).json({
+        error: 'Please explore and participate in at least one debate before submitting a review! We value feedback based on your real experience.',
+        requiresActivity: true,
+      });
+    }
 
     // Validate rating
     if (rating == null || rating < 1 || rating > 5) {
@@ -56,15 +70,20 @@ exports.submitFeedback = async (req, res) => {
 };
 
 /**
- * GET /me — Get the authenticated user's feedback.
+ * GET /me — Get the authenticated user's feedback and eligibility.
  */
 exports.getMyFeedback = async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
+    const debatesCount = await Debate.countDocuments({ userId: req.user.id });
+    const hasUsedApp = (user && user.totalDebates > 0) || debatesCount > 0;
+
     const feedback = await Feedback.findOne({ userId: req.user.id });
-    if (!feedback) {
-      return res.status(404).json({ error: 'No feedback found' });
-    }
-    return res.status(200).json({ feedback });
+    return res.status(200).json({
+      feedback: feedback || null,
+      eligible: hasUsedApp,
+      totalDebates: user?.totalDebates || debatesCount || 0,
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Server error', details: err.message });
   }

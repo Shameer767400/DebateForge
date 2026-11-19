@@ -275,6 +275,24 @@
   font-weight: 700;
 }
 
+.fb-eligibility-card {
+  text-align: center;
+  padding: 20px 12px;
+}
+
+.fb-eligibility-icon {
+  font-size: 2.6rem;
+  margin-bottom: 12px;
+}
+
+.fb-eligibility-text {
+  color: var(--text-secondary);
+  font-size: 0.94rem;
+  line-height: 1.6;
+  max-width: 520px;
+  margin: 0 auto 24px;
+}
+
 /* Reviews section */
 .fb-reviews-title {
   font-size: 1.1rem;
