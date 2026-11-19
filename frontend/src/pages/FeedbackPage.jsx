@@ -67,7 +67,7 @@ function ReviewCard({ review }) {
 
 export default function FeedbackPage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const api = useApi();
   const toast = useToast();
 
@@ -110,7 +110,10 @@ export default function FeedbackPage() {
     }
   }, [api, isAuthenticated]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    // Wait for auth to finish loading before fetching data
+    if (!authLoading) loadData();
+  }, [loadData, authLoading]);
 
   const populateForm = (fb) => {
     setRating(fb.rating);
@@ -201,7 +204,11 @@ export default function FeedbackPage() {
       <div className="fb-content">
         {/* Submission / Own Review */}
         <div className="fb-form-card">
-          {!isAuthenticated ? (
+          {authLoading ? (
+            <div className="fb-signin-prompt">
+              <p>Loading...</p>
+            </div>
+          ) : !isAuthenticated ? (
             <div className="fb-signin-prompt">
               <p>
                 <Link to="/login" className="fb-signin-link">Sign in</Link> to share your feedback

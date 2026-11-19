@@ -263,6 +263,9 @@ export default function LandingPage() {
       <section className="lp-section" id="social">
         <div className="lp-section-label landing-reveal">Community</div>
         <h2 className="lp-section-title landing-reveal">What debaters are saying.</h2>
+        <p className="lp-section-sub landing-reveal">
+          Real feedback from the DebateForge community. Join them and sharpen your skills.
+        </p>
 
         <div className="lp-testimonials-grid">
           {displayTestimonials.map((t, i) => (
@@ -282,14 +285,14 @@ export default function LandingPage() {
           ))}
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: '28px' }} className="landing-reveal">
+        <div className="lp-testimonial-cta landing-reveal">
           <button
-            className="lp-btn-secondary"
+            className="lp-btn-primary lp-btn-large"
             onClick={() => navigate('/feedback')}
-            style={{ fontSize: '0.85rem' }}
           >
             💬 Share Your Experience
           </button>
+          <p className="lp-testimonial-cta-sub">Your feedback helps us build a better platform</p>
         </div>
       </section>
 
