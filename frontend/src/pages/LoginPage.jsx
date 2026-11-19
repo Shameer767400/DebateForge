@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import SEOHead from '../components/SEOHead';
 import '../styles/auth.css';
 import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
 
@@ -47,6 +48,7 @@ export default function LoginPage() {
 
   return (
     <div className="df-center">
+      <SEOHead title="Sign In" noindex />
       <div className="auth-card" style={{ position: 'relative' }}>
         {showLoading && (
           <div className="auth-loading-overlay active">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import SEOHead from '../components/SEOHead';
 import '../styles/auth.css';
 
 export default function ForgotPasswordPage() {
@@ -51,6 +52,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="df-center">
+      <SEOHead title="Reset Password" noindex />
       <div className="auth-card">
         <div className="auth-logo">
           <span className="auth-logo-icon">🔑</span>

@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import SEOHead from '../components/SEOHead';
 import '../styles/theme.css';
 
 export default function NotFoundPage() {
   return (
     <div className="df-center" style={{ flexDirection: 'column', gap: '24px', textAlign: 'center', padding: '24px' }}>
+      <SEOHead title="Page Not Found" noindex />
 
       {/* Big 404 */}
       <div style={{

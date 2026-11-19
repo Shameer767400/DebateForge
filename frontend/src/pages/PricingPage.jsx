@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useApi } from '../hooks/useApi';
+import SEOHead from '../components/SEOHead';
 import '../styles/theme.css';
 import '../styles/pricing.css';
 
@@ -219,6 +220,11 @@ export default function PricingPage() {
 
   return (
     <div className="pricing-page">
+      <SEOHead
+        title="Pricing"
+        description="Simple, transparent pricing for DebateForge. Start free, upgrade to Pro for advanced AI coaching, analytics, and unlimited debates."
+        path="/pricing"
+      />
       {/* ── HEADER ── */}
       <header className="pricing-header">
         <button className="pricing-back" onClick={() => navigate(user ? '/dashboard' : '/')}>

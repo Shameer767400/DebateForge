@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from '../context/ToastContext';
+import SEOHead from '../components/SEOHead';
 import '../styles/auth.css';
 import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
 
@@ -59,6 +60,7 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="df-center">
+      <SEOHead title="Set New Password" noindex />
       <div className="auth-card">
         <div className="auth-logo">
           <span className="auth-logo-icon">🔐</span>

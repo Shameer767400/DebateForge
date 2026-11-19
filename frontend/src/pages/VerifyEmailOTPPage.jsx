@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from '../context/ToastContext';
+import SEOHead from '../components/SEOHead';
 import '../styles/auth.css';
 
 export default function VerifyEmailOTPPage() {
@@ -105,6 +106,7 @@ export default function VerifyEmailOTPPage() {
 
   return (
     <div className="df-center">
+      <SEOHead title="Verify Email" noindex />
       <div className="auth-card">
         <div className="auth-logo">
           <span className="auth-logo-icon">📧</span>
