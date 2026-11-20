@@ -17,7 +17,11 @@ async function sendViaResend({ to, subject, html }) {
   const { Resend } = require('resend');
   const resend = new Resend(apiKey);
 
-  const fromAddress = process.env.FROM_EMAIL || 'DebateForge <noreply@debateforge.tech>';
+  let fromAddress = process.env.FROM_EMAIL || 'DebateForge <noreply@debateforge.tech>';
+  // Resend requires sending from the verified domain (debateforge.tech), not personal gmail/yahoo
+  if (!fromAddress.includes('@debateforge.tech')) {
+    fromAddress = 'DebateForge <noreply@debateforge.tech>';
+  }
 
   const { data, error } = await resend.emails.send({
     from: fromAddress,
