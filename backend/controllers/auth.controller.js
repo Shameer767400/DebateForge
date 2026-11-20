@@ -182,11 +182,17 @@ async function register(req, res) {
 
     setTokenCookie(res, token);
 
-    return res.status(201).json({
+    // Only expose demo verificationOTP if Resend is NOT configured (dev/sandbox fallback)
+    const isLiveEmailConfigured = Boolean(process.env.RESEND_API_KEY);
+    const responsePayload = {
       token,
       user: user.toSafeObject(),
-      verificationOTP,
-    });
+    };
+    if (!isLiveEmailConfigured) {
+      responsePayload.verificationOTP = verificationOTP;
+    }
+
+    return res.status(201).json(responsePayload);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in register controller:', error);
