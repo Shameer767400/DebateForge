@@ -520,30 +520,47 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       recognition.lang = speechRecognitionLangFromIso(preferredLangRef.current);
     }
 
+    /* Track all final results separately — on Android Chrome, interim results
+       can reset between speech pauses, losing earlier text */
+    let accumulatedFinal = '';
+
     recognition.onresult = (e) => {
       let interim = '';
-      let final   = '';
+      let finalInBatch = '';
       for (const result of e.results) {
-        if (result.isFinal) final   += result[0].transcript;
-        else                 interim += result[0].transcript;
+        if (result.isFinal) finalInBatch += result[0].transcript;
+        else                 interim      += result[0].transcript;
       }
-      const next = interim || final;
-      setLiveTranscript(next);
-      liveTranscriptRef.current = next;
+      if (finalInBatch) accumulatedFinal += finalInBatch;
+      const display = accumulatedFinal + (interim ? interim : '');
+      setLiveTranscript(display);
+      liveTranscriptRef.current = display;
     };
 
     recognition.onerror = (e) => {
       console.warn('[useDebateSocket] SpeechRecognition fallback error:', e.error);
+      /* Stop retrying on permission errors */
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        shouldKeepRecognizingRef.current = false;
+        onEventRef.current?.('error', {
+          message: 'Microphone permission denied. Please allow mic access in your browser settings and try again.',
+        });
+      }
     };
 
     recognition.onend = () => {
       recognitionRef.current = null;
       if (!shouldKeepRecognizingRef.current || !isRecordingRef.current) return;
-      try {
-        startRecordingFallback();
-      } catch (err) {
-        console.warn('[useDebateSocket] SpeechRecognition fallback restart failed:', err);
-      }
+      /* On Android Chrome, SpeechRecognition stops after a speech pause.
+         Restart it to keep listening. Small delay avoids rapid restart loops. */
+      setTimeout(() => {
+        if (!shouldKeepRecognizingRef.current || !isRecordingRef.current) return;
+        try {
+          startRecordingFallback();
+        } catch (err) {
+          console.warn('[useDebateSocket] SpeechRecognition fallback restart failed:', err);
+        }
+      }, 100);
     };
 
     recognition.start();
@@ -567,10 +584,26 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
         try { await audioCtxRef.current.resume(); } catch { /* ignore */ }
       }
 
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const hasSpeechRecognition = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+
+      /* ── MOBILE: use SpeechRecognition-only mode ──
+         On mobile browsers, running MediaRecorder (getUserMedia) and
+         SpeechRecognition simultaneously causes a mic conflict — the
+         SpeechRecognition gets no audio because getUserMedia grabs
+         exclusive mic access on mobile. Since the ML transcription
+         service handles server-side audio-to-text, and SpeechRecognition
+         gives us the transcript directly, we skip MediaRecorder on mobile
+         to avoid the conflict. This also avoids the extra bandwidth of
+         streaming raw audio chunks over mobile data. */
+      if (isMobile && hasSpeechRecognition) {
+        startRecordingFallback();
+        return;
+      }
+
       /* Check if getUserMedia is available (HTTPS required on mobile) */
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        /* On mobile HTTP (non-HTTPS), getUserMedia is blocked entirely */
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        if (hasSpeechRecognition) {
           startRecordingFallback();
           return;
         }
@@ -580,9 +613,10 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
         return;
       }
 
+      /* ── DESKTOP: use MediaRecorder + parallel SpeechRecognition ── */
       if (typeof MediaRecorder !== 'undefined') {
         await startRecordingWithMediaRecorder();
-      } else if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      } else if (hasSpeechRecognition) {
         startRecordingFallback();
       } else {
         onEventRef.current?.('error', {
