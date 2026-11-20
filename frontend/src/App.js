@@ -29,6 +29,7 @@ const AdminFeedbackPage = lazy(() => import('./pages/AdminFeedbackPage'));
 import AdminRoute from './components/AdminRoute';
 import BottomNav from './components/BottomNav';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
             <ToastContainer />
             <BottomNav />
             <Analytics />
+            <SpeedInsights />
             <PageLoader>
               <Suspense fallback={null}>
                 <Routes>
