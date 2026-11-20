@@ -410,6 +410,12 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       if (process.env.NODE_ENV === 'development') {
         console.warn('[SpeechRecognition error]:', e.error);
       }
+      /* On mobile, 'not-allowed' means the user denied mic permission.
+         'network' means the speech recognition service is unavailable.
+         In both cases, don't keep retrying — it creates an infinite loop. */
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        shouldKeepRecognizingRef.current = false;
+      }
     };
 
     recognition.onend = () => {
@@ -430,13 +436,40 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   const startRecordingWithMediaRecorder = useCallback(async () => {
     isRecordingRef.current = true;
     usedMediaRecorderRef.current = true;
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    /* Mobile-friendly audio constraints:
+       - echoCancellation/noiseSuppression help on mobile
+       - channelCount:1 avoids stereo issues on some Android devices
+       - sampleRate:16000 is optimal for speech and widely supported */
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: 1,
+      sampleRate: { ideal: 16000 },
+    };
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
     streamRef.current = stream;
 
-    /* Prefer opus/webm; fall back to browser default */
-    const mimeType   = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : '';
+    /* Negotiate MIME type with broad mobile compatibility:
+       1. audio/webm;codecs=opus  — Chrome Android, desktop Chrome/Firefox
+       2. audio/mp4               — Safari iOS/macOS (no WebM support)
+       3. audio/webm              — older Chrome
+       4. '' (browser default)    — ultimate fallback */
+    let mimeType = '';
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/mp4',
+      'audio/webm',
+      'audio/aac',
+      'audio/ogg;codecs=opus',
+    ];
+    for (const candidate of candidates) {
+      if (MediaRecorder.isTypeSupported(candidate)) {
+        mimeType = candidate;
+        break;
+      }
+    }
     const recOptions = mimeType ? { mimeType } : {};
     const rec        = new MediaRecorder(stream, recOptions);
     mediaRecRef.current = rec;
@@ -449,12 +482,25 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       }
     };
 
+    rec.onerror = (e) => {
+      console.error('[MediaRecorder error]:', e.error || e);
+      /* On error, try to fall back to SpeechRecognition-only */
+    };
+
     // NOTE: Do NOT emit audio_end here.
     // stopRecording() handles submission to avoid sending both
     // audio_end AND transcript_direct (which caused duplicate AI responses).
     rec.onstop = () => {};
 
-    rec.start();  // emit once on stop (avoids Safari timeslice bugs)
+    /* Use timeslice on mobile to get periodic data chunks
+       instead of one giant blob at stop. This prevents mobile browsers
+       from dropping audio data when the recording session is long. */
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+      rec.start(1000);  // 1-second chunks on mobile
+    } else {
+      rec.start();      // single blob on desktop (avoids Safari timeslice bugs)
+    }
 
     /* Parallel live transcript */
     startSpeechRecognition();
@@ -515,6 +561,25 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     try {
       shouldKeepRecognizingRef.current = true;
       try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+
+      /* On mobile, resume AudioContext on user gesture (required by iOS/Android) */
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        try { await audioCtxRef.current.resume(); } catch { /* ignore */ }
+      }
+
+      /* Check if getUserMedia is available (HTTPS required on mobile) */
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        /* On mobile HTTP (non-HTTPS), getUserMedia is blocked entirely */
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+          startRecordingFallback();
+          return;
+        }
+        onEventRef.current?.('error', {
+          message: 'Microphone not available. Please use HTTPS or allow mic access in your browser settings.',
+        });
+        return;
+      }
+
       if (typeof MediaRecorder !== 'undefined') {
         await startRecordingWithMediaRecorder();
       } else if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -526,7 +591,39 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       }
     } catch (err) {
       console.error('[startRecording error]:', err);
+
+      /* Provide mobile-specific error messages */
+      const errName = err?.name || '';
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+        onEventRef.current?.('error', {
+          message: isMobile
+            ? 'Microphone permission denied. On mobile, go to your browser settings → Site Settings → Microphone → Allow for this site, then reload.'
+            : 'Microphone access denied. Please allow mic access in your browser and try again.',
+        });
+        return;
+      }
+
+      if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+        onEventRef.current?.('error', {
+          message: 'No microphone detected. Please connect a microphone or use text input.',
+        });
+        return;
+      }
+
+      if (errName === 'NotReadableError' || errName === 'TrackStartError') {
+        onEventRef.current?.('error', {
+          message: isMobile
+            ? 'Microphone is in use by another app. Please close other apps using the mic and try again.'
+            : 'Microphone is busy. Close other apps using it and try again.',
+        });
+        return;
+      }
+
+      /* Generic fallback: try SpeechRecognition */
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        console.warn('[startRecording] MediaRecorder failed, falling back to SpeechRecognition');
         startRecordingFallback();
       } else {
         onEventRef.current?.('error', {

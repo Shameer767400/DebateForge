@@ -502,8 +502,23 @@ function initWebSocket(server) {
       const chunks = socket.audioBuffer || [];
       socket.audioBuffer = []; // Clear current buffer
       
+      /* If no audio chunks but we have a transcript fallback from SpeechRecognition,
+         use it directly via transcript_direct path instead of silently dropping */
       if (chunks.length === 0) {
-
+        const fallbackText = String(transcriptFallback || '').trim();
+        if (fallbackText) {
+          /* Route through processTranscript (same as transcript_direct) */
+          const detectedLanguage = detectLanguageFromText(fallbackText) || session.detectedLanguage || session.currentLanguage || 'en';
+          session.detectedLanguage = detectedLanguage;
+          session.currentLanguage = resolveActiveLanguage(session, detectedLanguage);
+          socket.emit('transcript_final', { text: fallbackText, language: session.currentLanguage });
+          socket._turnInFlight = true;
+          try {
+            await processTranscript(socket, session, debateId, fallbackText);
+          } finally {
+            socket._turnInFlight = false;
+          }
+        }
         return;
       }
 
