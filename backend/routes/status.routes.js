@@ -111,4 +111,34 @@ router.get('/ml', async (_req, res) => {
   }
 });
 
+router.get('/test-email', async (req, res) => {
+  try {
+    const to = req.query.to || 'meerambigarishameer@gmail.com';
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      return res.status(400).json({ error: 'No RESEND_API_KEY configured' });
+    }
+    const { Resend } = require('resend');
+    const resend = new Resend(apiKey);
+    let fromAddress = process.env.FROM_EMAIL || 'DebateForge <noreply@debateforge.tech>';
+    if (!fromAddress.includes('@debateforge.tech')) {
+      fromAddress = 'DebateForge <noreply@debateforge.tech>';
+    }
+
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
+      to,
+      subject: 'DebateForge Test Email',
+      html: '<p>This is a test email from DebateForge verification system.</p>',
+    });
+
+    if (error) {
+      return res.status(500).json({ success: false, resendError: error, fromAddress, to });
+    }
+    return res.json({ success: true, data, fromAddress, to });
+  } catch (err) {
+    return res.status(500).json({ success: false, caughtError: err.message });
+  }
+});
+
 module.exports = router;
