@@ -40,6 +40,17 @@ authApi.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+function normalizeUser(userData) {
+  if (!userData) return userData;
+  if (userData.role) {
+    return {
+      ...userData,
+      role: String(userData.role).replace(/["'\\]/g, '').trim().toLowerCase(),
+    };
+  }
+  return userData;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +67,7 @@ export function AuthProvider({ children }) {
     try {
       const res = await authApi.get('/api/auth/session');
       if (res.data?.authenticated && res.data?.user) {
-        setUser(res.data.user);
+        setUser(normalizeUser(res.data.user));
         return res.data.user;
       }
       setUser(null);
@@ -89,7 +100,7 @@ export function AuthProvider({ children }) {
    * Stores the token in localStorage to bypass third-party cookie blocks on mobile.
    */
   const login = useCallback((token, newUser) => {
-    setUser(newUser);
+    setUser(normalizeUser(newUser));
     if (token && typeof window !== 'undefined') {
       localStorage.setItem('token', token);
     }
@@ -125,7 +136,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem('token', newToken);
       }
       if (userData) {
-        setUser(userData);
+        setUser(normalizeUser(userData));
         return true;
       }
       return false;

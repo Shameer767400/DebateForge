@@ -39,8 +39,9 @@ function isStrongPassword(password) {
    Helper: mint a JWT
 ═══════════════════════════════════════════ */
 function mintToken(user) {
+  const role = user.role ? String(user.role).replace(/["'\\]/g, '').trim().toLowerCase() : 'user';
   return jwt.sign(
-    { id: user._id, username: user.username, email: user.email, role: user.role },
+    { id: user._id, username: user.username, email: user.email, role },
     process.env.JWT_SECRET,
     { expiresIn: JWT_EXPIRY }
   );

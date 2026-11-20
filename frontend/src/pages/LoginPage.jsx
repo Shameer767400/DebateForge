@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,7 +33,12 @@ export default function LoginPage() {
       );
       login(res.data.token, res.data.user);
       toast.success('Welcome back!');
-      navigate('/lobby');
+      
+      const userData = res.data.user;
+      const userRole = userData?.role ? String(userData.role).replace(/["'\\]/g, '').trim().toLowerCase() : '';
+      const fromPath = location.state?.from?.pathname;
+      const target = fromPath || (userRole === 'admin' ? '/admin' : '/lobby');
+      navigate(target, { replace: true });
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed. Please try again.';
       setError(msg);

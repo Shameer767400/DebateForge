@@ -281,6 +281,9 @@ export default function DashboardPage() {
         </div>
         <div className="dash-header-right">
           <div className="dash-desktop-links">
+            {user?.role && String(user.role).replace(/["'\\]/g, '').trim().toLowerCase() === 'admin' && (
+              <Link to="/admin" className="dash-nav-desktop-link" style={{ color: '#00ff87', fontWeight: 700 }}>🛡️ Admin</Link>
+            )}
             <Link to="/lobby" className="dash-nav-desktop-link">Lobby</Link>
             <Link to="/leaderboard" className="dash-nav-desktop-link">Leaderboard</Link>
             <Link to="/history" className="dash-nav-desktop-link">History</Link>

@@ -207,6 +207,9 @@ export default function LobbyPage() {
         <h1 className="lobby-heading">Choose Your Debate</h1>
         <div className="lobby-user" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div className="lobby-desktop-links">
+            {user?.role && String(user.role).replace(/["'\\]/g, '').trim().toLowerCase() === 'admin' && (
+              <Link to="/admin" className="lobby-nav-desktop-link" style={{ color: '#00ff87', fontWeight: 700 }}>🛡️ Admin</Link>
+            )}
             <Link to="/dashboard" className="lobby-nav-desktop-link">Dashboard</Link>
             <Link to="/leaderboard" className="lobby-nav-desktop-link">Leaderboard</Link>
             <Link to="/history" className="lobby-nav-desktop-link">History</Link>

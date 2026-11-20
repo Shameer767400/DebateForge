@@ -193,6 +193,9 @@ export default function ProfilePage() {
       <nav className="prof-nav">
         <Link to="/lobby" className="retro-back-link">← Back to Lobby</Link>
         <div className="prof-nav-links">
+          {user?.role && String(user.role).replace(/["'\\]/g, '').trim().toLowerCase() === 'admin' && (
+            <Link to="/admin" className="prof-nav-link" style={{ color: '#00ff87', fontWeight: 700 }}>🛡️ Admin Dashboard</Link>
+          )}
           <Link to="/dashboard" className="prof-nav-link">Dashboard</Link>
           <Link to="/leaderboard" className="prof-nav-link">Leaderboard</Link>
           <Link to="/pricing" className="prof-nav-link">Pricing</Link>

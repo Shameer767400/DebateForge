@@ -7,7 +7,10 @@ const requireRole = (allowedRoles) => {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      if (!user.role || !allowedRoles.includes(user.role)) {
+      const cleanRole = user.role ? String(user.role).replace(/["'\\]/g, '').trim().toLowerCase() : '';
+      const normalizedAllowed = allowedRoles.map((r) => String(r).toLowerCase());
+
+      if (!cleanRole || !normalizedAllowed.includes(cleanRole)) {
         return res.status(403).json({ error: 'Access denied: Insufficient role permissions' });
       }
 

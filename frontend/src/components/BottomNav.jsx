@@ -17,7 +17,7 @@ const NAV_ITEMS = [
  * Hidden on desktop via CSS (display: none above 768px).
  */
 export default function BottomNav() {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
   // Don't render during auth loading, or when not logged in,
@@ -31,9 +31,14 @@ export default function BottomNav() {
     return null;
   }
 
+  const isAdmin = user?.role && String(user.role).replace(/["'\\]/g, '').trim().toLowerCase() === 'admin';
+  const navItems = isAdmin 
+    ? [...NAV_ITEMS, { path: '/admin', icon: '🛡️', label: 'Admin' }]
+    : NAV_ITEMS;
+
   return (
     <nav className="bottom-nav" aria-label="Main navigation">
-      {NAV_ITEMS.map(({ path, icon, label }) => {
+      {navItems.map(({ path, icon, label }) => {
         const isActive = location.pathname === path || 
           (path === '/lobby' && location.pathname.startsWith('/debate/'));
         return (
