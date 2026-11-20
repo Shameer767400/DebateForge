@@ -121,34 +121,44 @@ export default function AdminDebatesPage() {
 
   const winData = analytics
     ? [
-        { name: 'User Wins', value: analytics.userWins || 0 },
-        { name: 'AI Wins', value: analytics.aiWins || 0 },
-        { name: 'Draws', value: analytics.draws || 0 },
+        { name: 'User Wins', value: analytics.totals?.userWins || analytics.winDistribution?.user || analytics.userWins || 0 },
+        { name: 'AI Wins', value: analytics.totals?.aiWins || analytics.winDistribution?.ai || analytics.aiWins || 0 },
+        { name: 'Draws', value: analytics.totals?.draws || analytics.winDistribution?.draw || analytics.draws || 0 },
       ]
     : [];
 
-  const diffData = analytics?.difficultyDistribution
+  const diffData = Array.isArray(analytics?.difficultyDistribution)
+    ? analytics.difficultyDistribution.map((d) => ({
+        name: d.difficulty || d.name || 'Unknown',
+        value: typeof d.count === 'number' ? d.count : (typeof d.value === 'number' ? d.value : 0),
+      }))
+    : analytics?.difficultyDistribution && typeof analytics.difficultyDistribution === 'object'
     ? Object.entries(analytics.difficultyDistribution).map(([name, value]) => ({
         name,
-        value,
+        value: typeof value === 'number' ? value : (value?.count ?? 0),
       }))
     : [];
 
-  const topTopics = analytics?.topTopics
+  const topTopics = Array.isArray(analytics?.topTopics)
     ? analytics.topTopics.slice(0, 10).map((t) => ({
-        name: t.topic || t._id || t.name,
-        value: t.count || t.value,
+        name: t.topicSnapshot || t.topic || t._id || t.name || 'Unknown',
+        value: typeof t.count === 'number' ? t.count : (typeof t.value === 'number' ? t.value : 0),
       }))
     : [];
 
-  const scoreData = analytics?.scoreDistribution
+  const scoreData = Array.isArray(analytics?.scoreDistribution)
     ? analytics.scoreDistribution
     : [];
 
-  const fallacyData = analytics?.fallacyDistribution
+  const fallacyData = Array.isArray(analytics?.fallacyDistribution)
+    ? analytics.fallacyDistribution.map((f) => ({
+        name: f.type || f.name || 'Unknown',
+        value: typeof f.count === 'number' ? f.count : (typeof f.value === 'number' ? f.value : 0),
+      }))
+    : analytics?.fallacyDistribution && typeof analytics.fallacyDistribution === 'object'
     ? Object.entries(analytics.fallacyDistribution).map(([name, value]) => ({
         name,
-        value,
+        value: typeof value === 'number' ? value : (value?.count ?? 0),
       }))
     : [];
 
@@ -190,27 +200,27 @@ export default function AdminDebatesPage() {
       <div className="admin-stats-grid admin-stats-grid--6">
         <AdminStatCard
           label="Total Debates"
-          value={analytics?.totalDebates ?? '—'}
+          value={analytics?.totals?.total ?? analytics?.totalDebates ?? '—'}
           icon="🗣️"
           color="#00aaff"
         />
         <AdminStatCard
           label="Completed"
-          value={analytics?.completed ?? '—'}
+          value={analytics?.totals?.completed ?? analytics?.completed ?? '—'}
           icon="✅"
           color="#00ff87"
         />
         <AdminStatCard
           label="Avg Duration"
-          value={fmtDuration(analytics?.avgDuration)}
+          value={fmtDuration(analytics?.totals?.avgDuration ?? analytics?.avgDuration)}
           icon="⏱️"
           color="#ffcc00"
         />
         <AdminStatCard
           label="Avg Score"
           value={
-            analytics?.avgScore != null
-              ? `${Number(analytics.avgScore).toFixed(1)}/100`
+            (analytics?.totals?.avgScore ?? analytics?.avgScore) != null
+              ? `${Number(analytics?.totals?.avgScore ?? analytics?.avgScore).toFixed(1)}/100`
               : '—'
           }
           icon="⭐"
@@ -218,13 +228,13 @@ export default function AdminDebatesPage() {
         />
         <AdminStatCard
           label="User Wins"
-          value={analytics?.userWins ?? '—'}
+          value={analytics?.winDistribution?.user ?? analytics?.userWins ?? '—'}
           icon="🏆"
           color="#00ff87"
         />
         <AdminStatCard
           label="AI Wins"
-          value={analytics?.aiWins ?? '—'}
+          value={analytics?.winDistribution?.ai ?? analytics?.aiWins ?? '—'}
           icon="🤖"
           color="#ff3366"
         />

@@ -107,7 +107,7 @@ export default function AdminDataTable({
                 </div>
               </td>
             </tr>
-          ) : data.length === 0 ? (
+          ) : !Array.isArray(data) || data.length === 0 ? (
             <tr>
               <td colSpan={columns.length}>
                 <div className="admin-empty">
@@ -118,14 +118,34 @@ export default function AdminDataTable({
             </tr>
           ) : (
             data.map((row, rowIdx) => (
-              <tr key={row._id ?? row.id ?? rowIdx} className="admin-tr">
-                {columns.map((col) => (
-                  <td key={col.key} className="admin-td">
-                    {col.render
-                      ? col.render(row[col.key], row)
-                      : row[col.key] ?? '—'}
-                  </td>
-                ))}
+              <tr key={row?._id ?? row?.id ?? rowIdx} className="admin-tr">
+                {columns.map((col) => {
+                  const val = row && typeof row === 'object' ? row[col.key] : undefined;
+                  let cellContent = val ?? '—';
+                  if (col.render) {
+                    try {
+                      const res = col.render(val, row, rowIdx);
+                      if (res === undefined && row && typeof row === 'object') {
+                        const fallbackRes = col.render(row, rowIdx);
+                        cellContent = fallbackRes !== undefined ? fallbackRes : '—';
+                      } else {
+                        cellContent = res !== undefined ? res : '—';
+                      }
+                    } catch {
+                      try {
+                        const fallbackRes = col.render(row, rowIdx);
+                        cellContent = fallbackRes !== undefined ? fallbackRes : '—';
+                      } catch {
+                        cellContent = val ?? '—';
+                      }
+                    }
+                  }
+                  return (
+                    <td key={col.key} className="admin-td">
+                      {cellContent}
+                    </td>
+                  );
+                })}
               </tr>
             ))
           )}

@@ -182,41 +182,48 @@ export default function AdminTopicsPage() {
       key: 'title',
       label: 'Topic Title',
       sortable: true,
-      render: (t) => (
-        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-          {t.title}
-        </span>
-      ),
+      render: (val, t) => {
+        const title = t?.title ?? val ?? '—';
+        return (
+          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+            {title}
+          </span>
+        );
+      },
     },
     {
       key: 'category',
       label: 'Category',
       sortable: true,
-      render: (t) => (
-        <span
-          className="admin-badge admin-badge--info"
-          style={{
-            borderColor: CATEGORY_COLORS[t.category] || 'var(--border)',
-            color: CATEGORY_COLORS[t.category] || 'var(--accent-blue)',
-          }}
-        >
-          {t.category}
-        </span>
-      ),
+      render: (val, t) => {
+        const cat = t?.category ?? val ?? '—';
+        return (
+          <span
+            className="admin-badge admin-badge--info"
+            style={{
+              borderColor: CATEGORY_COLORS[cat] || 'var(--border)',
+              color: CATEGORY_COLORS[cat] || 'var(--accent-blue)',
+            }}
+          >
+            {cat}
+          </span>
+        );
+      },
     },
     {
       key: 'difficulty',
       label: 'Difficulty',
       sortable: true,
-      render: (t) => {
+      render: (val, t) => {
+        const diff = t?.difficulty ?? val ?? '—';
         const badgeMap = {
           easy: 'admin-badge--success',
           medium: 'admin-badge--warning',
           hard: 'admin-badge--danger',
         };
         return (
-          <span className={`admin-badge ${badgeMap[t.difficulty] || 'admin-badge--muted'}`}>
-            {t.difficulty}
+          <span className={`admin-badge ${badgeMap[diff] || 'admin-badge--muted'}`}>
+            {diff}
           </span>
         );
       },
@@ -225,46 +232,52 @@ export default function AdminTopicsPage() {
       key: 'debateCount',
       label: 'Debates',
       sortable: true,
-      render: (t) => (t.debateCount || 0).toLocaleString(),
+      render: (val, t) => (t?.debateCount ?? val ?? 0).toLocaleString(),
     },
     {
       key: 'voteCount',
       label: 'Votes',
       sortable: true,
-      render: (t) => (t.voteCount || 0).toLocaleString(),
+      render: (val, t) => (t?.voteCount ?? val ?? 0).toLocaleString(),
     },
     {
       key: 'isActive',
       label: 'Status',
       sortable: true,
-      render: (t) => (
-        <AdminStatusBadge
-          status={t.isActive ? 'success' : 'muted'}
-          label={t.isActive ? 'Active' : 'Inactive'}
-        />
-      ),
+      render: (val, t) => {
+        const active = t?.isActive ?? val ?? true;
+        return (
+          <AdminStatusBadge
+            status={active ? 'success' : 'muted'}
+            label={active ? 'Active' : 'Inactive'}
+          />
+        );
+      },
     },
     {
       key: 'actions',
       label: 'Actions',
-      render: (t) => (
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary admin-btn--sm"
-            onClick={() => handleOpenEdit(t)}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            className={`admin-btn admin-btn--sm ${t.isActive ? 'admin-btn--danger' : 'admin-btn--primary'}`}
-            onClick={() => handleToggleActive(t)}
-          >
-            {t.isActive ? 'Deactivate' : 'Activate'}
-          </button>
-        </div>
-      ),
+      render: (val, t) => {
+        const topicObj = t || val || {};
+        return (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--sm"
+              onClick={() => handleOpenEdit(topicObj)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className={`admin-btn admin-btn--sm ${topicObj.isActive ? 'admin-btn--danger' : 'admin-btn--primary'}`}
+              onClick={() => handleToggleActive(topicObj)}
+            >
+              {topicObj.isActive ? 'Deactivate' : 'Activate'}
+            </button>
+          </div>
+        );
+      },
     },
   ];
 

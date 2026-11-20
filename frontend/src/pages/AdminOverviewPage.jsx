@@ -28,7 +28,7 @@ const FORMAT_LABELS = {
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-const fmtNum = (n) => Number(n).toLocaleString();
+const fmtNum = (n) => (n != null && !isNaN(Number(n)) ? Number(n).toLocaleString() : '0');
 
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState({});
@@ -73,12 +73,15 @@ export default function AdminOverviewPage() {
   const registrations = charts.registrations || [];
   const debatesPerDay = charts.debatesPerDay || [];
   const scoreTrends = charts.scoreTrends || [];
-  const formatDistribution = (charts.formatDistribution || []).map((item) => ({
-    ...item,
-    name: FORMAT_LABELS[item.name] || item.name,
-  }));
-  const recentUsers = recent.users || [];
-  const recentDebates = recent.debates || [];
+  const formatDistribution = (charts.formatDistribution || []).map((item) => {
+    const rawKey = item.format || item.name || '';
+    return {
+      name: FORMAT_LABELS[rawKey] || rawKey || 'Unknown',
+      value: typeof item.count === 'number' ? item.count : (typeof item.value === 'number' ? item.value : 0),
+    };
+  });
+  const recentUsers = recent.users || recent.recentUsers || [];
+  const recentDebates = recent.debates || recent.recentDebates || [];
 
   return (
     <div className="admin-page">

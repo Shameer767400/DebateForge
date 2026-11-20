@@ -120,26 +120,29 @@ export default function AdminSecurityPage() {
     {
       key: 'timestamp',
       label: 'Timestamp',
-      render: (item) => (
+      render: (val, item) => (
         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          {formatTimestamp(item.timestamp)}
+          {formatTimestamp(val || item?.timestamp)}
         </span>
       ),
     },
     {
       key: 'level',
       label: 'Severity',
-      render: (item) => (
-        <AdminStatusBadge
-          status={LEVEL_BADGES[item.level] || 'muted'}
-          label={item.level}
-        />
-      ),
+      render: (val, item) => {
+        const lvl = val || item?.level || 'INFO';
+        return (
+          <AdminStatusBadge
+            status={LEVEL_BADGES[lvl] || 'muted'}
+            label={lvl}
+          />
+        );
+      },
     },
     {
       key: 'category',
       label: 'Category',
-      render: (item) => (
+      render: (val, item) => (
         <span
           className="admin-badge"
           style={{
@@ -148,16 +151,17 @@ export default function AdminSecurityPage() {
             color: 'var(--text-primary)',
           }}
         >
-          {item.category}
+          {val || item?.category || '—'}
         </span>
       ),
     },
     {
       key: 'message',
       label: 'Event Details',
-      render: (item, idx) => {
+      render: (val, item, idx) => {
         const isExpanded = expandedLogId === idx;
-        const metaKeys = Object.keys(item).filter(
+        const logObj = item && typeof item === 'object' ? item : {};
+        const metaKeys = Object.keys(logObj).filter(
           (k) => !['timestamp', 'level', 'category', 'message', 'ip'].includes(k)
         );
 
@@ -167,11 +171,11 @@ export default function AdminSecurityPage() {
               style={{
                 cursor: 'pointer',
                 fontWeight: 500,
-                color: item.level === 'ALERT' || item.level === 'CRITICAL' ? 'var(--accent-ai)' : 'var(--text-primary)',
+                color: (logObj.level === 'ALERT' || logObj.level === 'CRITICAL') ? 'var(--accent-ai)' : 'var(--text-primary)',
               }}
               onClick={() => setExpandedLogId(isExpanded ? null : idx)}
             >
-              {item.message}
+              {val || logObj.message || '—'}
               {metaKeys.length > 0 && (
                 <span style={{ marginLeft: '8px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                   {isExpanded ? '▲ Hide metadata' : '▼ Show metadata'}
@@ -194,7 +198,7 @@ export default function AdminSecurityPage() {
               >
                 {JSON.stringify(
                   metaKeys.reduce((acc, k) => {
-                    acc[k] = item[k];
+                    acc[k] = logObj[k];
                     return acc;
                   }, {}),
                   null,
@@ -209,9 +213,9 @@ export default function AdminSecurityPage() {
     {
       key: 'ip',
       label: 'IP Address',
-      render: (item) => (
+      render: (val, item) => (
         <code style={{ fontSize: '0.78rem', color: 'var(--accent-blue)' }}>
-          {item.ip || '—'}
+          {val || item?.ip || '—'}
         </code>
       ),
     },

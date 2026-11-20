@@ -158,54 +158,52 @@ export default function AdminUsersPage() {
       key: 'username',
       label: 'Username',
       sortable: true,
-      render: (u) => <span className="admin-username">{u.username}</span>,
+      render: (val, u) => <span className="admin-username">{u?.username ?? val ?? '—'}</span>,
     },
     {
       key: 'email',
       label: 'Email',
       sortable: true,
-      render: (u) => <span className="admin-email">{u.email}</span>,
+      render: (val, u) => <span className="admin-email">{u?.email ?? val ?? '—'}</span>,
     },
     {
       key: 'role',
       label: 'Role',
       sortable: true,
-      render: (u) => (
-        <AdminStatusBadge status={u.role} color={ROLE_COLOR[u.role] || 'blue'} />
-      ),
+      render: (val, u) => {
+        const role = u?.role ?? val ?? 'user';
+        return <AdminStatusBadge status={role} color={ROLE_COLOR[role] || 'blue'} />;
+      },
     },
     {
       key: 'plan',
       label: 'Plan',
       sortable: true,
-      render: (u) => (
-        <AdminStatusBadge
-          status={u.subscription?.plan || 'free'}
-          color={PLAN_COLOR[u.subscription?.plan] || 'blue'}
-        />
-      ),
+      render: (val, u) => {
+        const plan = u?.subscription?.plan ?? val ?? 'free';
+        return <AdminStatusBadge status={plan} color={PLAN_COLOR[plan] || 'blue'} />;
+      },
     },
     {
       key: 'eloRating',
       label: 'ELO',
       sortable: true,
-      render: (u) => <span>{u.eloRating ?? '—'}</span>,
+      render: (val, u) => <span>{u?.eloRating ?? val ?? '—'}</span>,
     },
     {
       key: 'totalDebates',
       label: 'Debates',
       sortable: true,
-      render: (u) => <span>{u.stats?.totalDebates ?? 0}</span>,
+      render: (val, u) => <span>{u?.totalDebates ?? u?.stats?.totalDebates ?? val ?? 0}</span>,
     },
     {
       key: 'winRate',
       label: 'Win Rate',
       sortable: true,
-      render: (u) => {
-        const rate =
-          u.stats?.totalDebates > 0
-            ? ((u.stats.wins / u.stats.totalDebates) * 100).toFixed(1)
-            : '0.0';
+      render: (val, u) => {
+        const total = u?.totalDebates ?? u?.stats?.totalDebates ?? 0;
+        const wins = u?.wins ?? u?.stats?.wins ?? 0;
+        const rate = total > 0 ? ((wins / total) * 100).toFixed(1) : '0.0';
         return <span>{rate}%</span>;
       },
     },
@@ -213,45 +211,51 @@ export default function AdminUsersPage() {
       key: 'streak',
       label: 'Streak',
       sortable: false,
-      render: (u) => <span>{u.stats?.currentStreak ?? 0}</span>,
+      render: (val, u) => <span>{u?.streak?.currentStreak ?? u?.stats?.currentStreak ?? 0}</span>,
     },
     {
       key: 'createdAt',
       label: 'Joined',
       sortable: true,
-      render: (u) => <span>{fmtDate(u.createdAt)}</span>,
+      render: (val, u) => <span>{fmtDate(u?.createdAt ?? val)}</span>,
     },
     {
       key: 'status',
       label: 'Status',
       sortable: false,
-      render: (u) => (
-        <AdminStatusBadge
-          status={u.isVerified ? 'Verified' : 'Unverified'}
-          color={u.isVerified ? 'green' : 'red'}
-        />
-      ),
+      render: (val, u) => {
+        const isVer = u?.emailVerified ?? u?.isVerified ?? false;
+        return (
+          <AdminStatusBadge
+            status={isVer ? 'Verified' : 'Unverified'}
+            color={isVer ? 'green' : 'red'}
+          />
+        );
+      },
     },
     {
       key: 'actions',
       label: 'Actions',
       sortable: false,
-      render: (u) => (
-        <div className="admin-actions">
-          <button
-            className="admin-btn admin-btn-sm"
-            onClick={() => toggleExpand(u._id)}
-          >
-            {expandedUser === u._id ? 'Hide' : 'View'}
-          </button>
-          <button
-            className="admin-btn admin-btn-sm admin-btn-warning"
-            onClick={() => openRoleModal(u)}
-          >
-            Change Role
-          </button>
-        </div>
-      ),
+      render: (val, u) => {
+        const userObj = u || val || {};
+        return (
+          <div className="admin-actions">
+            <button
+              className="admin-btn admin-btn-sm"
+              onClick={() => toggleExpand(userObj._id)}
+            >
+              {expandedUser === userObj._id ? 'Hide' : 'View'}
+            </button>
+            <button
+              className="admin-btn admin-btn-sm admin-btn-warning"
+              onClick={() => openRoleModal(userObj)}
+            >
+              Change Role
+            </button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -283,12 +287,16 @@ export default function AdminUsersPage() {
       />
 
       <AdminFilterBar
-        search={search}
+        searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search username or email…"
         filters={filters}
-        onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
         filterConfig={filterConfig}
+        onFilterChange={(key, val) => setFilters((prev) => ({ ...prev, [key]: val }))}
+        onClear={() => {
+          setSearch('');
+          setFilters({ role: '', plan: '', verified: '' });
+        }}
       />
 
       {error && <div className="admin-error">{error}</div>}
@@ -428,16 +436,21 @@ function UserDetailPanel({ detail }) {
 
         {/* Achievements */}
         <div className="admin-detail-section">
-          <h4>Achievements ({achievements.length})</h4>
-          {achievements.length === 0 ? (
+          <h4>Achievements ({(achievements || []).length})</h4>
+          {(!achievements || achievements.length === 0) ? (
             <p className="admin-empty">No achievements yet.</p>
           ) : (
             <div className="admin-achievement-list">
-              {achievements.map((a, i) => (
-                <span key={i} className="admin-achievement-badge" title={a.description}>
-                  {a.icon || '🏆'} {a.name || a}
-                </span>
-              ))}
+              {achievements.map((a, i) => {
+                const label = typeof a === 'string' ? a : (a?.name || a?.title || a?.id || JSON.stringify(a));
+                const icon = typeof a === 'object' && a?.icon ? a.icon : '🏆';
+                const desc = typeof a === 'object' ? a?.description : '';
+                return (
+                  <span key={i} className="admin-achievement-badge" title={desc}>
+                    {icon} {label}
+                  </span>
+                );
+              })}
             </div>
           )}
         </div>
@@ -445,14 +458,14 @@ function UserDetailPanel({ detail }) {
         {/* Fallacy Profile */}
         <div className="admin-detail-section">
           <h4>Fallacy Profile</h4>
-          {Object.keys(fallacyProfile).length === 0 ? (
+          {(!fallacyProfile || Object.keys(fallacyProfile).length === 0) ? (
             <p className="admin-empty">No data yet.</p>
           ) : (
             <div className="admin-fallacy-map">
               {Object.entries(fallacyProfile).map(([k, v]) => (
                 <div key={k} className="admin-detail-row">
                   <span>{k}:</span>
-                  <span>{v}</span>
+                  <span>{typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}</span>
                 </div>
               ))}
             </div>
