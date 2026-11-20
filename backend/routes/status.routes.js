@@ -50,6 +50,12 @@ router.get('/', async (_req, res) => {
 
   const allHealthy = mongoState === 1 && redisStatus.connected && aiStatus.availableProviders > 0;
 
+  const emailStatus = {
+    provider: process.env.RESEND_API_KEY ? 'resend' : 'smtp_fallback',
+    hasResendKey: Boolean(process.env.RESEND_API_KEY),
+    fromEmail: process.env.FROM_EMAIL || 'DebateForge <noreply@debateforge.tech>',
+  };
+
   res.json({
     status: allHealthy ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
@@ -59,6 +65,7 @@ router.get('/', async (_req, res) => {
       redis: redisStatus,
       ai: aiStatus,
       ml: mlStatus,
+      email: emailStatus,
     },
     environment: process.env.NODE_ENV || 'development',
     version: require('../package.json').version,

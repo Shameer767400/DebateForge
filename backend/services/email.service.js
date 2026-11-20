@@ -11,8 +11,11 @@ const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').split
 
 /* ── Resend (HTTP API — works on all cloud hosts) ── */
 async function sendViaResend({ to, subject, html }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
+
   const { Resend } = require('resend');
-  const resend = new Resend(RESEND_API_KEY);
+  const resend = new Resend(apiKey);
 
   const fromAddress = process.env.FROM_EMAIL || 'DebateForge <noreply@debateforge.tech>';
 
@@ -64,7 +67,7 @@ async function sendViaSmtp({ to, subject, html }) {
 /* ── Main sendMail: Resend → SMTP → console fallback ── */
 async function sendMail({ to, subject, html }) {
   // 1. Try Resend (HTTP — works on Render free tier)
-  if (RESEND_API_KEY) {
+  if (process.env.RESEND_API_KEY) {
     try {
       return await sendViaResend({ to, subject, html });
     } catch (err) {
