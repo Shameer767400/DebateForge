@@ -41,8 +41,9 @@ export default function AdminFeedbackPage() {
       ]);
 
       if (reviewsRes.status === 'fulfilled') {
-        setReviews(reviewsRes.value.data?.feedback || []);
-        setTotalPages(reviewsRes.value.data?.pagination?.totalPages || 1);
+        const data = reviewsRes.value.data;
+        setReviews(data?.feedback || data?.items || []);
+        setTotalPages(data?.pagination?.totalPages || data?.pagination?.pages || 1);
       }
       if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
     } catch (err) {

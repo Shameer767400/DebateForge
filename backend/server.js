@@ -21,6 +21,7 @@ const pushRoutes    = require('./routes/push.routes');
 const statusRoutes  = require('./routes/status.routes');
 const billingRoutes = require('./routes/billing.routes');
 const feedbackRoutes = require('./routes/feedback.routes');
+const adminRoutes    = require('./routes/admin.routes');
 const swaggerSpec   = require('./config/swagger.config');
 
 const { checkDebateQuota } = require('./controllers/billing.controller');
@@ -307,6 +308,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/status', statusRoutes);
 
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/admin', adminRoutes);
 
 /* ═══════════════════════════════════════════
    6a. SWAGGER / OPENAPI DOCUMENTATION

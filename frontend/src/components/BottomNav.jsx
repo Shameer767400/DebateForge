@@ -25,8 +25,9 @@ export default function BottomNav() {
   const publicPaths = ['/', '/login', '/register', '/forgot-password', '/verify-email-otp'];
   const isPublicPage = publicPaths.includes(location.pathname) || location.pathname.startsWith('/reset-password') || location.pathname.startsWith('/verify-email');
   const isDebatePage = location.pathname.startsWith('/debate/');
+  const isAdminPage = location.pathname.startsWith('/admin');
 
-  if (loading || !isAuthenticated || isPublicPage || isDebatePage) {
+  if (loading || !isAuthenticated || isPublicPage || isDebatePage || isAdminPage) {
     return null;
   }
 

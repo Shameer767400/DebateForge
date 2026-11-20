@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import PageLoader from './components/PageLoader';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -25,7 +25,14 @@ const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
+const AdminOverviewPage = lazy(() => import('./pages/AdminOverviewPage'));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const AdminDebatesPage = lazy(() => import('./pages/AdminDebatesPage'));
+const AdminTopicsPage = lazy(() => import('./pages/AdminTopicsPage'));
 const AdminFeedbackPage = lazy(() => import('./pages/AdminFeedbackPage'));
+const AdminSecurityPage = lazy(() => import('./pages/AdminSecurityPage'));
+const AdminSystemPage = lazy(() => import('./pages/AdminSystemPage'));
 import AdminRoute from './components/AdminRoute';
 import BottomNav from './components/BottomNav';
 import { Analytics } from '@vercel/analytics/react';
@@ -103,14 +110,24 @@ function App() {
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/privacy" element={<PrivacyPolicyPage />} />
                   <Route path="/terms" element={<TermsOfServicePage />} />
+                  {/* Admin Dashboard */}
                   <Route
-                    path="/admin/feedback"
+                    path="/admin"
                     element={
                       <AdminRoute>
-                        <AdminFeedbackPage />
+                        <AdminLayout />
                       </AdminRoute>
                     }
-                  />
+                  >
+                    <Route index element={<Navigate to="/admin/overview" replace />} />
+                    <Route path="overview" element={<AdminOverviewPage />} />
+                    <Route path="users" element={<AdminUsersPage />} />
+                    <Route path="debates" element={<AdminDebatesPage />} />
+                    <Route path="topics" element={<AdminTopicsPage />} />
+                    <Route path="feedback" element={<AdminFeedbackPage />} />
+                    <Route path="security" element={<AdminSecurityPage />} />
+                    <Route path="system" element={<AdminSystemPage />} />
+                  </Route>
 
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
