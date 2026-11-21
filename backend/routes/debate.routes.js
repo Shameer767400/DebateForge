@@ -7,6 +7,7 @@ const {
   endDebate,
 } = require('../controllers/debate.controller');
 const { protect } = require('../middleware/auth.middleware');
+const { checkDebateQuota } = require('../controllers/billing.controller');
 
 const router = express.Router();
 
@@ -79,7 +80,7 @@ router.use(protect);
  *       404:
  *         description: Topic not found (when using topicId)
  */
-router.post('/start', startDebate);
+router.post('/start', checkDebateQuota, startDebate);
 
 /**
  * @swagger

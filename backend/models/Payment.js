@@ -54,6 +54,11 @@ const paymentSchema = new Schema(
       type: String,
       default: null, // 'upi', 'card', 'netbanking', 'wallet'
     },
+    entitlementApplied: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     errorDescription: {
       type: String,
       default: null,

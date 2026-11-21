@@ -24,8 +24,6 @@ const feedbackRoutes = require('./routes/feedback.routes');
 const adminRoutes    = require('./routes/admin.routes');
 const swaggerSpec   = require('./config/swagger.config');
 
-const { checkDebateQuota } = require('./controllers/billing.controller');
-
 const { scheduleNotificationJobs } = require('./jobs/notifications.job');
 const secLogger = require('./services/security-logger.service');
 const aiOrchestrator = require('./services/aiOrchestrator.service');
@@ -289,8 +287,8 @@ app.use('/api/auth/reset-password', passwordResetLimiter);
 app.use('/api/auth/register', registrationLimiter);
 app.use('/api/auth', authLimiter, authRoutes);
 
-// Debate creation: rate limit + free tier quota check
-app.use('/api/debates/start', debateCreationLimiter, checkDebateQuota);
+// Debate creation: rate limit
+app.use('/api/debates/start', debateCreationLimiter);
 app.use('/api/debates', debateRoutes);
 
 app.use('/api/profile/avatar', uploadLimiter);

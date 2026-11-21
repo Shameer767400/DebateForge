@@ -1,21 +1,22 @@
 'use strict';
 
 /**
- * @fileoverview billing.controller.js — DebateForge Razorpay Billing
+ * @fileoverview billing.controller.js — DebateForge Razorpay Prepaid Billing
  *
  * Handles:
  *   GET  /api/billing/config                   — Public billing config (Key ID, pricing)
  *   POST /api/billing/create-order             — Create Razorpay Order (auth required)
  *   POST /api/billing/create-checkout-session  — Backward-compatible alias for create-order
- *   POST /api/billing/verify-payment           — Verify payment signature & activate subscription
- *   GET  /api/billing/subscription             — Get current plan status & quota
- *   POST /api/billing/cancel                   — Schedule cancellation at period end
- *   POST /api/billing/reactivate               — Undo scheduled cancellation
+ *   POST /api/billing/verify-payment           — Verify payment signature & activate prepaid access
+ *   GET  /api/billing/subscription             — Get current plan status & quota (real-time expiry aware)
+ *   POST /api/billing/cancel                   — Prepaid pass cancellation status notice
+ *   POST /api/billing/reactivate               — Prepaid pass reactivation status notice
  *   POST /api/billing/webhook                  — Razorpay webhook (raw body required)
  *
  * @module controllers/billing.controller
  */
 
+const mongoose = require('mongoose');
 const { User, Payment } = require('../models');
 const razorpayService = require('../services/razorpay.service');
 const secLogger = require('../services/security-logger.service');
@@ -47,6 +48,8 @@ async function getBillingConfig(req, res) {
 /* ═══════════════════════════════════════════
    POST /api/billing/create-order
    — Creates a Razorpay Order using trusted server pricing.
+   — Supports early renewal for the same plan.
+   — Prevents overwriting an active pass with a different tier.
 ═══════════════════════════════════════════ */
 async function createOrder(req, res) {
   try {
@@ -74,16 +77,24 @@ async function createOrder(req, res) {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Prevent duplicate payment if already active on this plan
-    if (
-      user.subscription?.plan === planId &&
+    const now = new Date();
+    const hasActivePass =
       user.subscription?.status === 'active' &&
       user.subscription?.currentPeriodEnd &&
-      new Date(user.subscription.currentPeriodEnd) > new Date()
+      new Date(user.subscription.currentPeriodEnd) > now;
+
+    // Cross-tier safety: prevent purchasing a different tier while an active pass is running,
+    // protecting existing paid time from being discarded or improperly converted.
+    if (
+      hasActivePass &&
+      user.subscription?.plan &&
+      user.subscription.plan !== 'free' &&
+      user.subscription.plan !== planId
     ) {
       return res.status(400).json({
-        error: `You already have an active ${planId.toUpperCase()} subscription.`,
-        alreadySubscribed: true,
+        error: `You currently have an active ${user.subscription.plan.toUpperCase()} pass valid until ${new Date(user.subscription.currentPeriodEnd).toLocaleDateString()}. Cross-tier changes cannot overwrite an existing active pass. Please wait until your current pass expires or contact support.`,
+        activePlan: user.subscription.plan,
+        currentPeriodEnd: user.subscription.currentPeriodEnd,
       });
     }
 
@@ -111,6 +122,7 @@ async function createOrder(req, res) {
       amount,
       currency: 'INR',
       status: 'created',
+      entitlementApplied: false,
       notes: {
         receipt,
         userEmail: user.email,
@@ -125,7 +137,7 @@ async function createOrder(req, res) {
       planId,
       billingCycle,
       name: 'DebateForge',
-      description: `${planId.toUpperCase()} (${billingCycle}) Plan Subscription`,
+      description: `${planId.toUpperCase()} (${billingCycle}) Prepaid Access Pass`,
       prefill: {
         name: user.username || '',
         email: user.email || '',
@@ -145,9 +157,199 @@ async function createCheckoutSession(req, res) {
 }
 
 /* ═══════════════════════════════════════════
+   SHARED ENTITLEMENT APPLICATION FUNCTION
+   — Reused by verifyPayment, handleWebhook, and reconcileOrphanedPayments.
+   — ACID Multi-Document Transaction: User entitlement and Payment finalization
+     commit or roll back together.
+   — Robust retry handling for TransientTransactionError and UnknownTransactionCommitResult.
+   — Formula: newExpiry = max(existingValidExpiry, paymentTime) + purchasedDuration
+═══════════════════════════════════════════ */
+async function applyPaymentEntitlement({
+  payment,
+  razorpayPaymentId,
+  razorpaySignature,
+  paymentMethod,
+}) {
+  // 1. Fast durable idempotency check: if entitlement was already applied to the user, avoid re-processing
+  if (payment.entitlementApplied && payment.status === 'captured') {
+    const user = await User.findById(payment.userId);
+    return { success: true, alreadyApplied: true, user, payment };
+  }
+
+  const session = await mongoose.startSession();
+  const MAX_TX_RETRIES = 3;
+  let attempt = 0;
+  let result = null;
+
+  try {
+    while (attempt < MAX_TX_RETRIES) {
+      attempt++;
+      try {
+        await session.withTransaction(
+          async () => {
+            // Helper to execute findById with session support
+            const findWithSession = async (model, id) => {
+              let q = model.findById(id);
+              if (q && typeof q.session === 'function') {
+                q = q.session(session);
+              }
+              return await q;
+            };
+
+            // A. Durable Idempotency Check inside transaction snapshot
+            const txPayment = await findWithSession(Payment, payment._id);
+            if (!txPayment) {
+              throw new Error(`Payment record ${payment._id} not found in transaction`);
+            }
+
+            if (txPayment.entitlementApplied && txPayment.status === 'captured') {
+              const currentUser = await findWithSession(User, txPayment.userId);
+              result = { success: true, alreadyApplied: true, user: currentUser, payment: txPayment };
+              return;
+            }
+
+            // B. Fetch latest User document inside snapshot
+            const txUser = await findWithSession(User, txPayment.userId);
+            if (!txUser) {
+              throw new Error(`User ${txPayment.userId} not found during entitlement activation`);
+            }
+
+            // C. Additional Idempotency Safeguard: check appliedOrderIds
+            if (txUser.subscription?.appliedOrderIds?.includes(txPayment.razorpayOrderId)) {
+              const finalizedPayment = await Payment.findByIdAndUpdate(
+                txPayment._id,
+                {
+                  $set: {
+                    status: 'captured',
+                    entitlementApplied: true,
+                    razorpayPaymentId: razorpayPaymentId || txPayment.razorpayPaymentId,
+                    razorpaySignature: razorpaySignature || txPayment.razorpaySignature,
+                    method: paymentMethod || txPayment.method,
+                    verifiedAt: txPayment.verifiedAt || new Date(),
+                  },
+                },
+                { session, new: true }
+              );
+              result = { success: true, alreadyApplied: true, user: txUser, payment: finalizedPayment };
+              return;
+            }
+
+            // D. Authoritative Payment Timestamp and Expiry Calculation
+            const paymentTime = new Date(txPayment.verifiedAt || txPayment.createdAt || Date.now()).getTime();
+            const periodDays = txPayment.billingCycle === 'yearly' ? 365 : 30;
+            const durationMs = periodDays * 24 * 60 * 60 * 1000;
+
+            const existingExpiry = txUser.subscription?.currentPeriodEnd
+              ? new Date(txUser.subscription.currentPeriodEnd).getTime()
+              : null;
+
+            // Stacking / Early Renewal Formula: extend from existing expiry if active on same tier
+            let baseTime = paymentTime;
+            if (
+              txUser.subscription?.status === 'active' &&
+              txUser.subscription?.plan === txPayment.planId &&
+              existingExpiry &&
+              existingExpiry > paymentTime
+            ) {
+              baseTime = existingExpiry;
+            }
+
+            const newExpiry = new Date(baseTime + durationMs);
+            const startDate =
+              baseTime === existingExpiry && txUser.subscription?.currentPeriodStart
+                ? txUser.subscription.currentPeriodStart
+                : new Date(paymentTime);
+
+            // E. Update User subscription inside transaction
+            const updatedUser = await User.findByIdAndUpdate(
+              txUser._id,
+              {
+                $set: {
+                  'subscription.plan': txPayment.planId,
+                  'subscription.status': 'active',
+                  'subscription.billingCycle': txPayment.billingCycle,
+                  'subscription.currentPeriodStart': startDate,
+                  'subscription.currentPeriodEnd': newExpiry,
+                  'subscription.razorpayPaymentId': razorpayPaymentId || txPayment.razorpayPaymentId,
+                  'subscription.razorpayOrderId': txPayment.razorpayOrderId,
+                  'subscription.cancelAtPeriodEnd': false,
+                  'subscription.canceledAt': null,
+                },
+                $addToSet: {
+                  'subscription.appliedOrderIds': txPayment.razorpayOrderId,
+                },
+              },
+              { session, new: true }
+            );
+
+            // F. Finalize Payment status & entitlementApplied inside same transaction
+            const updatedPayment = await Payment.findByIdAndUpdate(
+              txPayment._id,
+              {
+                $set: {
+                  status: 'captured',
+                  entitlementApplied: true,
+                  razorpayPaymentId: razorpayPaymentId || txPayment.razorpayPaymentId,
+                  razorpaySignature: razorpaySignature || txPayment.razorpaySignature,
+                  method: paymentMethod || txPayment.method,
+                  verifiedAt: txPayment.verifiedAt || new Date(paymentTime),
+                },
+              },
+              { session, new: true }
+            );
+
+            result = { success: true, alreadyApplied: false, user: updatedUser, payment: updatedPayment };
+          },
+          {
+            readPreference: 'primary',
+            readConcern: { level: 'snapshot' },
+            writeConcern: { w: 'majority' },
+          }
+        );
+
+        // Transaction successfully resolved
+        break;
+      } catch (txErr) {
+        // Driver semantics: withTransaction handles internal TransientTransactionError and
+        // UnknownTransactionCommitResult retries. This outer catch loop serves as a resilient backoff
+        // wrapper for transient network/socket drops across multiple connection attempts.
+        // Idempotency guarantee: If a previous commit succeeded before an UnknownTransactionCommitResult,
+        // the subsequent attempt reads txPayment.entitlementApplied === true (Step A) or
+        // txUser.subscription.appliedOrderIds (Step C) and exits safely without double-extending.
+        const isTransient =
+          txErr.hasErrorLabel?.('TransientTransactionError') ||
+          txErr.message?.includes('WriteConflict') ||
+          txErr.code === 112;
+
+        const isUnknownCommit = txErr.hasErrorLabel?.('UnknownTransactionCommitResult');
+
+        if ((isTransient || isUnknownCommit) && attempt < MAX_TX_RETRIES) {
+          const jitter = Math.floor(Math.random() * 50);
+          const delay = attempt * 100 + jitter;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Non-transient error or retries exhausted: throw so controller returns HTTP 500 for webhook redelivery
+        throw txErr;
+      }
+    }
+
+    if (!result) {
+      throw new Error(`Transaction failed to resolve after ${attempt} attempts`);
+    }
+
+    return result;
+  } finally {
+    await session.endSession();
+  }
+}
+
+/* ═══════════════════════════════════════════
    POST /api/billing/verify-payment
-   — Verifies Razorpay HMAC SHA256 signature and
-     activates the user's subscription.
+   — Secure payment signature & attribute verification.
+   — Ignores client-supplied planId/billingCycle.
+   — Verifies status is captured, amount matches, currency matches.
 ═══════════════════════════════════════════ */
 async function verifyPayment(req, res) {
   try {
@@ -155,8 +357,6 @@ async function verifyPayment(req, res) {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      planId,
-      billingCycle = 'monthly',
     } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -179,7 +379,7 @@ async function verifyPayment(req, res) {
       return res.status(400).json({ error: 'Invalid payment signature. Verification failed.' });
     }
 
-    // 2. Find and update Payment record
+    // 2. Find Payment record and verify ownership
     const payment = await Payment.findOne({ razorpayOrderId: razorpay_order_id });
     if (!payment) {
       return res.status(404).json({ error: 'Associated payment order record not found' });
@@ -194,61 +394,70 @@ async function verifyPayment(req, res) {
       return res.status(403).json({ error: 'Unauthorized: Payment does not belong to current user' });
     }
 
-    // Idempotency: if already captured, return success immediately
-    if (payment.status === 'captured') {
-      const existingUser = await User.findById(req.user.id);
-      return res.status(200).json({
-        success: true,
-        message: 'Payment already verified and subscription is active',
-        plan: existingUser.subscription?.plan || payment.planId,
-        currentPeriodEnd: existingUser.subscription?.currentPeriodEnd,
+    // 3. Fetch payment from Razorpay API and strictly validate captured status, amount, and currency
+    let rzpPayment = null;
+    try {
+      rzpPayment = await razorpayService.fetchPayment(razorpay_payment_id);
+    } catch (fetchErr) {
+      console.error('[Billing] fetchPayment error:', fetchErr.message);
+      return res.status(502).json({ error: 'Failed to verify payment status with payment gateway.' });
+    }
+
+    if (!rzpPayment || rzpPayment.status !== 'captured') {
+      secLogger.logSuspiciousActivity(req, 'Uncaptured payment verification attempt', {
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        status: rzpPayment?.status,
+      });
+      return res.status(400).json({
+        error: `Payment is not captured. Current gateway status: ${rzpPayment?.status || 'unknown'}`,
       });
     }
 
-    // Optional: fetch payment method detail from Razorpay
-    let paymentMethod = null;
-    try {
-      const rzpPayment = await razorpayService.fetchPayment(razorpay_payment_id);
-      paymentMethod = rzpPayment.method || null;
-    } catch {
-      // non-fatal
+    // Validate captured amount against stored payment amount
+    if (Number(rzpPayment.amount) !== Number(payment.amount)) {
+      secLogger.logSuspiciousActivity(req, 'Payment amount mismatch in verifyPayment', {
+        expected: payment.amount,
+        actual: rzpPayment.amount,
+      });
+      return res.status(400).json({ error: 'Payment validation failed: amount mismatch' });
     }
 
-    payment.status = 'captured';
-    payment.razorpayPaymentId = razorpay_payment_id;
-    payment.razorpaySignature = razorpay_signature;
-    payment.method = paymentMethod;
-    payment.verifiedAt = new Date();
-    await payment.save();
+    // Validate currency
+    const rzpCurrency = (rzpPayment.currency || 'INR').toUpperCase();
+    const storedCurrency = (payment.currency || 'INR').toUpperCase();
+    if (rzpCurrency !== storedCurrency) {
+      secLogger.logSuspiciousActivity(req, 'Payment currency mismatch in verifyPayment', {
+        expected: storedCurrency,
+        actual: rzpCurrency,
+      });
+      return res.status(400).json({ error: 'Payment validation failed: currency mismatch' });
+    }
 
-    // 3. Activate user subscription
-    const targetPlan = planId || payment.planId || 'pro';
-    const targetCycle = billingCycle || payment.billingCycle || 'monthly';
-    const periodDays = targetCycle === 'yearly' ? 365 : 30;
+    // Validate order association
+    if (rzpPayment.order_id && rzpPayment.order_id !== razorpay_order_id) {
+      secLogger.logSuspiciousActivity(req, 'Payment order_id mismatch in verifyPayment', {
+        expected: razorpay_order_id,
+        actual: rzpPayment.order_id,
+      });
+      return res.status(400).json({ error: 'Payment validation failed: order ID mismatch' });
+    }
 
-    const startDate = new Date();
-    const endDate = new Date(startDate.getTime() + periodDays * 24 * 60 * 60 * 1000);
+    // 4. Apply entitlement idempotently using trusted server-side record
+    const result = await applyPaymentEntitlement({
+      payment,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature,
+      paymentMethod: rzpPayment.method,
+    });
 
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id,
-      {
-        'subscription.plan': targetPlan,
-        'subscription.status': 'active',
-        'subscription.billingCycle': targetCycle,
-        'subscription.currentPeriodStart': startDate,
-        'subscription.currentPeriodEnd': endDate,
-        'subscription.razorpayPaymentId': razorpay_payment_id,
-        'subscription.razorpayOrderId': razorpay_order_id,
-        'subscription.cancelAtPeriodEnd': false,
-        'subscription.canceledAt': null,
-      },
-      { new: true }
-    );
+    const activeUser = result.user;
+    const currentPeriodEnd = activeUser.subscription?.currentPeriodEnd;
 
     secLogger.log({
       level: 'INFO',
       category: 'SYSTEM',
-      message: `User ${updatedUser.username} successfully upgraded to ${targetPlan} (${targetCycle}) via Razorpay`,
+      message: `User ${activeUser.username} successfully verified pass for ${payment.planId} (${payment.billingCycle})`,
       actorId: req.user.id,
       ip: req.ip,
       paymentId: razorpay_payment_id,
@@ -257,10 +466,10 @@ async function verifyPayment(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: `Successfully upgraded to ${targetPlan.toUpperCase()}!`,
-      plan: targetPlan,
-      billingCycle: targetCycle,
-      currentPeriodEnd: endDate,
+      message: `Successfully activated ${payment.planId.toUpperCase()} prepaid pass!`,
+      plan: payment.planId,
+      billingCycle: payment.billingCycle,
+      currentPeriodEnd,
     });
   } catch (err) {
     console.error('[Billing] verifyPayment error:', err);
@@ -272,6 +481,7 @@ async function verifyPayment(req, res) {
    POST /api/billing/webhook
    — Razorpay webhook endpoint (raw body required).
    — Handles async payment success/failure.
+   — Returns HTTP 500 on database failure to trigger retry.
 ═══════════════════════════════════════════ */
 async function handleWebhook(req, res) {
   const signature = req.headers['x-razorpay-signature'];
@@ -310,43 +520,94 @@ async function handleWebhook(req, res) {
       /* ── Payment Captured ── */
       case 'payment.captured': {
         const paymentEntity = event.payload?.payment?.entity;
-        if (!paymentEntity) break;
+        if (!paymentEntity) {
+          secLogger.logSuspiciousActivity(req, 'Missing payment entity in payment.captured webhook');
+          return res.status(400).json({ error: 'Missing payment entity' });
+        }
 
         const orderId = paymentEntity.order_id;
         const paymentId = paymentEntity.id;
         const method = paymentEntity.method;
 
-        if (orderId) {
-          const paymentRecord = await Payment.findOne({ razorpayOrderId: orderId });
-          if (paymentRecord) {
-            paymentRecord.status = 'captured';
-            paymentRecord.razorpayPaymentId = paymentId;
-            paymentRecord.method = method || paymentRecord.method;
-            paymentRecord.verifiedAt = paymentRecord.verifiedAt || new Date();
-            await paymentRecord.save();
-
-            // Ensure user subscription is active if not already
-            const user = await User.findById(paymentRecord.userId);
-            if (user && user.subscription?.status !== 'active') {
-              const cycle = paymentRecord.billingCycle || 'monthly';
-              const days = cycle === 'yearly' ? 365 : 30;
-              const startDate = new Date();
-              const endDate = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
-
-              await User.findByIdAndUpdate(user._id, {
-                'subscription.plan': paymentRecord.planId,
-                'subscription.status': 'active',
-                'subscription.billingCycle': cycle,
-                'subscription.currentPeriodStart': startDate,
-                'subscription.currentPeriodEnd': endDate,
-                'subscription.razorpayPaymentId': paymentId,
-                'subscription.razorpayOrderId': orderId,
-                'subscription.cancelAtPeriodEnd': false,
-              });
-              console.log(`[Billing Webhook] Activated ${paymentRecord.planId} for user ${user._id}`);
-            }
-          }
+        // 1 & 2: Identify stored Payment using Razorpay order ID
+        if (!orderId || !paymentId) {
+          secLogger.logSuspiciousActivity(req, 'Missing order_id or payment ID in payment.captured webhook', {
+            orderId,
+            paymentId,
+          });
+          return res.status(400).json({ error: 'Missing order_id or payment ID' });
         }
+
+        const paymentRecord = await Payment.findOne({ razorpayOrderId: orderId });
+        if (!paymentRecord) {
+          secLogger.logSuspiciousActivity(req, 'payment.captured received for unknown order', {
+            orderId,
+            paymentId,
+          });
+          return res.status(404).json({ error: 'Associated payment order record not found' });
+        }
+
+        // 3. Validate payment entity order_id against stored record
+        if (paymentEntity.order_id !== paymentRecord.razorpayOrderId) {
+          secLogger.logSuspiciousActivity(req, 'payment.captured order_id mismatch', {
+            expected: paymentRecord.razorpayOrderId,
+            actual: paymentEntity.order_id,
+          });
+          return res.status(400).json({ error: 'Order ID mismatch' });
+        }
+
+        // 4. Validate paymentEntity.amount === paymentRecord.amount
+        if (Number(paymentEntity.amount) !== Number(paymentRecord.amount)) {
+          secLogger.logSuspiciousActivity(req, 'payment.captured amount mismatch', {
+            expected: paymentRecord.amount,
+            actual: paymentEntity.amount,
+            orderId,
+            paymentId,
+          });
+          return res.status(400).json({ error: 'Payment amount mismatch' });
+        }
+
+        // 5. Validate paymentEntity.currency === paymentRecord.currency
+        const entityCurrency = (paymentEntity.currency || 'INR').toUpperCase();
+        const expectedCurrency = (paymentRecord.currency || 'INR').toUpperCase();
+        if (entityCurrency !== expectedCurrency) {
+          secLogger.logSuspiciousActivity(req, 'payment.captured currency mismatch', {
+            expected: expectedCurrency,
+            actual: entityCurrency,
+            orderId,
+            paymentId,
+          });
+          return res.status(400).json({ error: 'Payment currency mismatch' });
+        }
+
+        // 6. Validate gateway payment status is captured
+        if (paymentEntity.status !== 'captured') {
+          secLogger.logSuspiciousActivity(req, 'payment.captured received uncaptured status', {
+            status: paymentEntity.status,
+            orderId,
+            paymentId,
+          });
+          return res.status(400).json({ error: 'Payment status is not captured' });
+        }
+
+        // 7. Validate payment ID matches if already recorded
+        if (paymentRecord.razorpayPaymentId && paymentRecord.razorpayPaymentId !== paymentId) {
+          secLogger.logSuspiciousActivity(req, 'payment.captured payment ID mismatch with existing record', {
+            expected: paymentRecord.razorpayPaymentId,
+            actual: paymentId,
+            orderId,
+          });
+          return res.status(400).json({ error: 'Payment ID mismatch with existing record' });
+        }
+
+        // 8. Invoke canonical transaction-based entitlement function
+        await applyPaymentEntitlement({
+          payment: paymentRecord,
+          razorpayPaymentId: paymentId,
+          razorpaySignature: signature,
+          paymentMethod: method,
+        });
+        console.log(`[Billing Webhook] Entitlement applied for order ${orderId} via payment.captured`);
         break;
       }
 
@@ -354,10 +615,13 @@ async function handleWebhook(req, res) {
       case 'order.paid': {
         const orderEntity = event.payload?.order?.entity;
         if (orderEntity?.id) {
-          await Payment.findOneAndUpdate(
-            { razorpayOrderId: orderEntity.id },
-            { status: 'captured' }
-          );
+          const paymentRecord = await Payment.findOne({ razorpayOrderId: orderEntity.id });
+          if (paymentRecord && paymentRecord.entitlementApplied && paymentRecord.status === 'captured') {
+            console.log(`[Billing Webhook] Order ${orderEntity.id} already finalized; no-op on order.paid`);
+            break;
+          }
+          // Do not grant entitlement on order.paid without individual captured payment validation
+          console.log(`[Billing Webhook] Order ${orderEntity.id} marked paid. Activation handled via payment.captured.`);
         }
         break;
       }
@@ -380,39 +644,48 @@ async function handleWebhook(req, res) {
       default:
         console.log(`[Billing Webhook] Unhandled event: ${eventType}`);
     }
+
+    return res.status(200).json({ received: true });
   } catch (err) {
     console.error(`[Billing Webhook] Error processing ${eventType}:`, err.message);
+    // Return HTTP 500 so Razorpay retries the webhook delivery
+    return res.status(500).json({ error: 'Internal processing error' });
   }
-
-  // Always acknowledge 200 OK so Razorpay doesn't aggressively retry
-  return res.status(200).json({ received: true });
 }
 
 /* ═══════════════════════════════════════════
    GET /api/billing/subscription
-   — Returns the current user's plan, usage,
-     and billing details.
+   — Returns current user's plan and real-time expiry state.
 ═══════════════════════════════════════════ */
 async function getSubscription(req, res) {
   try {
     const user = await User.findById(req.user.id).select('subscription freeUsage');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const plan = user.subscription?.plan || 'free';
-    const status = user.subscription?.status || 'none';
-    const isPaid = ['pro', 'institution', 'enterprise'].includes(plan) &&
-                   ['active', 'trialing'].includes(status);
+    const now = new Date();
+    const rawPlan = user.subscription?.plan || 'free';
+    const rawStatus = user.subscription?.status || 'none';
+    const periodEnd = user.subscription?.currentPeriodEnd
+      ? new Date(user.subscription.currentPeriodEnd)
+      : null;
+
+    // Real-time expiry evaluation: pass is valid only if periodEnd > now
+    const isExpired = periodEnd !== null && periodEnd <= now;
+    const isPaid = !isExpired && ['pro', 'institution', 'enterprise'].includes(rawPlan) && rawStatus === 'active';
+    const effectivePlan = isPaid ? rawPlan : 'free';
+    const effectiveStatus = isExpired ? 'expired' : rawStatus;
 
     // Free tier usage (resets monthly)
     const currentMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
-    const debatesUsed = user.freeUsage?.resetMonth === currentMonth
-      ? (user.freeUsage.debatesThisMonth || 0)
-      : 0;
+    const debatesUsed =
+      user.freeUsage?.resetMonth === currentMonth
+        ? user.freeUsage.debatesThisMonth || 0
+        : 0;
     const debatesLimit = isPaid ? null : FREE_DEBATE_LIMIT;
 
     return res.status(200).json({
-      plan,
-      status,
+      plan: effectivePlan,
+      status: effectiveStatus,
       isPaid,
       currency: 'INR',
       billingCycle: user.subscription?.billingCycle || 'monthly',
@@ -433,7 +706,8 @@ async function getSubscription(req, res) {
 
 /* ═══════════════════════════════════════════
    POST /api/billing/cancel
-   — Schedules subscription to end at period end.
+   — Prepaid pass cancellation status notice.
+   — Explains that prepaid access remains active until currentPeriodEnd.
 ═══════════════════════════════════════════ */
 async function cancelSubscription(req, res) {
   try {
@@ -441,7 +715,7 @@ async function cancelSubscription(req, res) {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (!user.subscription?.plan || user.subscription.plan === 'free') {
-      return res.status(400).json({ error: 'No active paid subscription to cancel.' });
+      return res.status(400).json({ error: 'No active paid pass to cancel.' });
     }
 
     await User.findByIdAndUpdate(user._id, {
@@ -450,7 +724,7 @@ async function cancelSubscription(req, res) {
     });
 
     return res.status(200).json({
-      message: 'Subscription will not renew after the current period.',
+      message: 'Prepaid access remains active until your pass expiration date. Because DebateForge uses prepaid passes without automatic renewal, no recurring charges will occur.',
       currentPeriodEnd: user.subscription.currentPeriodEnd,
     });
   } catch (err) {
@@ -461,7 +735,7 @@ async function cancelSubscription(req, res) {
 
 /* ═══════════════════════════════════════════
    POST /api/billing/reactivate
-   — Undoes scheduled cancellation.
+   — Prepaid pass reactivation notice.
 ═══════════════════════════════════════════ */
 async function reactivateSubscription(req, res) {
   try {
@@ -469,7 +743,7 @@ async function reactivateSubscription(req, res) {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     if (!user.subscription?.cancelAtPeriodEnd) {
-      return res.status(400).json({ error: 'Subscription is not scheduled for cancellation.' });
+      return res.status(400).json({ error: 'Pass is already active.' });
     }
 
     await User.findByIdAndUpdate(user._id, {
@@ -477,7 +751,10 @@ async function reactivateSubscription(req, res) {
       'subscription.canceledAt': null,
     });
 
-    return res.status(200).json({ message: 'Subscription auto-renew reactivated successfully.' });
+    return res.status(200).json({
+      message: 'Prepaid access pass is active until your expiration date. To extend access, you can purchase an early renewal pass at any time.',
+      currentPeriodEnd: user.subscription.currentPeriodEnd,
+    });
   } catch (err) {
     console.error('[Billing] reactivateSubscription error:', err.message);
     return res.status(500).json({ error: 'Failed to reactivate subscription' });
@@ -486,24 +763,44 @@ async function reactivateSubscription(req, res) {
 
 /* ═══════════════════════════════════════════
    FREE TIER GATE MIDDLEWARE
-   — Use on debate creation routes to enforce
-     5 debates/month limit for free users.
+   — Real-time expiry check and quota enforcement.
+   — 5 debates/month limit for free users.
 ═══════════════════════════════════════════ */
 async function checkDebateQuota(req, res, next) {
   try {
-    if (process.env.NODE_ENV === 'test') return next();
+    if (process.env.NODE_ENV === 'test' && !req._enforceQuotaInTest) return next();
     if (!req.user) return next();
 
     const user = await User.findById(req.user.id).select('subscription freeUsage');
     if (!user) return next();
 
+    const now = new Date();
     const plan = user.subscription?.plan || 'free';
     const status = user.subscription?.status || 'none';
-    const isPaid = ['pro', 'institution', 'enterprise'].includes(plan) &&
-                   ['active', 'trialing'].includes(status);
+    const periodEnd = user.subscription?.currentPeriodEnd
+      ? new Date(user.subscription.currentPeriodEnd)
+      : null;
 
-    if (isPaid) return next();
+    // A paid entitlement is valid ONLY if status is active and periodEnd > now
+    const isPaidValid =
+      ['pro', 'institution', 'enterprise'].includes(plan) &&
+      status === 'active' &&
+      periodEnd !== null &&
+      periodEnd > now;
 
+    if (isPaidValid) {
+      return next();
+    }
+
+    // If the pass has expired, lazily downgrade user in database
+    if (status === 'active' && periodEnd && periodEnd <= now) {
+      await User.findByIdAndUpdate(user._id, {
+        'subscription.status': 'expired',
+        'subscription.plan': 'free',
+      });
+    }
+
+    // Apply Free-tier calendar month quota logic (5 debates/month)
     const currentMonth = new Date().toISOString().slice(0, 7);
     const isNewMonth = user.freeUsage?.resetMonth !== currentMonth;
 
@@ -600,4 +897,5 @@ module.exports = {
   cancelSubscription,
   reactivateSubscription,
   checkDebateQuota,
+  applyPaymentEntitlement,
 };

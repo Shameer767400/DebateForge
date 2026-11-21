@@ -186,6 +186,15 @@ async function fetchOrder(orderId) {
   return await client.orders.fetch(orderId);
 }
 
+/**
+ * Fetch payments associated with an order from Razorpay
+ * @param {string} orderId
+ */
+async function fetchOrderPayments(orderId) {
+  const client = getClient();
+  return await client.orders.fetchPayments(orderId);
+}
+
 module.exports = {
   isConfigured,
   getKeyId,
@@ -196,5 +205,6 @@ module.exports = {
   verifyWebhookSignature,
   fetchPayment,
   fetchOrder,
+  fetchOrderPayments,
   PLAN_PRICING,
 };

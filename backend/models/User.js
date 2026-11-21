@@ -175,6 +175,9 @@ const userSchema = new Schema(
       razorpayPaymentId:     { type: String, default: null },
       razorpayOrderId:       { type: String, default: null },
 
+      // Durable idempotency ledger: records every order ID successfully credited
+      appliedOrderIds:       { type: [String], default: [] },
+
       // Billing cycle: monthly | yearly
       billingCycle: {
         type: String,
@@ -186,10 +189,10 @@ const userSchema = new Schema(
       currentPeriodStart: { type: Date, default: null },
       currentPeriodEnd:   { type: Date, default: null },
 
-      // Subscription status mirrors Stripe status
+      // Subscription status mirrors Stripe / Prepaid status
       status: {
         type: String,
-        enum: ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'incomplete', 'none'],
+        enum: ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'incomplete', 'none', 'expired'],
         default: 'none',
       },
 
