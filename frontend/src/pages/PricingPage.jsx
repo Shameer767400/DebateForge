@@ -1,10 +1,11 @@
 /**
  * @fileoverview PricingPage — DebateForge SaaS Pricing
  *
- * 4-tier pricing:
- *   Free → Pro ($12/mo) → Institution ($299/mo) → Enterprise (custom)
+ * 4-tier pricing (INR):
+ *   Free (₹0) → Pro (₹999/mo) → Institution (₹24,999/mo) → Enterprise (Custom)
  *
- * Integrates with Stripe Checkout via /api/billing/create-checkout-session
+ * Integrates with Razorpay Checkout via /api/billing/create-order & /api/billing/verify-payment
+ * Supports UPI, Credit/Debit Cards, Net Banking, and Wallets.
  *
  * @module pages/PricingPage
  */
@@ -45,17 +46,13 @@ const PLANS = [
     id: 'pro',
     name: 'Pro',
     tagline: 'For serious individual debaters',
-    monthlyPrice: 12,
-    yearlyPrice: 99,
+    monthlyPrice: 999,
+    yearlyPrice: 7999,
     color: '#00ff87',
     accent: 'rgba(0, 255, 135, 0.12)',
     badge: 'Most Popular',
-    cta: 'Start Pro',
+    cta: 'Upgrade to Pro',
     ctaAction: 'checkout',
-    stripePriceId: {
-      monthly: 'price_pro_monthly',   // replace with real Stripe price IDs
-      yearly: 'price_pro_yearly',
-    },
     features: [
       { text: 'Unlimited AI debates', included: true },
       { text: 'All debate formats (Oxford, LD, Parliamentary)', included: true },
@@ -72,16 +69,12 @@ const PLANS = [
     id: 'institution',
     name: 'Institution',
     tagline: 'For schools, coaching institutes & clubs',
-    monthlyPrice: 299,
-    yearlyPrice: 2499,
+    monthlyPrice: 24999,
+    yearlyPrice: 199999,
     color: '#00aaff',
     accent: 'rgba(0, 170, 255, 0.12)',
-    cta: 'Start Institution Trial',
+    cta: 'Get Institution Plan',
     ctaAction: 'checkout',
-    stripePriceId: {
-      monthly: 'price_institution_monthly',
-      yearly: 'price_institution_yearly',
-    },
     features: [
       { text: 'Everything in Pro (up to 50 seats)', included: true },
       { text: 'Organization admin dashboard', included: true },
@@ -121,7 +114,7 @@ const PLANS = [
 const FAQ = [
   {
     q: 'Can I switch plans anytime?',
-    a: 'Yes. Upgrades take effect immediately (prorated). Downgrades take effect at the next billing cycle.',
+    a: 'Yes. Upgrades take effect immediately. Downgrades take effect at the end of your current active billing cycle.',
   },
   {
     q: 'What counts as a "debate" on the free tier?',
@@ -129,30 +122,51 @@ const FAQ = [
   },
   {
     q: 'How does Institution billing work?',
-    a: 'You pay one flat fee for up to 50 seats. Users within your organization share that quota. Additional seats are available at $6/seat/month.',
+    a: 'You pay one flat fee for up to 50 seats. Users within your organization share that quota. Additional seats are available upon request.',
   },
   {
     q: 'Do you offer discounts for students?',
-    a: 'Yes — verified students get 50% off Pro with a .edu email. Contact us at students@debateforge.app.',
-  },
-  {
-    q: 'Is there a free trial for paid plans?',
-    a: 'Institution plans include a 14-day free trial. Pro plans can be cancelled within 7 days for a full refund.',
+    a: 'Yes — verified students get special discounts with a valid student ID or educational email. Contact us at support@debateforge.tech.',
   },
   {
     q: 'What payment methods do you accept?',
-    a: 'All major credit cards, debit cards, UPI (India), and bank transfers for annual Enterprise plans.',
+    a: 'We accept UPI (Google Pay, PhonePe, Paytm, BHIM), all major Credit & Debit cards (Visa, Mastercard, RuPay), Net Banking across 50+ banks, and Wallets via Razorpay.',
+  },
+  {
+    q: 'Is payment secure?',
+    a: 'Yes. All payments are encrypted and processed securely by Razorpay, a PCI-DSS Level 1 compliant payment gateway. DebateForge never stores your card or banking credentials.',
   },
 ];
 
+/**
+ * Dynamically load Razorpay Checkout script if not already on window
+ */
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => {
+      console.error('[Razorpay] Failed to load checkout script');
+      resolve(false);
+    };
+    document.body.appendChild(script);
+  });
+}
+
 export default function PricingPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const toast = useToast();
   const api = useApi();
 
   const [billing, setBilling] = useState('monthly'); // 'monthly' | 'yearly'
-  const [loading, setLoading] = useState(null);       // plan id being loaded
+  const [loading, setLoading] = useState(null);       // plan id currently processing
   const [openFaq, setOpenFaq] = useState(null);
 
   const handleCTA = async (plan) => {
@@ -162,37 +176,103 @@ export default function PricingPage() {
     }
 
     if (plan.ctaAction === 'contact') {
-      window.open('mailto:sales@debateforge.app?subject=Enterprise%20Inquiry%20—%20DebateForge', '_blank');
+      window.open('mailto:sales@debateforge.tech?subject=Enterprise%20Inquiry%20—%20DebateForge', '_blank');
       return;
     }
 
     if (plan.ctaAction === 'checkout') {
       if (!user) {
-        toast.info('Please sign in to upgrade your plan.');
-        navigate('/login');
+        toast.info('Please sign in or create an account to upgrade your plan.');
+        navigate('/login', { state: { from: '/pricing' } });
         return;
       }
 
       try {
         setLoading(plan.id);
-        const priceId = plan.stripePriceId?.[billing];
 
-        const { data } = await api.post('/api/billing/create-checkout-session', {
-          priceId,
+        // 1. Ensure Razorpay SDK script is loaded
+        const isLoaded = await loadRazorpayScript();
+        if (!isLoaded) {
+          toast.error('Unable to load payment gateway. Please check your internet connection.');
+          setLoading(null);
+          return;
+        }
+
+        // 2. Create Razorpay order on backend
+        const { data: orderData } = await api.post('/api/billing/create-order', {
           planId: plan.id,
           billingCycle: billing,
         });
 
-        // Redirect to Stripe Checkout
-        if (data?.url) {
-          window.location.href = data.url;
-        } else {
-          throw new Error('No checkout URL returned');
+        if (!orderData?.orderId || !orderData?.keyId) {
+          throw new Error('Invalid order response from payment service');
         }
+
+        // 3. Configure Razorpay modal options
+        const options = {
+          key: orderData.keyId,
+          amount: orderData.amount,
+          currency: orderData.currency || 'INR',
+          name: 'DebateForge',
+          description: orderData.description || `${plan.name} (${billing}) Subscription`,
+          order_id: orderData.orderId,
+          prefill: {
+            name: orderData.prefill?.name || user.username || '',
+            email: orderData.prefill?.email || user.email || '',
+          },
+          theme: {
+            color: plan.color || '#00ff87',
+          },
+          modal: {
+            ondismiss: () => {
+              toast.info('Payment window closed.');
+              setLoading(null);
+            },
+          },
+          handler: async (response) => {
+            try {
+              toast.info('Verifying payment with bank…');
+
+              // 4. Verify payment on server
+              const verifyRes = await api.post('/api/billing/verify-payment', {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                planId: plan.id,
+                billingCycle: billing,
+              });
+
+              if (verifyRes.data?.success) {
+                toast.success(`🎉 Payment verified! Welcome to ${plan.name}!`);
+                if (refreshSession) {
+                  try { await refreshSession(); } catch { /* ignore */ }
+                }
+                navigate('/dashboard?upgraded=true&plan=' + plan.id);
+              } else {
+                toast.error(verifyRes.data?.error || 'Payment verification failed');
+              }
+            } catch (vErr) {
+              console.error('[Pricing] Verification error:', vErr);
+              toast.error(vErr.response?.data?.error || 'Payment verification failed. Please contact support.');
+            } finally {
+              setLoading(null);
+            }
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+
+        rzp.on('payment.failed', (errResponse) => {
+          console.error('[Pricing] Razorpay payment failure:', errResponse.error);
+          toast.error(errResponse.error?.description || 'Payment failed. Please try another payment method.');
+          setLoading(null);
+        });
+
+        rzp.open();
       } catch (err) {
         console.error('[Pricing] Checkout error:', err);
-        toast.error('Could not start checkout. Please try again or contact support.');
-      } finally {
+        const errMsg = err.response?.data?.error || err.message || 'Could not start payment. Please try again.';
+        toast.error(errMsg);
         setLoading(null);
       }
     }
@@ -202,7 +282,7 @@ export default function PricingPage() {
     if (plan.monthlyPrice === null) return 'Custom';
     if (plan.monthlyPrice === 0) return 'Free';
     const price = billing === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
-    return `$${price}`;
+    return `₹${price.toLocaleString('en-IN')}`;
   };
 
   const getPeriodLabel = (plan) => {
@@ -221,8 +301,8 @@ export default function PricingPage() {
   return (
     <div className="pricing-page">
       <SEOHead
-        title="Pricing"
-        description="Simple, transparent pricing for DebateForge. Start free, upgrade to Pro for advanced AI coaching, analytics, and unlimited debates."
+        title="Pricing - DebateForge"
+        description="Simple, transparent pricing for DebateForge. Start free, upgrade to Pro for advanced AI coaching, analytics, and unlimited debates via UPI and cards."
         path="/pricing"
       />
       {/* ── HEADER ── */}
@@ -236,7 +316,7 @@ export default function PricingPage() {
             Invest in your <span className="pricing-accent">debate edge</span>
           </h1>
           <p className="pricing-subtitle">
-            Start free. Scale when you're ready. No hidden fees, no contracts.
+            Start free. Scale when you're ready. Pay securely with UPI, Cards, or Net Banking.
           </p>
 
           {/* Billing toggle */}
@@ -252,7 +332,7 @@ export default function PricingPage() {
               onClick={() => setBilling('yearly')}
             >
               Yearly
-              <span className="toggle-save">Save up to 31%</span>
+              <span className="toggle-save">Save ~33%</span>
             </button>
           </div>
         </div>
@@ -284,7 +364,7 @@ export default function PricingPage() {
                   </div>
                   {billing === 'yearly' && savings && (
                     <div className="plan-savings">
-                      Save ${savings.savings}/year ({savings.pct}% off)
+                      Save ₹{savings.savings.toLocaleString('en-IN')}/year ({savings.pct}% off)
                     </div>
                   )}
                 </div>
@@ -293,7 +373,7 @@ export default function PricingPage() {
                   className="plan-cta"
                   style={{ background: plan.color }}
                   onClick={() => handleCTA(plan)}
-                  disabled={isLoading}
+                  disabled={Boolean(isLoading)}
                   id={`pricing-cta-${plan.id}`}
                 >
                   {isLoading ? (
@@ -324,7 +404,7 @@ export default function PricingPage() {
 
       {/* ── INSTITUTION TRUST STRIP ── */}
       <section className="pricing-trust">
-        <div className="trust-label">Trusted by debaters at</div>
+        <div className="trust-label">Trusted by debaters and teams at</div>
         <div className="trust-logos">
           {['Debate Clubs', 'Coaching Institutes', 'Law Schools', 'Corporates', 'High Schools'].map((org) => (
             <div key={org} className="trust-pill">{org}</div>
@@ -363,7 +443,7 @@ export default function PricingPage() {
           </p>
           <button
             className="enterprise-cta-btn"
-            onClick={() => window.open('mailto:sales@debateforge.app?subject=Enterprise%20Inquiry', '_blank')}
+            onClick={() => window.open('mailto:sales@debateforge.tech?subject=Enterprise%20Inquiry', '_blank')}
             id="pricing-contact-sales"
           >
             Talk to Sales →

@@ -163,10 +163,17 @@ const userSchema = new Schema(
         enum: ['free', 'pro', 'institution', 'enterprise'],
         default: 'free',
       },
-      // Stripe IDs
+      // Stripe IDs (legacy / fallback)
       stripeCustomerId:     { type: String, default: null },
       stripeSubscriptionId: { type: String, default: null },
       stripePriceId:        { type: String, default: null },
+
+      // Razorpay IDs
+      razorpayCustomerId:     { type: String, default: null },
+      razorpaySubscriptionId: { type: String, default: null },
+      razorpayPlanId:        { type: String, default: null },
+      razorpayPaymentId:     { type: String, default: null },
+      razorpayOrderId:       { type: String, default: null },
 
       // Billing cycle: monthly | yearly
       billingCycle: {

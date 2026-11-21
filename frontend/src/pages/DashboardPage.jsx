@@ -15,7 +15,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -114,6 +114,9 @@ export default function DashboardPage() {
   const api = useApi();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isUpgraded = searchParams.get('upgraded') === 'true';
+  const upgradedPlan = (searchParams.get('plan') || 'pro').toUpperCase();
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -297,6 +300,36 @@ export default function DashboardPage() {
           </button>
         </div>
       </header>
+
+      {/* ── UPGRADE CELEBRATION BANNER ── */}
+      {isUpgraded && (
+        <div
+          className="dash-upgrade-banner"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0, 255, 135, 0.12) 0%, rgba(96, 239, 255, 0.12) 100%)',
+            border: '1px solid rgba(0, 255, 135, 0.35)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: '#fff',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <span style={{ fontSize: '2rem' }}>🎉</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#00ff87' }}>
+                Subscription Activated!
+              </div>
+              <div style={{ fontSize: '0.88rem', color: 'rgba(255, 255, 255, 0.85)', marginTop: '2px' }}>
+                Welcome to DebateForge <strong>{upgradedPlan}</strong>! You now have unlimited debates, advanced judging, and priority AI feedback.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── STATS ROW ── */}
       <section className="dash-section">

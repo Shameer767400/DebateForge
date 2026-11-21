@@ -1,17 +1,17 @@
+'use strict';
+
 /**
- * @fileoverview billing.routes.js — Stripe billing endpoints
+ * @fileoverview billing.routes.js — Razorpay billing endpoints
  *
  * Routes:
- *   POST /api/billing/webhook                  — Stripe webhook (raw body, no auth)
- *   POST /api/billing/create-checkout-session  — Start checkout (auth required)
- *   POST /api/billing/create-portal-session    — Open billing portal (auth required)
- *   GET  /api/billing/subscription             — Get plan status (auth required)
- *   POST /api/billing/cancel                   — Cancel at period end (auth required)
- *   POST /api/billing/reactivate               — Undo cancellation (auth required)
- *
- * IMPORTANT: The webhook route uses express.raw() — it must be registered
- * BEFORE express.json() in server.js. This file handles that internally
- * by exporting the raw middleware separately.
+ *   GET  /api/billing/config                   — Public Razorpay config & plan info (no auth)
+ *   POST /api/billing/webhook                  — Razorpay webhook (raw body, no auth)
+ *   POST /api/billing/create-order             — Create Razorpay Order (auth required)
+ *   POST /api/billing/create-checkout-session  — Backward-compatible alias for create-order (auth required)
+ *   POST /api/billing/verify-payment           — Verify payment signature & activate plan (auth required)
+ *   GET  /api/billing/subscription             — Get plan status & usage (auth required)
+ *   POST /api/billing/cancel                   — Schedule cancellation at period end (auth required)
+ *   POST /api/billing/reactivate               — Reactivate plan auto-renew (auth required)
  *
  * @module routes/billing.routes
  */
@@ -19,8 +19,10 @@
 const express = require('express');
 const { protect } = require('../middleware/auth.middleware');
 const {
+  getBillingConfig,
+  createOrder,
   createCheckoutSession,
-  createPortalSession,
+  verifyPayment,
   getSubscription,
   cancelSubscription,
   reactivateSubscription,
@@ -29,23 +31,29 @@ const {
 
 const router = express.Router();
 
-/* ── Webhook: raw body required for Stripe signature verification ──
-   This route intentionally has NO auth — Stripe calls it directly.
-   Security comes from the STRIPE_WEBHOOK_SECRET signature check. */
+/* ── Public endpoints ── */
+router.get('/config', getBillingConfig);
+
+/* ── Webhook: raw body required for Razorpay signature verification ──
+   This route intentionally has NO auth — Razorpay calls it directly.
+   Security comes from the RAZORPAY_WEBHOOK_SECRET signature check. */
 router.post(
   '/webhook',
-  express.raw({ type: 'application/json' }),
+  express.raw({ type: '*/*' }),
   handleWebhook
 );
 
 /* ── All routes below require authentication ── */
 router.use(protect);
 
-/* Start a Stripe Checkout session */
+/* Create Razorpay order */
+router.post('/create-order', createOrder);
+
+/* Backward-compatibility alias */
 router.post('/create-checkout-session', createCheckoutSession);
 
-/* Open the Stripe Customer Portal (manage payment methods, invoices, cancel) */
-router.post('/create-portal-session', createPortalSession);
+/* Verify Razorpay payment signature & activate subscription */
+router.post('/verify-payment', verifyPayment);
 
 /* Get current subscription status + usage */
 router.get('/subscription', getSubscription);

@@ -131,13 +131,12 @@ app.use(
 );
 
 /* ═══════════════════════════════════════════
-   2b. STRIPE WEBHOOK — raw body required.
+   2b. RAZORPAY WEBHOOK — raw body required.
    MUST be mounted BEFORE express.json().
-   Stripe sends raw octet-stream; signature
-   verification fails if body is parsed first.
+   Signature verification requires exact raw buffer.
 ═══════════════════════════════════════════ */
 app.post('/api/billing/webhook',
-  express.raw({ type: 'application/json' }),
+  express.raw({ type: '*/*' }),
   require('./controllers/billing.controller').handleWebhook
 );
 
