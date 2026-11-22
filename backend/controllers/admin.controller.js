@@ -686,7 +686,23 @@ function readSecurityLogLines() {
   const parsed = [];
   for (const line of lines) {
     try {
-      parsed.push(JSON.parse(line));
+      const item = JSON.parse(line);
+      if (item && typeof item === 'object') {
+        // Normalise any historical log lines where an object was stored under level
+        if (item.level && typeof item.level === 'object') {
+          const nested = item.level;
+          parsed.push({
+            timestamp: item.timestamp || nested.timestamp || new Date().toISOString(),
+            level: typeof nested.level === 'string' ? nested.level : 'INFO',
+            category: typeof nested.category === 'string' ? nested.category : (item.category || 'SYSTEM'),
+            message: typeof nested.message === 'string' ? nested.message : (item.message || '—'),
+            ip: nested.ip || item.ip || '—',
+            ...nested,
+          });
+        } else {
+          parsed.push(item);
+        }
+      }
     } catch {
       // skip malformed lines
     }

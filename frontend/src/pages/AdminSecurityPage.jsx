@@ -130,7 +130,11 @@ export default function AdminSecurityPage() {
       key: 'level',
       label: 'Severity',
       render: (val, item) => {
-        const lvl = val || item?.level || 'INFO';
+        let lvl = 'INFO';
+        if (typeof val === 'string') lvl = val;
+        else if (typeof item?.level === 'string') lvl = item.level;
+        else if (item?.level && typeof item.level === 'object' && typeof item.level.level === 'string') lvl = item.level.level;
+
         return (
           <AdminStatusBadge
             status={LEVEL_BADGES[lvl] || 'muted'}
@@ -142,18 +146,25 @@ export default function AdminSecurityPage() {
     {
       key: 'category',
       label: 'Category',
-      render: (val, item) => (
-        <span
-          className="admin-badge"
-          style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            borderColor: 'var(--border)',
-            color: 'var(--text-primary)',
-          }}
-        >
-          {val || item?.category || '—'}
-        </span>
-      ),
+      render: (val, item) => {
+        let cat = '—';
+        if (typeof val === 'string') cat = val;
+        else if (typeof item?.category === 'string') cat = item.category;
+        else if (item?.category && typeof item.category === 'object' && typeof item.category.category === 'string') cat = item.category.category;
+
+        return (
+          <span
+            className="admin-badge"
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderColor: 'var(--border)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            {cat}
+          </span>
+        );
+      },
     },
     {
       key: 'message',
@@ -165,17 +176,24 @@ export default function AdminSecurityPage() {
           (k) => !['timestamp', 'level', 'category', 'message', 'ip'].includes(k)
         );
 
+        let msg = '—';
+        if (typeof val === 'string') msg = val;
+        else if (typeof logObj.message === 'string') msg = logObj.message;
+        else if (val && typeof val === 'object') msg = JSON.stringify(val);
+
+        const isAlert = logObj.level === 'ALERT' || logObj.level === 'CRITICAL';
+
         return (
           <div>
             <div
               style={{
                 cursor: 'pointer',
                 fontWeight: 500,
-                color: (logObj.level === 'ALERT' || logObj.level === 'CRITICAL') ? 'var(--accent-ai)' : 'var(--text-primary)',
+                color: isAlert ? 'var(--accent-ai)' : 'var(--text-primary)',
               }}
               onClick={() => setExpandedLogId(isExpanded ? null : idx)}
             >
-              {val || logObj.message || '—'}
+              {msg}
               {metaKeys.length > 0 && (
                 <span style={{ marginLeft: '8px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                   {isExpanded ? '▲ Hide metadata' : '▼ Show metadata'}

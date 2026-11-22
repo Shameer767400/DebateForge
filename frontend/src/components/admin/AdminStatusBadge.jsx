@@ -16,11 +16,13 @@ const STATUS_MAP = {
  *   label  – display text (falls back to status string if omitted)
  */
 export default function AdminStatusBadge({ status = 'muted', label }) {
-  const modifier = STATUS_MAP[status] ?? STATUS_MAP.muted;
+  const safeStatus = typeof status === 'string' ? status : 'muted';
+  const modifier = STATUS_MAP[safeStatus] ?? STATUS_MAP.muted;
+  const safeLabel = (typeof label === 'string' || typeof label === 'number') ? label : safeStatus;
 
   return (
     <span className={`admin-badge ${modifier}`}>
-      {label ?? status}
+      {safeLabel}
     </span>
   );
 }

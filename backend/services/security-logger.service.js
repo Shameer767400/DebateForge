@@ -47,18 +47,37 @@ const COLORS = {
 
 /**
  * Core log function — writes to both console and file.
- * @param {string} level - 'INFO' | 'WARN' | 'ALERT' | 'CRITICAL'
- * @param {string} category - e.g. 'AUTH', 'RATE_LIMIT', 'API_ERROR'
- * @param {string} message - Human-readable description
+ * Accepts either:
+ *   log(level, category, message, meta)
+ * OR
+ *   log({ level, category, message, ...meta })
+ *
+ * @param {string|object} level - 'INFO' | 'WARN' | 'ALERT' | 'CRITICAL' or full log object
+ * @param {string} [category] - e.g. 'AUTH', 'RATE_LIMIT', 'API_ERROR'
+ * @param {string} [message] - Human-readable description
  * @param {object} [meta] - Extra data (IP, email, userId, etc.)
  */
 function log(level, category, message, meta = {}) {
+  let resolvedLevel = level;
+  let resolvedCategory = category;
+  let resolvedMessage = message;
+  let resolvedMeta = meta;
+
+  if (level && typeof level === 'object') {
+    const obj = level;
+    resolvedLevel = typeof obj.level === 'string' ? obj.level : 'INFO';
+    resolvedCategory = typeof obj.category === 'string' ? obj.category : 'SYSTEM';
+    resolvedMessage = typeof obj.message === 'string' ? obj.message : '';
+    const { level: _l, category: _c, message: _m, timestamp: _t, ...rest } = obj;
+    resolvedMeta = rest;
+  }
+
   const entry = {
     timestamp: new Date().toISOString(),
-    level,
-    category,
-    message,
-    ...meta,
+    level: resolvedLevel,
+    category: resolvedCategory,
+    message: resolvedMessage,
+    ...resolvedMeta,
   };
 
   // Write structured JSON to log file
@@ -70,11 +89,11 @@ function log(level, category, message, meta = {}) {
     process.stdout.write(JSON.stringify(entry) + '\n');
   } else {
     // Development: human-readable colored output
-    const color = COLORS[level] || COLORS.RESET;
+    const color = COLORS[resolvedLevel] || COLORS.RESET;
     // eslint-disable-next-line no-console
     console.log(
-      `${color}[SECURITY:${level}]${COLORS.RESET} [${category}] ${message}`,
-      Object.keys(meta).length > 0 ? meta : ''
+      `${color}[SECURITY:${resolvedLevel}]${COLORS.RESET} [${resolvedCategory}] ${resolvedMessage}`,
+      Object.keys(resolvedMeta).length > 0 ? resolvedMeta : ''
     );
   }
 }

@@ -140,6 +140,12 @@ export default function AdminDataTable({
                       }
                     }
                   }
+
+                  // Guard: if cellContent is an object that is not a valid React element, serialize to string
+                  if (cellContent && typeof cellContent === 'object' && !React.isValidElement(cellContent)) {
+                    cellContent = JSON.stringify(cellContent);
+                  }
+
                   return (
                     <td key={col.key} className="admin-td">
                       {cellContent}
