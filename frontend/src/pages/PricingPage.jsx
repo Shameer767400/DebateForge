@@ -139,6 +139,19 @@ const FAQ = [
 ];
 
 /**
+ * Detect if the page is opened inside a social media in-app WebView
+ * (Instagram, Facebook, WhatsApp, Twitter/X, LinkedIn)
+ */
+function detectInAppBrowser() {
+  if (typeof navigator === 'undefined') return { isInApp: false, isAndroid: false, isIOS: false };
+  const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+  const isInApp = /instagram|fban|fbav|twitter|linkedinapp|whatsapp|snapchat|line\//i.test(ua);
+  const isAndroid = /android/i.test(ua);
+  const isIOS = /iphone|ipad|ipod/i.test(ua);
+  return { isInApp, isAndroid, isIOS };
+}
+
+/**
  * Dynamically load Razorpay Checkout script if not already on window
  */
 function loadRazorpayScript() {
@@ -168,6 +181,24 @@ export default function PricingPage() {
   const [billing, setBilling] = useState('monthly'); // 'monthly' | 'yearly'
   const [loading, setLoading] = useState(null);       // plan id currently processing
   const [openFaq, setOpenFaq] = useState(null);
+  const [inAppInfo] = useState(() => detectInAppBrowser());
+  const [dismissInAppNotice, setDismissInAppNotice] = useState(false);
+
+  const handleOpenExternal = () => {
+    if (typeof window === 'undefined') return;
+    const currentUrl = window.location.href;
+    if (inAppInfo.isAndroid) {
+      const cleanUrl = currentUrl.replace(/^https?:\/\//, '');
+      window.location.href = `intent://${cleanUrl}#Intent;scheme=https;package=com.android.chrome;end`;
+    } else {
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(currentUrl);
+        toast.info('Link copied! Open Safari and paste to pay with Google Pay or PhonePe.');
+      } else {
+        toast.info('Tap ··· at the top right and select "Open in Safari" to pay with UPI.');
+      }
+    }
+  };
 
   const handleCTA = async (plan) => {
     if (plan.ctaAction === 'register') {
@@ -219,6 +250,7 @@ export default function PricingPage() {
           prefill: {
             name: orderData.prefill?.name || user.username || '',
             email: orderData.prefill?.email || user.email || '',
+            contact: orderData.prefill?.contact || user.phone || user.contact || '',
           },
           theme: {
             color: plan.color || '#00ff87',
@@ -339,6 +371,53 @@ export default function PricingPage() {
           </div>
         </div>
       </header>
+
+      {/* ── IN-APP BROWSER NOTICE (Instagram / WhatsApp / FB) ── */}
+      {inAppInfo.isInApp && !dismissInAppNotice && (
+        <div className="in-app-browser-banner" role="alert">
+          <div className="in-app-banner-icon">📱</div>
+          <div className="in-app-banner-content">
+            <div className="in-app-banner-title">
+              Paying via Google Pay, PhonePe, or Paytm?
+            </div>
+            <div className="in-app-banner-desc">
+              Social media in-app browsers block direct UPI app switching. Open this page in{' '}
+              <strong>{inAppInfo.isAndroid ? 'Chrome' : 'Safari'}</strong> for instant 1-tap UPI payment.
+            </div>
+            {inAppInfo.isIOS && (
+              <div className="in-app-banner-ios-hint">
+                👉 Tap <strong>···</strong> at the top right &amp; choose <strong>"Open in Safari"</strong>.
+              </div>
+            )}
+          </div>
+          <div className="in-app-banner-actions">
+            {inAppInfo.isAndroid ? (
+              <a
+                href={`intent://${typeof window !== 'undefined' ? window.location.host + window.location.pathname + window.location.search : 'www.debateforge.tech/pricing'}#Intent;scheme=https;package=com.android.chrome;end`}
+                className="in-app-banner-btn in-app-banner-btn--primary"
+              >
+                Open in Chrome
+              </a>
+            ) : (
+              <button
+                type="button"
+                className="in-app-banner-btn in-app-banner-btn--primary"
+                onClick={handleOpenExternal}
+              >
+                Copy Link for Safari
+              </button>
+            )}
+            <button
+              type="button"
+              className="in-app-banner-close"
+              onClick={() => setDismissInAppNotice(true)}
+              aria-label="Dismiss banner"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── PLAN GRID ── */}
       <section className="pricing-grid-section">

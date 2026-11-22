@@ -533,3 +533,121 @@
   }
 }
 
+/* ── IN-APP BROWSER BREAKOUT BANNER ── */
+.in-app-browser-banner {
+  max-width: 960px;
+  margin: -10px auto 30px auto;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(0, 255, 135, 0.08) 0%, rgba(0, 170, 255, 0.08) 100%);
+  border: 1px solid rgba(0, 255, 135, 0.28);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 10;
+}
+
+.in-app-banner-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.in-app-banner-content {
+  flex: 1;
+  text-align: left;
+}
+
+.in-app-banner-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #00ff87;
+  margin-bottom: 4px;
+}
+
+.in-app-banner-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.in-app-banner-desc strong {
+  color: #fff;
+}
+
+.in-app-banner-ios-hint {
+  font-size: 0.82rem;
+  color: #00aaff;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.in-app-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.in-app-banner-btn {
+  background: #00ff87;
+  color: #050e09;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 255, 135, 0.25);
+}
+
+.in-app-banner-btn:hover {
+  background: #00df76;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 255, 135, 0.35);
+}
+
+.in-app-banner-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.15rem;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.in-app-banner-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 680px) {
+  .in-app-browser-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin: -5px 16px 24px 16px;
+    padding: 14px 16px;
+  }
+
+  .in-app-banner-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .in-app-banner-btn {
+    flex: 1;
+    text-align: center;
+  }
+}
+
+
