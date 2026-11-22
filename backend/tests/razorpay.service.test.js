@@ -1,6 +1,20 @@
 'use strict';
 
 const crypto = require('crypto');
+
+// Save original pricing environment overrides before requiring service
+const originalPricingEnv = {
+  PLAN_PRO_MONTHLY_PAISE: process.env.PLAN_PRO_MONTHLY_PAISE,
+  PLAN_PRO_YEARLY_PAISE: process.env.PLAN_PRO_YEARLY_PAISE,
+  PLAN_INSTITUTION_MONTHLY_PAISE: process.env.PLAN_INSTITUTION_MONTHLY_PAISE,
+  PLAN_INSTITUTION_YEARLY_PAISE: process.env.PLAN_INSTITUTION_YEARLY_PAISE,
+};
+
+delete process.env.PLAN_PRO_MONTHLY_PAISE;
+delete process.env.PLAN_PRO_YEARLY_PAISE;
+delete process.env.PLAN_INSTITUTION_MONTHLY_PAISE;
+delete process.env.PLAN_INSTITUTION_YEARLY_PAISE;
+
 const razorpayService = require('../services/razorpay.service');
 
 describe('Razorpay Service', () => {
@@ -15,6 +29,13 @@ describe('Razorpay Service', () => {
 
   afterAll(() => {
     process.env = originalEnv;
+    Object.entries(originalPricingEnv).forEach(([key, val]) => {
+      if (val !== undefined) {
+        process.env[key] = val;
+      } else {
+        delete process.env[key];
+      }
+    });
   });
 
   describe('Configuration & Key Access', () => {

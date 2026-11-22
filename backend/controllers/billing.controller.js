@@ -260,16 +260,29 @@ async function applyPaymentEntitlement({
                 ? txUser.subscription.currentPeriodStart
                 : new Date(paymentTime);
 
+            // Tier ranking to protect active higher-tier plans from being prematurely overwritten
+            const TIER_RANKS = { free: 0, pro: 1, institution: 2, enterprise: 3 };
+            const currentRank = TIER_RANKS[txUser.subscription?.plan] || 0;
+            const newRank = TIER_RANKS[txPayment.planId] || 0;
+            const isDowngrade =
+              txUser.subscription?.status === 'active' &&
+              existingExpiry &&
+              existingExpiry > paymentTime &&
+              currentRank > newRank;
+
+            const effectivePlan = isDowngrade ? txUser.subscription.plan : txPayment.planId;
+            const effectiveExpiry = isDowngrade ? new Date(existingExpiry) : newExpiry;
+
             // E. Update User subscription inside transaction
             const updatedUser = await User.findByIdAndUpdate(
               txUser._id,
               {
                 $set: {
-                  'subscription.plan': txPayment.planId,
+                  'subscription.plan': effectivePlan,
                   'subscription.status': 'active',
                   'subscription.billingCycle': txPayment.billingCycle,
                   'subscription.currentPeriodStart': startDate,
-                  'subscription.currentPeriodEnd': newExpiry,
+                  'subscription.currentPeriodEnd': effectiveExpiry,
                   'subscription.razorpayPaymentId': razorpayPaymentId || txPayment.razorpayPaymentId,
                   'subscription.razorpayOrderId': txPayment.razorpayOrderId,
                   'subscription.cancelAtPeriodEnd': false,
@@ -630,8 +643,13 @@ async function handleWebhook(req, res) {
       case 'payment.failed': {
         const paymentEntity = event.payload?.payment?.entity;
         if (paymentEntity?.order_id) {
+          // A delayed failed-attempt event must not overwrite an order already marked captured
           await Payment.findOneAndUpdate(
-            { razorpayOrderId: paymentEntity.order_id },
+            {
+              razorpayOrderId: paymentEntity.order_id,
+              status: { $ne: 'captured' },
+              entitlementApplied: { $ne: true },
+            },
             {
               status: 'failed',
               errorDescription: paymentEntity.error_description || 'Payment failed',

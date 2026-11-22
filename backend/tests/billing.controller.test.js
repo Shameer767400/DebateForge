@@ -817,6 +817,73 @@ describe('Billing Controller Unit Tests (Mocked Sessions)', () => {
         expect(res.statusCode).toBe(400);
         expect(res._data.error).toBe('Payment ID mismatch with existing record');
       });
+
+      it('does not overwrite captured payment on payment.failed event', async () => {
+        const findOneAndUpdateSpy = jest.spyOn(Payment, 'findOneAndUpdate').mockResolvedValue(null);
+        const payload = {
+          event: 'payment.failed',
+          payload: {
+            payment: {
+              entity: { id: 'pay_failed_attempt', order_id: 'ord_already_captured', error_description: 'Card declined' },
+            },
+          },
+        };
+        const { req, res } = createMockReqRes({
+          headers: { 'x-razorpay-signature': 'valid_sig' },
+          extra: { body: Buffer.from(JSON.stringify(payload)) },
+        });
+
+        await handleWebhook(req, res);
+        expect(res.statusCode).toBe(200);
+        expect(findOneAndUpdateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            razorpayOrderId: 'ord_already_captured',
+            status: { $ne: 'captured' },
+            entitlementApplied: { $ne: true },
+          }),
+          expect.any(Object)
+        );
+      });
+    });
+
+    it('preserves active higher-tier plan (institution) and existing period end when a lower-tier payment is processed', async () => {
+      const futureExpiry = new Date(Date.now() + 25 * 24 * 60 * 60 * 1000);
+      const proPayment = {
+        _id: 'pay_pro_downgrade',
+        userId: 'u_institution_user',
+        planId: 'pro',
+        billingCycle: 'monthly',
+        razorpayOrderId: 'ord_pro_lower',
+        entitlementApplied: false,
+        status: 'created',
+      };
+
+      jest.spyOn(Payment, 'findById').mockResolvedValue(proPayment);
+      jest.spyOn(User, 'findById').mockResolvedValue({
+        _id: 'u_institution_user',
+        subscription: {
+          plan: 'institution',
+          status: 'active',
+          currentPeriodEnd: futureExpiry,
+          appliedOrderIds: [],
+        },
+      });
+
+      let updatedFields = null;
+      jest.spyOn(User, 'findByIdAndUpdate').mockImplementation((id, update) => {
+        updatedFields = update.$set;
+        return { _id: id, subscription: update.$set };
+      });
+      jest.spyOn(Payment, 'findByIdAndUpdate').mockResolvedValue({ ...proPayment, entitlementApplied: true });
+
+      const result = await applyPaymentEntitlement({
+        payment: proPayment,
+        razorpayPaymentId: 'pay_pro_123',
+      });
+
+      expect(result.success).toBe(true);
+      expect(updatedFields['subscription.plan']).toBe('institution');
+      expect(new Date(updatedFields['subscription.currentPeriodEnd']).getTime()).toBe(futureExpiry.getTime());
     });
 
     it('two different concurrent renewal payments preserve both durations (F5)', async () => {
