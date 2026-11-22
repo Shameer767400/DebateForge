@@ -322,17 +322,19 @@ export default function PricingPage() {
           {/* Billing toggle */}
           <div className="pricing-toggle">
             <button
-              className={`toggle-btn ${billing === 'monthly' ? 'toggle-btn--active' : ''}`}
+              type="button"
+              className={`pricing-toggle-btn ${billing === 'monthly' ? 'pricing-toggle-btn--active' : ''}`}
               onClick={() => setBilling('monthly')}
             >
               Monthly
             </button>
             <button
-              className={`toggle-btn ${billing === 'yearly' ? 'toggle-btn--active' : ''}`}
+              type="button"
+              className={`pricing-toggle-btn ${billing === 'yearly' ? 'pricing-toggle-btn--active' : ''}`}
               onClick={() => setBilling('yearly')}
             >
               Yearly
-              <span className="toggle-save">Save ~33%</span>
+              <span className="pricing-toggle-save">Save ~33%</span>
             </button>
           </div>
         </div>
