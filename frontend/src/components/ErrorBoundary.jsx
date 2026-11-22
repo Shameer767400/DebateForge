@@ -7,6 +7,24 @@ class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
+    const msg = error?.message || String(error);
+    const isChunkOrPreloadError =
+      error?.name === 'ChunkLoadError' ||
+      /Unable to preload CSS/i.test(msg) ||
+      /Failed to fetch dynamically imported module/i.test(msg) ||
+      /Loading chunk .* failed/i.test(msg);
+
+    // If a deployment occurred and old hashed chunks are missing, automatically reload once
+    if (isChunkOrPreloadError) {
+      const lastReload = sessionStorage.getItem('df_last_chunk_reload');
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload, 10) > 30000) {
+        sessionStorage.setItem('df_last_chunk_reload', String(now));
+        window.location.reload();
+        return { hasError: false, error: null };
+      }
+    }
+
     return { hasError: true, error };
   }
 
