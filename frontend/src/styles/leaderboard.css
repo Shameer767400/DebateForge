@@ -370,6 +370,10 @@
     font-size: 0.58rem;
   }
 
+  .th-rank {
+    width: 48px;
+  }
+
   .lb-row td {
     padding: 8px 8px;
   }

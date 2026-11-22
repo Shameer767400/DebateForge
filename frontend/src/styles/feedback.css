@@ -396,9 +396,63 @@
   font-weight: 700;
 }
 
+@media (max-width: 768px) {
+  .fb-page {
+    padding-bottom: 80px;
+  }
+}
+
 @media (max-width: 600px) {
   .fb-reviews-grid {
     grid-template-columns: 1fr;
   }
   .fb-stats { gap: 20px; }
+}
+
+@media (max-width: 480px) {
+  .fb-header {
+    padding: 24px 16px 0;
+  }
+
+  .fb-title {
+    font-size: 1.4rem;
+  }
+
+  .fb-content {
+    padding: 0 14px;
+  }
+
+  .fb-form-card {
+    padding: 18px 14px;
+  }
+
+  .fb-stat-value {
+    font-size: 1.4rem;
+  }
+
+  .fb-stats {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .fb-header {
+    padding: 20px 12px 0;
+  }
+
+  .fb-title {
+    font-size: 1.25rem;
+  }
+
+  .fb-content {
+    padding: 0 10px;
+  }
+
+  .fb-form-card {
+    padding: 14px 12px;
+  }
+
+  .fb-star {
+    font-size: 1.6rem;
+  }
 }

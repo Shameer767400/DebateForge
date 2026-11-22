@@ -266,6 +266,10 @@
    ══════════════════════════════ */
 
 @media (max-width: 480px) {
+  .streak-number {
+    font-size: 1.5rem;
+  }
+
   .streak-celebration-card {
     padding: 28px 20px;
     max-width: 90vw;

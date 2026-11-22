@@ -279,3 +279,35 @@
   .admin-filters { flex-direction: column; }
   .admin-export-btn { margin-left: 0; width: 100%; }
 }
+
+@media (max-width: 480px) {
+  .admin-page {
+    padding: 24px 14px 80px;
+  }
+
+  .admin-title {
+    font-size: 1.3rem;
+  }
+
+  .admin-stat-card {
+    padding: 14px;
+  }
+
+  .admin-stat-value {
+    font-size: 1.3rem;
+  }
+
+  .admin-empty {
+    padding: 32px 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .admin-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-title {
+    font-size: 1.15rem;
+  }
+}

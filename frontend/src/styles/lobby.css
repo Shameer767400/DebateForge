@@ -119,7 +119,7 @@
   color: var(--text-primary);
   font-family: var(--font-ui);
   padding: 40px 32px 64px;
-  max-width: 100%;
+  max-width: 1040px;
   margin: 0 auto;
 }
 
@@ -598,7 +598,7 @@
   }
 
   .custom-topic-input {
-    font-size: 0.85rem;
+    font-size: 1rem;
     padding: 10px 12px;
   }
 

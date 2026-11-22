@@ -176,3 +176,31 @@
   opacity: 0.8;
 }
 
+/* ══════════════════════════════════════════
+   GLOBAL MOBILE & PWA OPTIMIZATIONS
+   ══════════════════════════════════════════ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+  touch-action: manipulation;
+}
+
+/* Prevent auto-zooming on iOS when tapping input fields */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+

@@ -189,9 +189,69 @@
 
 .about-cta-btn:hover { opacity: 0.9; }
 
+@media (max-width: 768px) {
+  .about-page {
+    padding-bottom: 80px;
+  }
+}
+
 @media (max-width: 600px) {
   .about-section,
   .about-founder {
     padding: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .about-header {
+    padding: 24px 16px 0;
+  }
+
+  .about-title {
+    font-size: 1.4rem;
+  }
+
+  .about-content {
+    padding: 0 14px;
+  }
+
+  .about-section {
+    padding: 18px 14px;
+  }
+
+  .about-founder {
+    padding: 18px 14px;
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .about-founder-avatar {
+    width: 90px;
+    height: 90px;
+    margin: 0 auto;
+  }
+
+  .about-cta-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .about-header {
+    padding: 20px 12px 0;
+  }
+
+  .about-title {
+    font-size: 1.25rem;
+  }
+
+  .about-content {
+    padding: 0 10px;
+  }
+
+  .about-founder {
+    padding: 14px 10px;
   }
 }

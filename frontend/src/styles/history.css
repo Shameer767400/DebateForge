@@ -389,6 +389,7 @@
 
   .item-meta-info {
     width: 100%;
+    min-width: 0;
   }
 
   .item-score {
@@ -399,5 +400,20 @@
     width: 100%;
     text-align: right;
     margin-top: 4px;
+  }
+}
+
+@media (max-width: 360px) {
+  .item-title {
+    font-size: 0.82rem;
+  }
+
+  .score-value {
+    font-size: 1rem;
+  }
+
+  .action-btn {
+    padding: 8px 10px;
+    font-size: 0.72rem;
   }
 }

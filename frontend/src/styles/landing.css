@@ -538,7 +538,7 @@ html, body {
 /* ── Features grid ── */
 .lp-features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 20px;
   margin-top: 48px;
 }
@@ -636,7 +636,7 @@ html, body {
 
 .lp-testimonials-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 28px;
   margin-top: 60px;
 }
@@ -1006,6 +1006,8 @@ html, body {
   }
 
   .lp-section { padding: 60px 20px; }
+  .lp-section--testimonials { padding: 60px 20px; }
+  .lp-testimonial-card { padding: 26px 20px; }
   .lp-stats-strip { padding: 32px 20px; gap: 0; flex-wrap: wrap; }
   .lp-stat-item { min-width: 50%; border-right: none; padding: 16px; }
   .lp-cta-banner { padding: 48px 20px; margin: 0 16px 40px; }
@@ -1019,5 +1021,21 @@ html, body {
   .lp-hero-actions { flex-direction: column; width: 100%; }
   .lp-btn-primary, .lp-btn-secondary { width: 100%; justify-content: center; }
   .lp-chip--2, .lp-chip--3 { display: none; }
+  .lp-section--testimonials { padding: 40px 16px; }
+  .lp-testimonial-card { padding: 20px 16px; gap: 16px; }
+  .lp-testimonial-quote { font-size: 0.95rem; }
+  .lp-feedback-banner { padding: 24px 16px; }
+}
+
+@media (max-width: 360px) {
+  .lp-nav { padding: 12px 14px; }
+  .lp-hero { padding: 32px 12px 32px; }
+  .lp-hero-title { font-size: 2rem; }
+  .lp-hero-sub { font-size: 0.88rem; }
+  .lp-section { padding: 40px 12px; }
+  .lp-stat-item { min-width: 100%; }
+  .lp-orb-wrap { width: 180px; height: 180px; }
+  .lp-orb-core { width: 70px; height: 70px; }
+  .lp-cta-banner { padding: 36px 14px; margin: 0 10px 30px; }
 }
 

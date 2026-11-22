@@ -123,3 +123,11 @@
     max-width: unset;
   }
 }
+
+@media (max-width: 360px) {
+  .toast {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    gap: 8px;
+  }
+}
