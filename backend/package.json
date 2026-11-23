@@ -40,23 +40,23 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.9.3",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.2.2",
+    "mongoose": "^9.12.3",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
-    "nodemailer": "^10.6.0",
+    "nodemailer": "^10.6.1",
     "openai": "^6.25.0",
     "razorpay": "^2.9.8",
     "resend": "^6.12.3",
     "socket.io": "^4.8.4",
-    "swagger-jsdoc": "^6.2.8",
+    "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
     "jest": "^29.7.0",
     "mongodb-memory-server": "^11.0.1",
-    "nodemon": "^3.1.11",
+    "nodemon": "^3.1.14",
     "supertest": "^7.2.2"
   },
   "allowScripts": {
