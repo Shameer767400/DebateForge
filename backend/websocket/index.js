@@ -109,7 +109,9 @@ function detectLanguageFromText(text) {
   const raw = String(text || '').trim();
   if (!raw) return 'en';
 
-  if (/[\u0C00-\u0C7F]/.test(raw)) return 'te'; // Telugu
+  if (/[\u0C00-\u0C7F]/.test(raw)) return 'te'; // Telugu script
+  // Transliterated Telugu (Tenglish commonly spoken by students)
+  if (/\b(nenu|meeru|cheppandi|cheptunna|kaadu|avunu|enduku|ekkada|ippudu|kada|kani|mari|bagundi|undali|chesaru|alochinchandi|vishayam|chudandi|manaki|vaallu|mithrulara|namaskaram|matladali|antanu)\b/i.test(raw)) return 'te';
   if (/[\u0B80-\u0BFF]/.test(raw)) return 'ta'; // Tamil
   if (/[\u0C80-\u0CFF]/.test(raw)) return 'kn'; // Kannada
   if (/[\u0D00-\u0D7F]/.test(raw)) return 'ml'; // Malayalam
@@ -346,24 +348,31 @@ function initWebSocket(server) {
 
       try {
         const debate = await Debate.findOne({
-          _id:    debateId,
-          userId: socket.user.id,
+          _id: debateId,
+          $or: [
+            { userId: socket.user.id },
+            { 'participants.userId': socket.user.id },
+          ],
         });
         if (!debate) {
           secLogger.error(`[WS] ERROR: Debate ${debateId} not found for user ${socket.user.id}`);
           return socket.emit('error', { message: 'Debate not found' });
         }
 
-        const preferredLangIso = normalizeOptionalLang(preferredLang);
+        const preferredLangIso = normalizeOptionalLang(preferredLang) || normalizeOptionalLang(debate.language);
 
         /* ── Check for existing session (reconnect case) ── */
         const existingRaw = await redisClient.get(`session:${debateId}`);
         if (existingRaw) {
           const existing = JSON.parse(existingRaw);
-          if (existing.userId === socket.user.id) {
+          const isParticipant =
+            existing.userId === socket.user.id ||
+            (existing.participants && existing.participants.some((p) => p.id === socket.user.id));
+
+          if (isParticipant) {
             // Restore existing session — do NOT overwrite round/history.
             // Just update language and tzOffset if they changed.
-            if (preferredLang !== undefined) {
+            if (preferredLang !== undefined || debate.language) {
               existing.preferredLang = preferredLangIso;
               existing.currentLanguage = resolveActiveLanguage(existing, preferredLangIso);
             }
@@ -374,11 +383,21 @@ function initWebSocket(server) {
             socket.join(debateId);
 
             socket.emit('debate_joined', {
-              topic:      debate.topicSnapshot,
-              userSide:   debate.userSide,
-              aiPosition: existing.aiPosition,
-              difficulty: debate.difficulty,
-              format:     debate.format || 'freeform',
+              topic:        debate.topicSnapshot,
+              userSide:     debate.userSide,
+              aiPosition:   existing.aiPosition,
+              difficulty:   debate.difficulty,
+              format:       debate.format || 'freeform',
+              language:     existing.currentLanguage || 'en',
+              roomCode:     debate.roomCode || null,
+              participants: existing.participants || [],
+            });
+
+            // Broadcast updated table state to all participants
+            io.to(debateId).emit('gd_table_update', {
+              participants: existing.participants || [],
+              roomCode:     debate.roomCode || null,
+              capacity:     debate.capacity || 4,
             });
             return;
           }
@@ -402,9 +421,20 @@ function initWebSocket(server) {
         const debateFormat = debate.format || 'freeform';
         const phaseInfo    = DebateFormatEngine.getCurrentPhaseInfo(debateFormat, 0);
 
+        const initialParticipants = (debate.participants && debate.participants.length > 0)
+          ? debate.participants.map((p) => ({
+              id: p.userId ? p.userId.toString() : socket.user.id,
+              name: p.name || 'Candidate',
+              seatNumber: p.seatNumber || 1,
+            }))
+          : [{ id: socket.user.id, name: user?.name || 'Candidate 1 (Host)', seatNumber: 1 }];
+
         const sessionState = {
           debateId,
-          userId:              socket.user.id,
+          userId:              debate.userId ? debate.userId.toString() : socket.user.id,
+          participants:        initialParticipants,
+          roomCode:            debate.roomCode || null,
+          capacity:            debate.capacity || 4,
           topic:               debate.topicSnapshot,
           userSide:            debate.userSide,
           aiPosition,
@@ -437,11 +467,21 @@ function initWebSocket(server) {
         socket.join(debateId);
 
         socket.emit('debate_joined', {
-          topic:      debate.topicSnapshot,
-          userSide:   debate.userSide,
+          topic:        debate.topicSnapshot,
+          userSide:     debate.userSide,
           aiPosition,
-          difficulty: debate.difficulty,
-          format:     debateFormat,
+          difficulty:   debate.difficulty,
+          format:       debateFormat,
+          language:     sessionState.currentLanguage,
+          roomCode:     debate.roomCode || null,
+          participants: initialParticipants,
+        });
+
+        // Broadcast to all connected sockets in this debate room
+        io.to(debateId).emit('gd_table_update', {
+          participants: initialParticipants,
+          roomCode:     debate.roomCode || null,
+          capacity:     debate.capacity || 4,
         });
 
         /* ── Emit initial phase info for format debates ── */
@@ -518,14 +558,21 @@ function initWebSocket(server) {
       }
       const session = JSON.parse(sessionRaw);
 
-      /* ── Ownership check: prevent IDOR ── */
-      if (session.userId !== socket.user.id) {
+      /* ── Ownership check: allow host or joined participants ── */
+      const isAuthorizedUser =
+        session.userId === socket.user.id ||
+        (session.participants && session.participants.some((p) => p.id === socket.user.id));
+      if (!isAuthorizedUser) {
         return socket.emit('error', { message: 'Unauthorized' });
       }
       
       const chunks = socket.audioBuffer || [];
       socket.audioBuffer = []; // Clear current buffer
       
+      const currentParticipant = (session.participants || []).find((p) => p.id === socket.user.id);
+      const speakerName = currentParticipant?.name || 'You';
+      const seatNumber = currentParticipant?.seatNumber || 1;
+
       /* If no audio chunks but we have a transcript fallback from SpeechRecognition,
          use it directly via transcript_direct path instead of silently dropping */
       if (chunks.length === 0) {
@@ -535,7 +582,13 @@ function initWebSocket(server) {
           const detectedLanguage = detectLanguageFromText(fallbackText) || session.detectedLanguage || session.currentLanguage || 'en';
           session.detectedLanguage = detectedLanguage;
           session.currentLanguage = resolveActiveLanguage(session, detectedLanguage);
-          socket.emit('transcript_final', { text: fallbackText, language: session.currentLanguage });
+          io.to(debateId).emit('transcript_final', {
+            text: fallbackText,
+            language: session.currentLanguage,
+            speakerName,
+            seatNumber,
+            userId: socket.user.id,
+          });
           socket._turnInFlight = true;
           try {
             await processTranscript(socket, session, debateId, fallbackText);
@@ -567,13 +620,15 @@ function initWebSocket(server) {
 
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
-
          return;
       }
       const session = JSON.parse(sessionRaw);
 
-      /* ── Ownership check: prevent IDOR ── */
-      if (session.userId !== socket.user.id) {
+      /* ── Ownership check: allow host or joined participants ── */
+      const isAuthorizedUser =
+        session.userId === socket.user.id ||
+        (session.participants && session.participants.some((p) => p.id === socket.user.id));
+      if (!isAuthorizedUser) {
         return socket.emit('error', { message: 'Unauthorized' });
       }
 
@@ -581,11 +636,21 @@ function initWebSocket(server) {
         return socket.emit('error', { message: 'Could not transcribe. Please try again.' });
       }
 
+      const currentParticipant = (session.participants || []).find((p) => p.id === socket.user.id);
+      const speakerName = currentParticipant?.name || 'You';
+      const seatNumber = currentParticipant?.seatNumber || 1;
+
       const detectedLanguage = detectLanguageFromText(text) || session.detectedLanguage || session.currentLanguage || 'en';
       session.detectedLanguage = detectedLanguage;
       session.currentLanguage = resolveActiveLanguage(session, detectedLanguage);
 
-      socket.emit('transcript_final', { text, language: session.currentLanguage });
+      io.to(debateId).emit('transcript_final', {
+        text,
+        language: session.currentLanguage,
+        speakerName,
+        seatNumber,
+        userId: socket.user.id,
+      });
       socket._turnInFlight = true;
       try {
         await processTranscript(socket, session, debateId, text);

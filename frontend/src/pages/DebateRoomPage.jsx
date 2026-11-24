@@ -297,18 +297,86 @@ export default function DebateRoomPage() {
   // Addition 7: Streak celebration
   const [streakMilestone, setStreakMilestone] = useState(null);
   const [streakFreezeUsed, setStreakFreezeUsed] = useState(false);
+  const [activeGDSpeaker, setActiveGDSpeaker] = useState(null);
 
   /* Incrementing key used to guarantee the timer resets every new user_turn */
   const [timerKey, setTimerKey] = useState(0);
 
   const toast = useToast();
 
+  const renderGDCandidateMessages = (msg) => {
+    const text = msg.text || '';
+    const regex = /\[(Aarav|Priya|Karan|Candidate\s*\d+)\]:?\s*/gi;
+    const matches = [...text.matchAll(regex)];
+
+    if (matches.length <= 1) {
+      let name = 'AI Candidate';
+      let role = 'Peer';
+      let avatar = '🤖';
+      let color = '#00e5ff';
+
+      if (text.includes('[Aarav]')) {
+        name = 'Aarav'; role = 'Assertive'; avatar = '⚡'; color = '#ffaa00';
+      } else if (text.includes('[Priya]')) {
+        name = 'Priya'; role = 'Analytical'; avatar = '📊'; color = '#00e5ff';
+      } else if (text.includes('[Karan]')) {
+        name = 'Karan'; role = 'Diplomat'; avatar = '🤝'; color = '#d8b4fe';
+      }
+
+      const cleanText = text.replace(/\[(Aarav|Priya|Karan|Candidate\s*\d+)\]:?\s*/gi, '').trim();
+
+      return (
+        <div className="gd-candidate-turn-box" style={{ borderLeft: `3px solid ${color}`, paddingLeft: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '0.9rem' }}>{avatar}</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color }}>{name}</span>
+            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}>{role}</span>
+          </div>
+          <div className="gd-candidate-text">{cleanText || text}</div>
+        </div>
+      );
+    }
+
+    const blocks = [];
+    for (let i = 0; i < matches.length; i++) {
+      const rawName = matches[i][1];
+      const startIndex = matches[i].index + matches[i][0].length;
+      const endIndex = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      const segment = text.slice(startIndex, endIndex).trim().replace(/^["']|["']$/g, '');
+
+      let name = rawName;
+      let role = 'Peer';
+      let avatar = '🤖';
+      let color = '#00e5ff';
+
+      if (/aarav/i.test(rawName)) {
+        name = 'Aarav'; role = 'Assertive'; avatar = '⚡'; color = '#ffaa00';
+      } else if (/priya/i.test(rawName)) {
+        name = 'Priya'; role = 'Analytical'; avatar = '📊'; color = '#00e5ff';
+      } else if (/karan/i.test(rawName)) {
+        name = 'Karan'; role = 'Diplomat'; avatar = '🤝'; color = '#d8b4fe';
+      }
+
+      blocks.push(
+        <div key={i} className="gd-candidate-turn-box" style={{ borderLeft: `3px solid ${color}`, paddingLeft: '10px', marginTop: i > 0 ? '8px' : '0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '0.9rem' }}>{avatar}</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 800, color }}>{name}</span>
+            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}>{role}</span>
+          </div>
+          <div className="gd-candidate-text">{segment}</div>
+        </div>
+      );
+    }
+    return <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{blocks}</div>;
+  };
+
   const LANGUAGE_OPTIONS = [
-    { value: 'auto', label: 'Auto (detected)' },
-    { value: 'en', label: 'English' },
+    { value: 'en', label: '🇬🇧 English (Default)' },
+    { value: 'te', label: '🇮🇳 తెలుగు (Telugu)' },
+    { value: 'auto', label: '🌐 Auto / Bilingual' },
     { value: 'hi', label: 'Hindi' },
     { value: 'ta', label: 'Tamil' },
-    { value: 'te', label: 'Telugu' },
     { value: 'kn', label: 'Kannada' },
     { value: 'ml', label: 'Malayalam' },
     { value: 'mr', label: 'Marathi' },
@@ -390,6 +458,11 @@ export default function DebateRoomPage() {
         const isPlaceholder = !!data.isPlaceholder;
         const chunkTurnId = data.turnId || null;
         setPhase('ai_speaking');
+
+        if (token.includes('[Aarav]')) setActiveGDSpeaker('Aarav');
+        else if (token.includes('[Priya]')) setActiveGDSpeaker('Priya');
+        else if (token.includes('[Karan]')) setActiveGDSpeaker('Karan');
+
         setMessages((prev) => {
           const hasPending = prev.some((m) => m.isStreaming);
           if (hasPending) {
@@ -428,6 +501,7 @@ export default function DebateRoomPage() {
       /* AI finished its turn — match by turnId (precise) or first streaming bubble */
       case 'ai_turn_complete': {
         const completeTurnId = data.turnId || null;
+        setActiveGDSpeaker(null);
         setMessages((prev) => {
           const hasTurnIdMatch = completeTurnId && prev.some((m) => m.isStreaming && m.turnId === completeTurnId);
           return prev.map((m) => {
@@ -450,6 +524,24 @@ export default function DebateRoomPage() {
         break;
 
       case 'debate_joined':
+        if (data?.roomCode || data?.participants) {
+          setDebateInfo((prev) => ({
+            ...prev,
+            roomCode: data.roomCode || prev?.roomCode,
+            participants: data.participants || prev?.participants,
+          }));
+        }
+        break;
+
+      case 'gd_table_update':
+        if (data?.participants) {
+          setDebateInfo((prev) => ({
+            ...prev,
+            roomCode: data.roomCode || prev?.roomCode,
+            participants: data.participants,
+          }));
+        }
+        break;
         break;
 
       /* Phase transition (Addition 6) — also update timer max for new phase */
@@ -535,7 +627,15 @@ export default function DebateRoomPage() {
     const fetchDebate = () => {
       api
         .get(`/api/debates/${debateId}`)
-        .then((r) => { if (mounted) setDebateInfo(r.data?.debate ?? r.data); })
+        .then((r) => {
+          if (mounted) {
+            const data = r.data?.debate ?? r.data;
+            setDebateInfo(data);
+            if (data?.language) {
+              setDebateLanguage(data.language);
+            }
+          }
+        })
         .catch((err) => {
           if (!mounted) return;
           console.error('[DebateRoom] Failed to load debate info:', err);
@@ -812,29 +912,207 @@ export default function DebateRoomPage() {
           {debateInfo?.format === 'group_discussion' && (
             <div className="gd-table-strip" style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-around',
-              padding: '10px 16px',
-              background: 'linear-gradient(180deg, rgba(14, 20, 36, 0.95), rgba(9, 13, 24, 0.95))',
-              borderBottom: '1px solid rgba(0, 229, 255, 0.2)',
-              gap: '8px',
-              flexWrap: 'wrap'
+              flexDirection: 'column',
+              padding: '12px 16px',
+              background: 'linear-gradient(180deg, rgba(14, 20, 36, 0.98), rgba(9, 13, 24, 0.98))',
+              borderBottom: '1px solid rgba(0, 229, 255, 0.25)',
+              gap: '10px',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: 'rgba(0, 255, 135, 0.1)', border: '1px solid rgba(0, 255, 135, 0.3)' }}>
-                <span style={{ fontSize: '1rem' }}>👤</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00ff87' }}>You (Candidate 1)</span>
+              {/* Table Header with Room Code & Invite button */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#00e5ff', letterSpacing: '0.04em' }}>
+                    👥 CAMPUS GD TABLE (4 SEATS)
+                  </span>
+                  {debateInfo?.roomCode && (
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      background: 'rgba(0, 229, 255, 0.12)',
+                      border: '1px solid rgba(0, 229, 255, 0.35)',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      color: '#00e5ff',
+                      letterSpacing: '0.08em',
+                    }}>
+                      ROOM: {debateInfo.roomCode}
+                    </span>
+                  )}
+                  {debateLanguage === 'te' && (
+                    <span style={{
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 170, 0, 0.15)',
+                      border: '1px solid rgba(255, 170, 0, 0.4)',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      color: '#ffaa00',
+                    }}>
+                      🇮🇳 తెలుగు మోడ్
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {debateInfo?.roomCode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `${window.location.origin}/lobby`;
+                        navigator.clipboard.writeText(`Join my Campus GD on DebateForge! Room Code: ${debateInfo.roomCode}\n${url}`);
+                        toast.success(`Copied! Share room code "${debateInfo.roomCode}" with classmates.`);
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        background: 'rgba(0, 229, 255, 0.1)',
+                        border: '1px solid rgba(0, 229, 255, 0.3)',
+                        color: '#00e5ff',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      📋 Copy Invite
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={phase !== 'user_turn'}
+                    onClick={() => {
+                      sendText("Let's hear other perspectives on this topic. Who has an alternative take?");
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      background: 'rgba(180, 100, 255, 0.12)',
+                      border: '1px solid rgba(180, 100, 255, 0.35)',
+                      color: '#d8b4fe',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: phase === 'user_turn' ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    ⚡ Prompt Peer Debate
+                  </button>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: isAISpeaking ? 'rgba(255, 170, 0, 0.18)' : 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 170, 0, 0.3)' }}>
-                <span style={{ fontSize: '1rem' }}>⚡</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ffaa00' }}>Aarav (Assertive)</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: isAISpeaking ? 'rgba(0, 229, 255, 0.18)' : 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(0, 229, 255, 0.3)' }}>
-                <span style={{ fontSize: '1rem' }}>📊</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#00e5ff' }}>Priya (Analytical)</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: isAISpeaking ? 'rgba(180, 100, 255, 0.18)' : 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(180, 100, 255, 0.3)' }}>
-                <span style={{ fontSize: '1rem' }}>🤝</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#d8b4fe' }}>Karan (Diplomat)</span>
+
+              {/* 4 Seats Visualization with Auto-Fill Badges */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                {/* Seat 1: Host / You */}
+                <div style={{
+                  flex: '1 1 120px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 12px',
+                  borderRadius: '12px',
+                  background: activeGDSpeaker === 'user' ? 'rgba(0, 255, 135, 0.25)' : 'rgba(0, 255, 135, 0.08)',
+                  border: activeGDSpeaker === 'user' ? '2px solid #00ff87' : '1px solid rgba(0, 255, 135, 0.3)',
+                  boxShadow: activeGDSpeaker === 'user' ? '0 0 15px rgba(0, 255, 135, 0.4)' : 'none',
+                  transition: 'all 0.3s ease',
+                }}>
+                  <span style={{ fontSize: '1.1rem' }}>👤</span>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#00ff87' }}>You (Candidate 1)</div>
+                    <div style={{ fontSize: '0.66rem', color: '#64748b' }}>{activeGDSpeaker === 'user' ? '🎙️ Speaking' : '🟢 Ready'}</div>
+                  </div>
+                </div>
+
+                {/* Seat 2: Real Participant or Aarav */}
+                {(() => {
+                  const p2 = (debateInfo?.participants || [])[1];
+                  const isAarav = !p2;
+                  const isSpeaking = activeGDSpeaker === 'Aarav';
+                  return (
+                    <div style={{
+                      flex: '1 1 120px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '7px 12px',
+                      borderRadius: '12px',
+                      background: isSpeaking ? 'rgba(255, 170, 0, 0.25)' : 'rgba(255, 170, 0, 0.08)',
+                      border: isSpeaking ? '2px solid #ffaa00' : '1px solid rgba(255, 170, 0, 0.3)',
+                      boxShadow: isSpeaking ? '0 0 15px rgba(255, 170, 0, 0.4)' : 'none',
+                      transition: 'all 0.3s ease',
+                    }}>
+                      <span style={{ fontSize: '1.1rem' }}>{isAarav ? '⚡' : '👤'}</span>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffaa00' }}>
+                          {isAarav ? 'Aarav (Assertive)' : (p2.name || 'Candidate 2')}
+                        </div>
+                        <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
+                          {isSpeaking ? '🎙️ Speaking' : (isAarav ? '🤖 AI Auto-Filled' : '🟢 Real Peer')}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Seat 3: Real Participant or Priya */}
+                {(() => {
+                  const p3 = (debateInfo?.participants || [])[2];
+                  const isPriya = !p3;
+                  const isSpeaking = activeGDSpeaker === 'Priya';
+                  return (
+                    <div style={{
+                      flex: '1 1 120px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '7px 12px',
+                      borderRadius: '12px',
+                      background: isSpeaking ? 'rgba(0, 229, 255, 0.25)' : 'rgba(0, 229, 255, 0.08)',
+                      border: isSpeaking ? '2px solid #00e5ff' : '1px solid rgba(0, 229, 255, 0.3)',
+                      boxShadow: isSpeaking ? '0 0 15px rgba(0, 229, 255, 0.4)' : 'none',
+                      transition: 'all 0.3s ease',
+                    }}>
+                      <span style={{ fontSize: '1.1rem' }}>{isPriya ? '📊' : '👤'}</span>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#00e5ff' }}>
+                          {isPriya ? 'Priya (Analytical)' : (p3.name || 'Candidate 3')}
+                        </div>
+                        <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
+                          {isSpeaking ? '🎙️ Speaking' : (isPriya ? '🤖 AI Auto-Filled' : '🟢 Real Peer')}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Seat 4: Real Participant or Karan */}
+                {(() => {
+                  const p4 = (debateInfo?.participants || [])[3];
+                  const isKaran = !p4;
+                  const isSpeaking = activeGDSpeaker === 'Karan';
+                  return (
+                    <div style={{
+                      flex: '1 1 120px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '7px 12px',
+                      borderRadius: '12px',
+                      background: isSpeaking ? 'rgba(180, 100, 255, 0.25)' : 'rgba(180, 100, 255, 0.08)',
+                      border: isSpeaking ? '2px solid #d8b4fe' : '1px solid rgba(180, 100, 255, 0.3)',
+                      boxShadow: isSpeaking ? '0 0 15px rgba(180, 100, 255, 0.4)' : 'none',
+                      transition: 'all 0.3s ease',
+                    }}>
+                      <span style={{ fontSize: '1.1rem' }}>{isKaran ? '🤝' : '👤'}</span>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#d8b4fe' }}>
+                          {isKaran ? 'Karan (Diplomat)' : (p4.name || 'Candidate 4')}
+                        </div>
+                        <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
+                          {isSpeaking ? '🎙️ Speaking' : (isKaran ? '🤖 AI Auto-Filled' : '🟢 Real Peer')}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -863,6 +1141,8 @@ export default function DebateRoomPage() {
                       <span className="generating-dots">
                         <span /><span /><span />
                       </span>
+                    ) : isGDRoom && msg.speaker === 'ai' ? (
+                      renderGDCandidateMessages(msg)
                     ) : msg.speaker === 'ai' && !msg.isStreaming ? (
                       <StreamText text={msg.text} />
                     ) : (

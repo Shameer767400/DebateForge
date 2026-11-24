@@ -73,7 +73,15 @@ COACHING RULES:
   const langName = LANGUAGE_NAMES[langToUse] || langToUse;
 
   let languageBlock;
-  if (langToUse !== 'en') {
+  if (langToUse === 'te') {
+    languageBlock = `!!! MANDATORY LANGUAGE RULE — TELUGU (తెలుగు) !!!
+You MUST converse, debate, and respond in fluent, authentic Telugu (తెలుగు).
+Your sentences, grammar, and expressions MUST be natural Telugu as spoken in college placement debates and interviews in Andhra Pradesh and Telangana.
+You may naturally keep common technical terms in English (e.g. 'Artificial Intelligence', 'Data', 'Economy', 'Campus Placement', 'Technology', 'Software') within your Telugu sentences, but all your verbs, connectors, and arguments MUST be in authentic Telugu script (తెలుగు).
+Do NOT revert to speaking full English sentences.
+LANGUAGE: Telugu (తెలుగు).
+`;
+  } else if (langToUse !== 'en') {
     languageBlock = `!!! MANDATORY LANGUAGE RULE — READ THIS FIRST !!!
 You MUST respond ENTIRELY in ${langName} (${langToUse}).
 Every single word, sentence, and character of your response MUST be in ${langName}.

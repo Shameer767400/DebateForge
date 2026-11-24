@@ -1,0 +1,73 @@
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [5 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj
+5 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 6 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >> endobj
+6 0 obj << /Length 5151 >> stream
+BT /F2 22 Tf 0.10 0.22 0.54 rg 48.0 785.0 Td (DebateForge - Technical Architecture & Product Specs) Tj ET
+BT /F1 10 Tf 0.35 0.38 0.45 rg 48.0 761.0 Td (Aditya University Incubation Supporting Document | Live at debateforge.tech) Tj ET
+0.15 0.35 0.75 RG 1.5 w 48 741.0 m 547 741.0 l S
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 711.0 Td (1. Platform Verification & Live Deployment) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 695.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 695.0 Td (Production URL: https://debateforge.tech) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 679.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 679.0 Td (Live Status: Fully active, publicly accessible, and SSL secured.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 663.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 663.0 Td (Frontend Architecture: React 18 Single-Page Application \(SPA\) powered by Vite,) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 650.0 Td (Tailwind CSS, Lucide React, and HTML5 Canvas API.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 634.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 634.0 Td (Backend Architecture: Node.js and Express REST API coupled with Socket.io) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 621.0 Td (WebSockets for bi-directional real-time audio and textual debate streaming.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 605.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 605.0 Td (Database Layer: MongoDB Atlas distributed cluster with automated schema) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 592.0 Td (validation and multi-index query optimization.) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 568.0 Td (2. Deep Dive: Campus GD Table Simulation Engine) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 552.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 552.0 Td (Multi-Agent Coordination: Employs an orchestrated state machine coordinating) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 539.0 Td (turns between the human student and 3 concurrent AI candidates.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 523.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 523.0 Td (Candidate Archetypes: Candidate 2 \(Aarav: High assertiveness, fast) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 510.0 Td (interjections\); Candidate 3 \(Priya: Data-driven, analytical statistics\); Candidate) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 497.0 Td (4 \(Karan: Diplomatic, consensus-builder\).) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 481.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 481.0 Td (5-Phase Discussion Flow: Structured into Opening Statement \(1 min\), Group) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 468.0 Td (Cross-Debate \(3 min\), Challenge/Interjection Round \(2 min\), Consensus Summary \(1) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 455.0 Td (min\), and Recruiter Evaluation.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 439.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 439.0 Td (Recruiter Decision Matrix: Algorithmic placement scoring: Selected \(Score >=) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 426.0 Td (80%\), Waitlisted \(60% - 79%\), Rejected \(< 60%\).) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 402.0 Td (3. Security, Payment & Data Governance) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 386.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 386.0 Td (Payment Security: Razorpay webhook integration with HMAC-SHA256 signature) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 373.0 Td (verification ensuring zero payment tampering.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 357.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 357.0 Td (Authentication & Session Safety: Stateless JSON Web Tokens \(JWT\) stored in) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 344.0 Td (HTTP-only, SameSite secure cookies with bcrypt password hashing.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 328.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 328.0 Td (Audio & Data Privacy: Ephemeral voice stream processing designed in accordance) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 315.0 Td (with Indian Digital Personal Data Protection \(DPDP\) Act principles.) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 291.0 Td (4. Product Roadmap & Scaling Milestones \(2026-2027\)) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 275.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 275.0 Td (Phase 1 \(Q1-Q2 2026\): Onboard 2,500 Aditya University students; validate B2C) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 262.0 Td (24-Hour Pass conversions; finalize DPIIT Startup India registration.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 246.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 246.0 Td (Phase 2 \(Q3 2026\): Launch Institutional Recruiter Dashboard for colleges;) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 233.0 Td (introduce regional language voice support \(Telugu, Hindi\).) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 217.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 217.0 Td (Phase 3 \(Q4 2026 - Q1 2027\): Native iOS and Android mobile app rollout; initiate) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 204.0 Td (institutional B2B sales across 20+ engineering colleges in AP and Telangana.) Tj ET
+endstream endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000000260 00000 n 
+0000000396 00000 n 
+trailer << /Size 7 /Root 1 0 R >>
+startxref
+5599
+%%EOF

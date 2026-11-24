@@ -137,6 +137,44 @@ export default function LeaderboardPage() {
         </div>
       </header>
 
+      {/* ── 3D CYBER COLOSSEUM PODIUM (TOP 3) ── */}
+      {rows.length >= 3 && (
+        <div className="lb-podium-stage">
+          {/* 2nd Place */}
+          <div className="lb-podium-item lb-podium--silver">
+            <div className="podium-aura"></div>
+            <div className="podium-trophy">🥈</div>
+            <div className="podium-user">{rows[1].username}</div>
+            <div className="podium-elo">{rows[1].elo ?? rows[1].eloRating ?? 1200} ELO</div>
+            <div className="podium-block block--silver">
+              <span className="podium-rank-tag">#2</span>
+            </div>
+          </div>
+
+          {/* 1st Place */}
+          <div className="lb-podium-item lb-podium--gold">
+            <div className="podium-aura"></div>
+            <div className="podium-trophy">👑 🥇</div>
+            <div className="podium-user">{rows[0].username}</div>
+            <div className="podium-elo">{rows[0].elo ?? rows[0].eloRating ?? 1200} ELO</div>
+            <div className="podium-block block--gold">
+              <span className="podium-rank-tag">#1 CHAMPION</span>
+            </div>
+          </div>
+
+          {/* 3rd Place */}
+          <div className="lb-podium-item lb-podium--bronze">
+            <div className="podium-aura"></div>
+            <div className="podium-trophy">🥉</div>
+            <div className="podium-user">{rows[2].username}</div>
+            <div className="podium-elo">{rows[2].elo ?? rows[2].eloRating ?? 1200} ELO</div>
+            <div className="podium-block block--bronze">
+              <span className="podium-rank-tag">#3</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── USER RANK CARD (sticky, shown only when user outside top 10) ── */}
       {!userInTop10 && userRow && (
         <div className="lb-user-rank-card">

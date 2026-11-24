@@ -4,7 +4,7 @@ const debateEngine = require('../services/debateEngine.service');
 
 async function startDebate(req, res) {
   try {
-    const { topicId, customTopic, side, userSide, difficulty, persona, format } = req.body;
+    const { topicId, customTopic, side, userSide, difficulty, persona, format, language } = req.body;
 
     // Frontend sends "side", model expects "userSide"
     const resolvedSide = userSide || side;
@@ -28,6 +28,18 @@ async function startDebate(req, res) {
       await Topic.findByIdAndUpdate(topicId, { $inc: { debateCount: 1 } });
     }
 
+    const crypto = require('crypto');
+    let roomCode = null;
+    const participants = [];
+    if (format === 'group_discussion') {
+      roomCode = 'GD' + crypto.randomBytes(2).toString('hex').toUpperCase();
+      participants.push({
+        userId: req.user.id,
+        name: req.user.name || 'Candidate 1 (Host)',
+        seatNumber: 1,
+      });
+    }
+
     const debate = new Debate({
       userId: req.user.id,
       topicId: resolvedTopicId,
@@ -36,6 +48,10 @@ async function startDebate(req, res) {
       difficulty: resolvedDifficulty,
       persona: persona || 'balanced',
       format: format || 'freeform',
+      language: language || 'en',
+      roomCode,
+      capacity: 4,
+      participants,
       arguments: [],
     });
 
@@ -48,6 +64,9 @@ async function startDebate(req, res) {
       difficulty: debate.difficulty,
       persona: debate.persona,
       format: debate.format,
+      language: debate.language,
+      roomCode: debate.roomCode,
+      participants: debate.participants,
     });
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -90,7 +109,10 @@ async function getDebateById(req, res) {
   try {
     const debate = await Debate.findOne({
       _id: req.params.id,
-      userId: req.user.id,
+      $or: [
+        { userId: req.user.id },
+        { 'participants.userId': req.user.id },
+      ],
     });
 
     if (!debate) {
@@ -101,6 +123,57 @@ async function getDebateById(req, res) {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in getDebateById controller:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function joinGDRoomByCode(req, res) {
+  try {
+    const { roomCode } = req.body;
+    if (!roomCode || !roomCode.trim()) {
+      return res.status(400).json({ error: 'Room code is required' });
+    }
+    const cleanCode = roomCode.trim().toUpperCase();
+    const debate = await Debate.findOne({ roomCode: cleanCode, format: 'group_discussion' });
+    if (!debate) {
+      return res.status(404).json({ error: 'Campus GD room not found. Check the room code and try again.' });
+    }
+    if (debate.endedAt) {
+      return res.status(400).json({ error: 'This GD session has already concluded.' });
+    }
+
+    const existingIndex = (debate.participants || []).findIndex(
+      (p) => p.userId && p.userId.toString() === req.user.id
+    );
+
+    let seatNumber;
+    if (existingIndex !== -1) {
+      seatNumber = debate.participants[existingIndex].seatNumber;
+    } else {
+      if ((debate.participants || []).length >= (debate.capacity || 4)) {
+        return res.status(400).json({ error: 'This GD table is already full (maximum 4 participants)' });
+      }
+      seatNumber = (debate.participants || []).length + 1;
+      debate.participants.push({
+        userId: req.user.id,
+        name: req.user.name || `Candidate ${seatNumber}`,
+        seatNumber,
+      });
+      await debate.save();
+    }
+
+    return res.status(200).json({
+      debateId: debate._id,
+      roomCode: debate.roomCode,
+      topicSnapshot: debate.topicSnapshot,
+      format: debate.format,
+      language: debate.language,
+      seatNumber,
+      participants: debate.participants,
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in joinGDRoomByCode controller:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -159,6 +232,6 @@ module.exports = {
   getDebateHistory,
   getDebateById,
   endDebate,
-
+  joinGDRoomByCode,
 };
 

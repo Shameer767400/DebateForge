@@ -128,6 +128,34 @@ const DebateSchema = new Schema(
     },
 
     /* ── Addition 6: Formal Debate Format Fields ── */
+    language: {
+      type: String,
+      default: 'en',
+    },
+    roomCode: {
+      type: String,
+      uppercase: true,
+      trim: true,
+      index: true,
+      sparse: true,
+    },
+    capacity: {
+      type: Number,
+      default: 4,
+    },
+    participants: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        name: { type: String, default: 'Candidate' },
+        seatNumber: { type: Number, default: 1 },
+        joinedAt: { type: Date, default: Date.now },
+        speakingTimeSeconds: { type: Number, default: 0 },
+        turnCount: { type: Number, default: 0 },
+        score: { type: Number, default: null },
+        verdict: { type: String, enum: ['SELECTED', 'WAITLISTED', 'REJECTED', null], default: null },
+        feedback: { type: String, default: null },
+      },
+    ],
     format: {
       type: String,
       default: 'freeform',

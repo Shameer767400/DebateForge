@@ -921,5 +921,58 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
+/* ═══════════════════════════════════════════
+   3D HOLOGRAPHIC COMMAND DECK ELEVATIONS
+   ═══════════════════════════════════════════ */
+.lobby-root {
+  perspective: 1200px;
+}
+
+.lobby-container {
+  transform-style: preserve-3d;
+}
+
+.topic-card {
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+  transform: translateZ(0);
+}
+
+.topic-card:hover {
+  transform: translateY(-4px) translateZ(8px);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35), 0 0 20px rgba(0, 229, 255, 0.12);
+}
+
+.side-btn,
+.diff-card,
+.persona-card,
+.format-card {
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.24s ease, border-color 0.24s ease;
+  transform: translateZ(0);
+}
+
+.side-btn:hover,
+.diff-card:hover,
+.persona-card:hover {
+  transform: translateY(-3px) translateZ(6px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
+}
+
+.lobby-start--ready {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 24px rgba(0, 255, 135, 0.4), 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: lobbyStartPulse 2.4s infinite;
+}
+
+@keyframes lobbyStartPulse {
+  0%, 100% {
+    box-shadow: 0 0 24px rgba(0, 255, 135, 0.35), 0 8px 20px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 36px rgba(0, 229, 255, 0.6), 0 10px 28px rgba(0, 0, 0, 0.5);
+  }
+}
+
+
 
 

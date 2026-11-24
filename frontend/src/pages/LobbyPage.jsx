@@ -99,6 +99,12 @@ const FORMATS = [
   { key: 'parliamentary',     icon: '🏛️', name: 'Parliamentary',     desc: 'British Parliamentary style',        badge: 'EXPERT',       badgeColor: '#ff3366' },
 ];
 
+const LANGUAGES = [
+  { key: 'en', flag: '🇬🇧', name: 'English', desc: 'Corporate & Campus Placement Standard', badge: 'DEFAULT', badgeColor: '#00ff87' },
+  { key: 'te', flag: '🇮🇳', name: 'తెలుగు (Telugu)', desc: 'AP & Telangana Campus Placement Coaching', badge: 'REGIONAL', badgeColor: '#ffaa00' },
+  { key: 'auto', flag: '🌐', name: 'Bilingual (Auto)', desc: 'Speak English or Telugu naturally', badge: 'FLEXIBLE', badgeColor: '#00e5ff' },
+];
+
 const DIFF_COLORS = {
   easy: '#00ff87',
   medium: '#ffcc00',
@@ -125,7 +131,10 @@ export default function LobbyPage() {
   const [difficulty, setDifficulty] = useState(null);
   const [persona, setPersona] = useState('balanced');
   const [format, setFormat] = useState('freeform');
+  const [language, setLanguage] = useState('en');
   const [starting, setStarting] = useState(false);
+  const [joinRoomCode, setJoinRoomCode] = useState('');
+  const [joiningRoom, setJoiningRoom] = useState(false);
   const [error, setError] = useState('');
   const [billingInfo, setBillingInfo] = useState(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -241,13 +250,14 @@ export default function LobbyPage() {
 
       const body =
         mode === 'custom' || isCuratedCustom
-          ? { customTopic: activeTopic, side, difficulty, persona, format }
+          ? { customTopic: activeTopic, side, difficulty, persona, format, language }
           : {
               topicId: selectedTopic._id ?? selectedTopic.id,
               side,
               difficulty,
               persona,
               format,
+              language,
             };
 
       const res = await api.post('/api/debates/start', body);
@@ -265,6 +275,21 @@ export default function LobbyPage() {
       }
     } finally {
       setStarting(false);
+    }
+  };
+
+  /* ── Join existing GD table with room code ── */
+  const handleJoinByCode = async () => {
+    if (!joinRoomCode.trim()) return;
+    setJoiningRoom(true);
+    setError('');
+    try {
+      const res = await api.post('/api/debates/join-gd', { roomCode: joinRoomCode.trim() });
+      navigate(`/debate/${res.data.debateId}`);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Could not join GD room. Check the code.');
+    } finally {
+      setJoiningRoom(false);
     }
   };
 
@@ -552,6 +577,88 @@ export default function LobbyPage() {
               <span className="format-icon">{f.icon}</span>
               <span className="format-name">{f.name}</span>
               <span className="format-desc">{f.desc}</span>
+            </button>
+          ))}
+        </div>
+
+        {format === 'group_discussion' && (
+          <div className="gd-room-join-panel" style={{
+            marginTop: '16px',
+            padding: '16px 20px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(0, 255, 135, 0.04))',
+            border: '1px solid rgba(0, 229, 255, 0.25)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#00e5ff', margin: 0 }}>
+                  👥 Campus GD Round Table · 4-Seat Room
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '4px 0 0 0' }}>
+                  Start a table as host, or join your classmates with their 6-character room code. Vacant seats automatically fill with AI candidates!
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Enter Room Code (e.g. GD4A2F)"
+                value={joinRoomCode}
+                onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase())}
+                maxLength={8}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(0, 229, 255, 0.3)',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  minWidth: '220px'
+                }}
+              />
+              <button
+                type="button"
+                disabled={!joinRoomCode.trim() || joiningRoom}
+                onClick={handleJoinByCode}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  background: joinRoomCode.trim() ? 'linear-gradient(135deg, #00e5ff, #00ff87)' : 'rgba(255,255,255,0.08)',
+                  color: joinRoomCode.trim() ? '#050c18' : '#64748b',
+                  fontWeight: 800,
+                  fontSize: '0.86rem',
+                  border: 'none',
+                  cursor: joinRoomCode.trim() ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {joiningRoom ? 'Connecting...' : 'Join Table ➔'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Language selector ── */}
+      <div className={`lobby-section ${format ? 'lobby-section--open' : ''}`}>
+        <h2 className="lobby-section-title">
+          {format === 'group_discussion' ? 'Choose GD Language' : 'Choose Debate Language'}
+        </h2>
+        <div className="format-row">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.key}
+              type="button"
+              className={`format-card ${language === l.key ? 'format-card--active' : ''}`}
+              onClick={() => setLanguage(l.key)}
+            >
+              <span className="format-badge" style={{ background: l.badgeColor }}>{l.badge}</span>
+              <span className="format-icon">{l.flag}</span>
+              <span className="format-name">{l.name}</span>
+              <span className="format-desc">{l.desc}</span>
             </button>
           ))}
         </div>

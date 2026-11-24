@@ -397,6 +397,161 @@
   }
 }
 
+/* ── 3D CYBER COLOSSEUM PODIUM ── */
+.lb-podium-stage {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 16px;
+  margin: 28px 0 34px;
+  perspective: 1200px;
+}
+
+.lb-podium-item {
+  position: relative;
+  flex: 1;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.lb-podium-item:hover {
+  transform: translateY(-8px) scale(1.03);
+}
+
+.podium-aura {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  filter: blur(28px);
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lb-podium--gold .podium-aura {
+  background: radial-gradient(circle, #ffd700 0%, transparent 70%);
+  opacity: 0.45;
+}
+
+.lb-podium--silver .podium-aura {
+  background: radial-gradient(circle, #c0c0c0 0%, transparent 70%);
+}
+
+.lb-podium--bronze .podium-aura {
+  background: radial-gradient(circle, #cd7f32 0%, transparent 70%);
+}
+
+.podium-trophy {
+  font-size: 2.2rem;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+  z-index: 1;
+  animation: podiumFloat 3s ease-in-out infinite alternate;
+}
+
+.lb-podium--gold .podium-trophy {
+  font-size: 2.7rem;
+  animation-duration: 2.5s;
+}
+
+@keyframes podiumFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-6px); }
+}
+
+.podium-user {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.lb-podium--gold .podium-user {
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  font-size: 1.05rem;
+}
+
+.podium-elo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  z-index: 1;
+}
+
+.lb-podium--gold .podium-elo {
+  color: #ffd700;
+}
+
+.podium-block {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px 12px 6px 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.block--gold {
+  height: 125px;
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.25) 0%, rgba(20, 18, 5, 0.85) 100%);
+  border: 1px solid rgba(255, 215, 0, 0.6);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.2), inset 0 2px 4px rgba(255, 215, 0, 0.4);
+}
+
+.block--silver {
+  height: 95px;
+  background: linear-gradient(180deg, rgba(192, 192, 192, 0.2) 0%, rgba(15, 17, 22, 0.85) 100%);
+  border: 1px solid rgba(192, 192, 192, 0.4);
+}
+
+.block--bronze {
+  height: 75px;
+  background: linear-gradient(180deg, rgba(205, 127, 50, 0.2) 0%, rgba(22, 15, 10, 0.85) 100%);
+  border: 1px solid rgba(205, 127, 50, 0.4);
+}
+
+.podium-rank-tag {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.block--gold .podium-rank-tag { color: #ffd700; }
+.block--silver .podium-rank-tag { color: #e0e0e0; }
+.block--bronze .podium-rank-tag { color: #cd7f32; }
+
+@media (max-width: 600px) {
+  .lb-podium-stage {
+    gap: 8px;
+  }
+  .block--gold { height: 95px; }
+  .block--silver { height: 75px; }
+  .block--bronze { height: 60px; }
+  .podium-user { font-size: 0.8rem; }
+  .podium-trophy { font-size: 1.8rem; }
+  .lb-podium--gold .podium-trophy { font-size: 2.2rem; }
+}
+
 @media (max-width: 768px) {
   .lb-page {
     padding-bottom: 80px !important; /* spacing for bottom nav */

@@ -650,4 +650,40 @@
   }
 }
 
+/* ═══════════════════════════════════════════
+   3D QUANTUM VAULT & CRYSTAL CARD ELEVATIONS
+   ═══════════════════════════════════════════ */
+.pricing-grid {
+  perspective: 1200px;
+}
+
+.pricing-card {
+  transform: translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.pricing-card:hover {
+  transform: translateY(-6px) translateZ(12px) rotateX(1.5deg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 229, 255, 0.18);
+  border-color: rgba(0, 229, 255, 0.35);
+}
+
+.pricing-card--popular {
+  border: 1.5px solid rgba(0, 255, 135, 0.45);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.4), 0 0 28px rgba(0, 255, 135, 0.2);
+  animation: popularCardGlow 4s infinite ease-in-out;
+}
+
+@keyframes popularCardGlow {
+  0%, 100% {
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.4), 0 0 24px rgba(0, 255, 135, 0.18);
+  }
+  50% {
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.5), 0 0 38px rgba(0, 229, 255, 0.35);
+  }
+}
+
+
 

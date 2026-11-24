@@ -193,6 +193,10 @@ In this turn, simulate 1 or 2 of the AI candidates (e.g. Aarav, Priya, or Karan)
 Always start each candidate's speech with their name in brackets, e.g.:
 [Aarav]: "While I understand that point, in a competitive corporate landscape..."
 [Priya]: "To add to what was said, the recent industry data shows..."
+
+LANGUAGE COHERENCE:
+If the active discussion language is Telugu (తెలుగు), all candidates MUST speak in natural, fluent Telugu (e.g., [Aarav]: "నేను ఆ వాదనతో పూర్తిగా విభేదిస్తున్నాను...", [Priya]: "మార్కెట్ గణాంకాలను పరిశీలిస్తే...", [Karan]: "ఇద్దరి అభిప్రాయాల్లోనూ నిజం ఉంది, కానీ...").
+If the discussion language is English, candidates must speak in polished professional English.
 Keep each candidate's speech focused, conversational, and direct (2-4 sentences per candidate). Directly challenge the user to step in, back up their claims with facts, or synthesize the discussion!`;
     }
 

@@ -1,0 +1,126 @@
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [5 0 R 6 0 R] /Count 2 >> endobj
+3 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj
+5 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >> endobj
+6 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 8 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> >> endobj
+7 0 obj << /Length 5874 >> stream
+BT /F2 22 Tf 0.10 0.22 0.54 rg 48.0 785.0 Td (DebateForge - Pitch Deck & Business Plan) Tj ET
+BT /F1 10 Tf 0.35 0.38 0.45 rg 48.0 761.0 Td (Aditya University Student Startup Initiative | Live at debateforge.tech) Tj ET
+0.15 0.35 0.75 RG 1.5 w 48 741.0 m 547 741.0 l S
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 711.0 Td (1. Executive Summary) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 695.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 695.0 Td (Venture Name: DebateForge \(Live at https://debateforge.tech\)) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 679.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 679.0 Td (Institution: Aditya University - Student Entrepreneurship Initiative) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 663.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 663.0 Td (Category: EdTech / Artificial Intelligence / Placement Technology) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 647.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 647.0 Td (Value Proposition: AI-powered real-time voice sparring and multi-candidate Campus) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 634.0 Td (Group Discussion \(GD\) simulations with automated recruiter placement rubrics.) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 610.0 Td (2. The Problem We Are Solving) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 594.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 594.0 Td (Campus GD Elimination Rate: Over 70% of engineering and management graduates are) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 581.0 Td (eliminated in the preliminary Group Discussion round during campus recruitment) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 568.0 Td (\(TCS, Infosys, Cognizant, Wipro, Accenture, Deloitte\).) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 552.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 552.0 Td (Communication Anxiety & Lack of Practice: Students lack a safe, non-judgmental) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 539.0 Td (environment and peer groups to practice structured articulation,) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 526.0 Td (counter-arguments, and professional interjections.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 510.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 510.0 Td (Expensive & Inaccessible Coaching: Traditional personality development and) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 497.0 Td (soft-skills coaching centers charge upwards of Rs 10,000 to 25,000, which is) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 484.0 Td (unaffordable for the majority of tier-2 and tier-3 students.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 468.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 468.0 Td (Subjective & Delayed Feedback: Manual mock GDs conducted in colleges fail to) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 455.0 Td (provide quantitative, data-driven insights into speaking time, content depth,) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 442.0 Td (listening skills, and leadership.) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 418.0 Td (3. The Solution: DebateForge Platform) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 402.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 402.0 Td (Real-Time Voice AI Debater: Users engage in fluid, verbal debates against an) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 389.0 Td (adaptive AI that detects weak logic, counters assertions, and trains articulation) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 376.0 Td (in real-time.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 360.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 360.0 Td (Campus GD Round Table Simulation: A multi-agent virtual table featuring 3) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 347.0 Td (distinct AI candidate archetypes \(Aarav - Assertive, Priya - Analytical, Karan -) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 334.0 Td (Diplomatic\) mirroring actual corporate hiring dynamics.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 318.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 318.0 Td (Automated Recruiter Rubrics: Instant placement verdicts \(Selected, Waitlisted,) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 305.0 Td (Rejected\) with quantitative scores across 4 core dimensions: Entry Timing, Content) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 292.0 Td (Depth, Active Listening, and Leadership.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 276.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 276.0 Td (Viral Social Verification: Automated HTML5 Canvas generation of 1200x630 social) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 263.0 Td (scorecards with verified skill badges, shareable instantly to LinkedIn and) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 250.0 Td (WhatsApp.) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 226.0 Td (4. Market Opportunity & Target Audience) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 210.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 210.0 Td (Total Addressable Market \(TAM\): 35 Million+ students enrolled in higher education) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 197.0 Td (institutions across India, with 1.5 Million engineers graduating each year.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 181.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 181.0 Td (Serviceable Available Market \(SAM\): 6 Million+ pre-final and final-year) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 168.0 Td (undergraduate students actively preparing for campus placements, MBA interviews) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 155.0 Td (\(CAT/XAT\), and civil services.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 139.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 139.0 Td (Serviceable Obtainable Market \(SOM\): 150,000+ students across engineering, MCA,) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 126.0 Td (and management colleges in Andhra Pradesh and Telangana within the first 18) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 113.0 Td (months.) Tj ET
+endstream endobj
+8 0 obj << /Length 4113 >> stream
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 777.0 Td (5. Business Model & Revenue Streams) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 761.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 761.0 Td (Freemium Tier: Free daily debate rounds and foundational practice topics to drive) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 748.0 Td (viral student adoption and campus word-of-mouth.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 732.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 732.0 Td (24-Hour Placement Sprint Pass \(Rs 49\): Affordable micro-transaction pass targeted) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 719.0 Td (at students facing imminent placement drives, offering 24-hour unlimited) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 706.0 Td (high-speed AI sparring.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 690.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 690.0 Td (Pro Monthly Subscription \(Rs 199/mo\): Unlimited speech debates, advanced) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 677.0 Td (recruiter analytics, deep rebuttal breakdowns, and priority low-latency servers.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 661.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 661.0 Td (B2B Institutional Campus Licensing: Annual per-seat software licensing for) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 648.0 Td (college Training and Placement \(T&P\) cells for batch-wide screening and automated) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 635.0 Td (progress monitoring.) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 611.0 Td (6. Current Traction & Technical Milestones) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 595.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 595.0 Td (Live Production Deployment: Fully operational web platform deployed at) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 582.0 Td (https://debateforge.tech with SSL encryption and automated daily XML sitemaps.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 566.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 566.0 Td (Live Payment Gateway: Integrated Razorpay checkout supporting UPI, debit/credit) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 553.0 Td (cards, and net banking with cryptographic signature verification.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 537.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 537.0 Td (Version 2 Multi-Candidate Engine: Successfully engineered and deployed) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 524.0 Td (multi-agent state machines orchestrating multi-party campus discussions.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 508.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 508.0 Td (Robust Test Suite: 100% backend test suite coverage \(120/120 passing) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 495.0 Td (unit/integration tests\).) Tj ET
+BT /F2 13 Tf 0.12 0.31 0.85 rg 48.0 471.0 Td (7. Support & Grants Requested from Aditya EDC) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 455.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 455.0 Td (Campus Pilot Deployment: Approval to partner with Aditya University Training &) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 442.0 Td (Placement Cell to conduct pilot mock GD sessions for 1,000+ students.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 426.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 426.0 Td (Seed Grants & Funding: Mentorship and institutional nomination to apply for) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 413.0 Td (Startup India Seed Fund Scheme \(SISFS\), NIDHI-EIR, and MeitY TIDE 2.0.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 397.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 397.0 Td (Startup Registration & IPR: Guidance in incorporating as a Private Limited) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 384.0 Td (Company or LLP, DPIIT registration, and trademarking DebateForge.) Tj ET
+BT /F2 10 Tf 0.12 0.31 0.85 rg 54.0 368.0 Td (-) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 368.0 Td (Cloud Infrastructure Credits: Access to cloud compute credits \(AWS / Google) Tj ET
+BT /F1 9.5 Tf 0.15 0.18 0.22 rg 66.0 355.0 Td (Cloud\) to support real-time audio LLM inference at campus scale.) Tj ET
+endstream endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000000266 00000 n 
+0000000402 00000 n 
+0000000538 00000 n 
+0000006464 00000 n 
+trailer << /Size 9 /Root 1 0 R >>
+startxref
+10629
+%%EOF

@@ -20,6 +20,7 @@ const SERVER_EVENTS = [
   'judge_verdict',
   'ai_translation',
   'user_translation',
+  'gd_table_update',
   'error',
 ];
 
@@ -746,6 +747,13 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   /** Notify server of language change mid-debate */
   const setLanguage = useCallback((lang) => {
     preferredLangRef.current = lang;
+    if (recognitionRef.current && lang && lang !== 'auto') {
+      try {
+        recognitionRef.current.lang = speechRecognitionLangFromIso(lang);
+      } catch (err) {
+        console.warn('[useDebateSocket] Failed to update recognition.lang:', err);
+      }
+    }
     socketRef.current?.emit('set_language', { debateId, lang: lang || 'auto' });
   }, [debateId]);
 
