@@ -27,6 +27,7 @@ import { useToast } from '../context/ToastContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
 import Confetti from '../components/Confetti';
 import StreakCelebration from '../components/StreakCelebration';
+import ShareDebateModal from '../components/ShareDebateModal';
 import '../styles/theme.css';
 import '../styles/debate.css';
 import '../styles/lobby-format.css';
@@ -285,6 +286,7 @@ export default function DebateRoomPage() {
   const [alertExiting,   setAlertExiting]   = useState(false);
   const [endResult,      setEndResult]      = useState(null);
   const [showConfetti,   setShowConfetti]   = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [textInput,      setTextInput]      = useState('');
   const [selectedVoiceURI, setSelectedVoiceURI] = useState('');
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -672,9 +674,8 @@ export default function DebateRoomPage() {
   /* ── Share result handler ── */
   const handleShare = useCallback(() => {
     if (!judgeVerdict) return;
-    const text = `I scored ${judgeVerdict.userScore}/100 in a formal debate on DebateForge!\nTopic: ${debateInfo?.topicSnapshot || 'Custom topic'} | Format: ${debateInfo?.format || 'Freeform'}\nResult: ${judgeVerdict.winner === 'user' ? 'WIN 🏆' : judgeVerdict.winner === 'ai' ? 'LOSS' : 'DRAW'}\nTry it at debateforge.app`;
-    navigator.clipboard?.writeText(text).then(() => toast.success('Result copied to clipboard!')).catch(() => {});
-  }, [judgeVerdict, debateInfo, toast]);
+    setShowShareModal(true);
+  }, [judgeVerdict]);
 
   /* ── Render ── */
   return (
@@ -1191,6 +1192,16 @@ export default function DebateRoomPage() {
           </div>
         </div>
       )}
+      {/* Share Debate Modal */}
+      <ShareDebateModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        topic={debateInfo?.topicSnapshot || 'Debate Practice'}
+        format={debateInfo?.format || 'freeform'}
+        userScore={judgeVerdict?.userScore || 0}
+        winner={judgeVerdict?.winner || 'draw'}
+        debateId={debateId}
+      />
     </>
   );
 }

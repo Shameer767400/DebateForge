@@ -1,0 +1,266 @@
+/* ═══════════════════════════════════════════════
+   DebateForge — Viral Share Modal Styles
+   ═══════════════════════════════════════════════ */
+
+.share-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 12, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: shareFadeIn 0.22s ease-out;
+}
+
+@keyframes shareFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.share-modal-card {
+  background: #0f141f;
+  border: 1px solid rgba(0, 255, 135, 0.28);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 24px rgba(0, 255, 135, 0.12);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  padding: 24px;
+  color: #fff;
+  position: relative;
+  animation: shareSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes shareSlideUp {
+  from { transform: translateY(18px) scale(0.96); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.share-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.share-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.share-modal-icon {
+  font-size: 1.3rem;
+}
+
+.share-modal-title {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: #f0f6fc;
+}
+
+.share-modal-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.share-modal-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Score Preview Card ── */
+.share-preview-card {
+  background: linear-gradient(135deg, rgba(20, 28, 45, 0.9), rgba(12, 17, 28, 0.95));
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.share-preview--win {
+  border-color: rgba(0, 255, 135, 0.35);
+  box-shadow: inset 0 0 16px rgba(0, 255, 135, 0.08);
+}
+
+.share-preview-badge {
+  display: inline-block;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #00ff87;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+  text-shadow: 0 0 12px rgba(0, 255, 135, 0.4);
+}
+
+.share-preview--other .share-preview-badge {
+  color: #00aaff;
+  text-shadow: 0 0 12px rgba(0, 170, 255, 0.4);
+}
+
+.share-preview-topic {
+  font-size: 0.94rem;
+  color: #e6edf3;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  max-height: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.share-preview-meta {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.share-modal-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 14px 0;
+  line-height: 1.4;
+}
+
+/* ── 1-Click Social Buttons Grid ── */
+.share-social-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.share-social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  color: #fff;
+}
+
+.social-icon {
+  font-size: 1.05rem;
+}
+
+.share-btn--whatsapp {
+  background: rgba(37, 211, 102, 0.15);
+  border-color: rgba(37, 211, 102, 0.35);
+  color: #25d366;
+}
+.share-btn--whatsapp:hover {
+  background: rgba(37, 211, 102, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+}
+
+.share-btn--linkedin {
+  background: rgba(10, 102, 194, 0.15);
+  border-color: rgba(10, 102, 194, 0.35);
+  color: #388bfd;
+}
+.share-btn--linkedin:hover {
+  background: rgba(10, 102, 194, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(10, 102, 194, 0.25);
+}
+
+.share-btn--twitter {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #f0f6fc;
+}
+.share-btn--twitter:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
+.share-btn--native {
+  background: rgba(0, 255, 135, 0.12);
+  border-color: rgba(0, 255, 135, 0.3);
+  color: #00ff87;
+}
+.share-btn--native:hover {
+  background: rgba(0, 255, 135, 0.22);
+  transform: translateY(-2px);
+}
+
+/* ── Copy Link Box ── */
+.share-copy-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #090d14;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 4px 4px 4px 12px;
+}
+
+.share-copy-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.82rem;
+  outline: none;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.share-copy-btn {
+  background: #1b263b;
+  border: 1px solid rgba(0, 255, 135, 0.25);
+  color: #00ff87;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.share-copy-btn:hover {
+  background: rgba(0, 255, 135, 0.16);
+  border-color: #00ff87;
+}
+
+.share-copy-btn--copied {
+  background: #00ff87 !important;
+  color: #0a0a0f !important;
+  font-weight: 700 !important;
+}
+
+@media (max-width: 480px) {
+  .share-modal-card {
+    padding: 18px;
+  }
+  .share-social-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

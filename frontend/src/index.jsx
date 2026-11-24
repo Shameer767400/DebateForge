@@ -15,6 +15,20 @@ window.addEventListener('vite:preloadError', (event) => {
   }
 });
 
+// Google Analytics 4 (GA4) auto-initialization when VITE_GA_MEASUREMENT_ID is configured
+const gaMeasurementId = import.meta.env.VITE_GA_MEASUREMENT_ID;
+if (gaMeasurementId && typeof window !== 'undefined') {
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`;
+  document.head.appendChild(script);
+
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function() { window.dataLayer.push(arguments); };
+  window.gtag('js', new Date());
+  window.gtag('config', gaMeasurementId, { send_page_view: true });
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>

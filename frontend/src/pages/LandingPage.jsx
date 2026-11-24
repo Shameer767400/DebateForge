@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api.service';
+import InteractiveSparringDemo from '../components/InteractiveSparringDemo';
 import '../styles/landing.css';
 
 const FEATURES = [
@@ -218,6 +219,9 @@ export default function LandingPage() {
           </div>
         ))}
       </section>
+
+      {/* ══════════ INTERACTIVE SPARRING PLAYGROUND ══════════ */}
+      <InteractiveSparringDemo />
 
       {/* ══════════ HOW IT WORKS ══════════ */}
       <section className="lp-section" id="how">

@@ -710,4 +710,216 @@
   }
 }
 
+/* ═══════════════════════════════════════════════
+   Lobby Usage Strip & Upgrade Modal
+   ═══════════════════════════════════════════════ */
+
+.lobby-usage-strip {
+  margin: 0 0 20px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.lobby-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  background: rgba(15, 20, 31, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.lobby-usage-pill--free {
+  border-color: rgba(0, 255, 135, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.lobby-usage-pill--free strong {
+  color: #00ff87;
+}
+
+.lobby-usage-pill--pro {
+  border-color: rgba(0, 170, 255, 0.4);
+  background: linear-gradient(135deg, rgba(0, 170, 255, 0.12), rgba(0, 255, 135, 0.08));
+  color: #e0f2fe;
+}
+
+.lobby-usage-icon {
+  font-size: 1.05rem;
+}
+
+.lobby-upgrade-cta {
+  background: rgba(0, 255, 135, 0.15);
+  border: 1px solid rgba(0, 255, 135, 0.4);
+  color: #00ff87;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.lobby-upgrade-cta:hover {
+  background: #00ff87;
+  color: #0a0a0f;
+  transform: translateY(-1px);
+}
+
+/* Category Pills for GD and MUN */
+.topic-pill[data-category="placement & gd"] {
+  background: rgba(255, 170, 0, 0.14);
+  color: #ffaa00;
+  border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
+.topic-pill[data-category="model un (mun)"] {
+  background: rgba(0, 170, 255, 0.14);
+  color: #00aaff;
+  border: 1px solid rgba(0, 170, 255, 0.3);
+}
+
+/* ── Lobby Upgrade Modal ── */
+.lobby-upgrade-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 7, 12, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: modalFadeIn 0.22s ease-out;
+}
+
+.lobby-upgrade-card {
+  background: #0f1420;
+  border: 1px solid rgba(0, 255, 135, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 255, 135, 0.1);
+  border-radius: 18px;
+  max-width: 460px;
+  width: 100%;
+  padding: 28px;
+  text-align: center;
+  color: #fff;
+  animation: modalSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lobby-upgrade-icon {
+  font-size: 2.4rem;
+  margin-bottom: 12px;
+}
+
+.lobby-upgrade-title {
+  margin: 0 0 10px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.lobby-upgrade-desc {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+}
+
+.lobby-upgrade-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.lobby-upgrade-option {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px 10px;
+  position: relative;
+}
+
+.lobby-upgrade-option--featured {
+  background: rgba(0, 255, 135, 0.08);
+  border-color: rgba(0, 255, 135, 0.4);
+}
+
+.option-badge {
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  background: #00ff87;
+  color: #0a0a0f;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.option-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.option-price {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #00ff87;
+  margin-bottom: 4px;
+}
+
+.option-sub {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.3;
+}
+
+.lobby-upgrade-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lobby-upgrade-btn {
+  background: linear-gradient(135deg, #00ff87, #00aaff);
+  color: #0a0a0f;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 0.94rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lobby-upgrade-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 255, 135, 0.35);
+}
+
+.lobby-upgrade-dismiss {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 6px;
+}
+
+.lobby-upgrade-dismiss:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+
 

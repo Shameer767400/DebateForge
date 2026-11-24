@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../context/AuthContext';
+import ShareDebateModal from '../components/ShareDebateModal';
 import '../styles/theme.css';
 import '../styles/history.css';
 
@@ -153,6 +154,7 @@ export default function DebateHistoryPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [filter, setFilter] = useState('all'); // all | win | loss | draw
+  const [shareDebate, setShareDebate] = useState(null);
   const LIMIT = 15;
 
   useEffect(() => {
@@ -317,6 +319,13 @@ export default function DebateHistoryPage() {
                             📥 Download Report Card
                           </button>
                           <button
+                            onClick={() => setShareDebate(detail)}
+                            className="action-btn action-btn--share"
+                            style={{ background: 'rgba(0, 255, 135, 0.12)', color: '#00ff87', borderColor: 'rgba(0, 255, 135, 0.3)' }}
+                          >
+                            📤 Share Score
+                          </button>
+                          <button
                             onClick={() => navigate('/lobby')}
                             className="action-btn action-btn--again"
                           >
@@ -412,6 +421,16 @@ export default function DebateHistoryPage() {
           </button>
         </div>
       )}
+      {/* ── Share Modal ── */}
+      <ShareDebateModal
+        isOpen={!!shareDebate}
+        onClose={() => setShareDebate(null)}
+        topic={shareDebate?.topicSnapshot ?? 'Debate Practice'}
+        format={shareDebate?.format ?? 'Freeform'}
+        userScore={shareDebate?.userFinalScore ?? 0}
+        winner={shareDebate?.winner ?? 'draw'}
+        debateId={shareDebate?._id ?? ''}
+      />
     </div>
   );
 }

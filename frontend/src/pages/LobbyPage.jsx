@@ -8,12 +8,31 @@ import '../styles/lobby-format.css';
 
 const CATEGORIES = [
   'All',
+  'Placement & GD',
+  'Model UN (MUN)',
   'Technology',
   'Society',
   'Politics',
   'Education',
   'Environment',
   'Economy',
+];
+
+const CURATED_TOPICS = [
+  { id: 'gd-1', title: 'Work From Home vs Return to Office: What is better for young careers?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-2', title: 'Should Generative AI tools be allowed during campus placement coding tests?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-3', title: 'Cryptocurrency & Digital Currency: Financial future or speculative bubble?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-4', title: 'Privatization of Public Sector Banks and PSUs: Economic boon or bane?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-5', title: 'Electric Vehicles in developing nations: Are power grids and infra ready?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-6', title: 'Gig Economy: Flexible workforce empowerment or lack of labor security?', category: 'Placement & GD', difficulty: 'easy' },
+  { id: 'gd-7', title: 'Data localization vs cross-border cloud innovation: Which must policy prioritize?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-8', title: 'College degrees vs specialized portfolio skills: What recruiters value more in 2026', category: 'Placement & GD', difficulty: 'easy' },
+  { id: 'mun-1', title: 'The UN Security Council veto power should be permanently restructured', category: 'Model UN (MUN)', difficulty: 'hard' },
+  { id: 'mun-2', title: 'Developed nations owe legally binding climate reparations to the Global South', category: 'Model UN (MUN)', difficulty: 'hard' },
+  { id: 'mun-3', title: 'An international treaty must ban fully autonomous lethal military systems', category: 'Model UN (MUN)', difficulty: 'hard' },
+  { id: 'mun-4', title: 'Developing nations should have guaranteed sovereign access to outer space resources', category: 'Model UN (MUN)', difficulty: 'medium' },
+  { id: 'mun-5', title: 'Universal human rights vs cultural sovereignty in international trade sanctions', category: 'Model UN (MUN)', difficulty: 'hard' },
+  { id: 'mun-6', title: 'Global governance of artificial intelligence should be managed by a UN specialized agency', category: 'Model UN (MUN)', difficulty: 'medium' },
 ];
 
 const DIFFICULTIES = [
@@ -86,6 +105,8 @@ export default function LobbyPage() {
   const [format, setFormat] = useState('freeform');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
+  const [billingInfo, setBillingInfo] = useState(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const sideRef = useRef(null);
   const diffRef = useRef(null);
@@ -95,7 +116,7 @@ export default function LobbyPage() {
   const apiRef = useRef(api);
   apiRef.current = api;
 
-  /* ── Fetch topics on mount ── */
+  /* ── Fetch topics & subscription on mount ── */
   useEffect(() => {
     let mounted = true;
     apiRef.current
@@ -103,7 +124,24 @@ export default function LobbyPage() {
       .then((res) => { if (mounted) setTopics(res.data.topics ?? res.data); })
       .catch(() => { if (mounted) setError('Failed to load topics.'); })
       .finally(() => { if (mounted) setLoading(false); });
+
+    apiRef.current
+      .get('/api/billing/subscription')
+      .then((res) => { if (mounted) setBillingInfo(res.data); })
+      .catch(() => {});
+
     return () => { mounted = false; };
+  }, []);
+
+  /* ── Auto-select shared challenge topic from URL ── */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedTopic = params.get('topic');
+    if (sharedTopic && sharedTopic.trim()) {
+      setMode('custom');
+      setCustomTopicText(sharedTopic.trim());
+      setSelectedTopic({ title: sharedTopic.trim(), category: 'Challenge', difficulty: 'medium' });
+    }
   }, []);
 
   /* ── Reset step-2 / step-3 when mode or topic changes ── */
@@ -122,10 +160,11 @@ export default function LobbyPage() {
   };
 
   /* ── Filters ── */
+  const allAvailableTopics = [...CURATED_TOPICS, ...topics];
   const filtered =
     activeTab === 'All'
-      ? topics
-      : topics.filter(
+      ? allAvailableTopics
+      : allAvailableTopics.filter(
           (t) => t.category?.toLowerCase() === activeTab.toLowerCase()
         );
 
@@ -174,9 +213,13 @@ export default function LobbyPage() {
     setStarting(true);
     setError('');
     try {
+      const isCuratedCustom =
+        selectedTopic?.id &&
+        (String(selectedTopic.id).startsWith('gd-') || String(selectedTopic.id).startsWith('mun-'));
+
       const body =
-        mode === 'custom'
-          ? { customTopic: customTopicText.trim(), side, difficulty, persona, format }
+        mode === 'custom' || isCuratedCustom
+          ? { customTopic: activeTopic, side, difficulty, persona, format }
           : {
               topicId: selectedTopic._id ?? selectedTopic.id,
               side,
@@ -188,12 +231,16 @@ export default function LobbyPage() {
       const res = await api.post('/api/debates/start', body);
       navigate(`/debate/${res.data.debateId ?? res.data._id}`);
     } catch (err) {
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          err.message ||
-          'Could not start debate.'
-      );
+      if (err.response?.status === 402 || err.response?.data?.code === 'FREE_LIMIT_REACHED') {
+        setShowUpgradeModal(true);
+      } else {
+        setError(
+          err.response?.data?.error ||
+            err.response?.data?.message ||
+            err.message ||
+            'Could not start debate.'
+        );
+      }
     } finally {
       setStarting(false);
     }
@@ -222,6 +269,28 @@ export default function LobbyPage() {
           </Link>
         </div>
       </header>
+
+      {/* ── Usage / Plan status banner ── */}
+      {billingInfo && (
+        <div className="lobby-usage-strip">
+          {billingInfo.isPaid ? (
+            <div className="lobby-usage-pill lobby-usage-pill--pro">
+              <span className="lobby-usage-icon">✨</span>
+              <span className="lobby-usage-text"><strong>Pro Active:</strong> Unlimited AI debate sparring rounds unlocked</span>
+            </div>
+          ) : (
+            <div className="lobby-usage-pill lobby-usage-pill--free">
+              <span className="lobby-usage-icon">🎯</span>
+              <span className="lobby-usage-text">
+                Free Plan: <strong>{billingInfo.usage?.debatesRemaining ?? (Math.max(0, 5 - (billingInfo.usage?.debatesUsed ?? 0)))} of {billingInfo.usage?.debatesLimit ?? 5} free debates</strong> remaining this month
+              </span>
+              <Link to="/pricing" className="lobby-upgrade-cta">
+                ⚡ Upgrade (Day Pass ₹49 / Pro ₹299)
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Mode toggle ── */}
       <div className="mode-toggle">
@@ -477,6 +546,39 @@ export default function LobbyPage() {
       >
         {starting ? 'Entering arena…' : 'Start Debate ⚔️'}
       </button>
+      {/* ── Upgrade Prompt Modal ── */}
+      {showUpgradeModal && (
+        <div className="lobby-upgrade-backdrop" onClick={() => setShowUpgradeModal(false)}>
+          <div className="lobby-upgrade-card" onClick={(e) => e.stopPropagation()}>
+            <div className="lobby-upgrade-icon">🎯</div>
+            <h3 className="lobby-upgrade-title">Monthly Free Limit Reached (5/5)</h3>
+            <p className="lobby-upgrade-desc">
+              You've used all 5 free debates for this month! Upgrade now to keep sparring with AI opponents, unlock unlimited custom personas, and access detailed fallacy breakdowns.
+            </p>
+            <div className="lobby-upgrade-options">
+              <div className="lobby-upgrade-option">
+                <div className="option-name">⚡ 24-Hour Pass</div>
+                <div className="option-price">₹49</div>
+                <div className="option-sub">Unlimited debates for 24h</div>
+              </div>
+              <div className="lobby-upgrade-option lobby-upgrade-option--featured">
+                <div className="option-badge">POPULAR</div>
+                <div className="option-name">✨ Monthly Pro</div>
+                <div className="option-price">₹299/mo</div>
+                <div className="option-sub">Unlimited debates & advanced judging</div>
+              </div>
+            </div>
+            <div className="lobby-upgrade-actions">
+              <button className="lobby-upgrade-btn" onClick={() => navigate('/pricing')}>
+                View Plans & Upgrade →
+              </button>
+              <button className="lobby-upgrade-dismiss" onClick={() => setShowUpgradeModal(false)}>
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

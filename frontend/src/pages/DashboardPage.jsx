@@ -122,6 +122,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState(null);
   const [fallacies, setFallacies] = useState([]);
   const [history, setHistory] = useState([]);
+  const [subscription, setSubscription] = useState(null);
 
   const { supported: pushSupported, subscribed: pushSubscribed, subscribe: subscribePush } =
     usePushNotifications();
@@ -148,11 +149,13 @@ export default function DashboardPage() {
       apiRef.current.get('/api/profile/me'),
       apiRef.current.get('/api/profile/fallacies'),
       apiRef.current.get('/api/debates/history?limit=100'),
-    ]).then(([prof, fall, hist]) => {
+      apiRef.current.get('/api/billing/subscription'),
+    ]).then(([prof, fall, hist, sub]) => {
       if (!mounted) return;
       if (prof.status  === 'fulfilled') setProfile(prof.value.data);
       if (fall.status  === 'fulfilled') setFallacies(fall.value.data?.fallacies ?? fall.value.data ?? []);
       if (hist.status  === 'fulfilled') setHistory(hist.value.data?.debates     ?? hist.value.data ?? []);
+      if (sub?.status  === 'fulfilled') setSubscription(sub.value.data);
       setLoading(false);
     });
 
@@ -356,6 +359,19 @@ export default function DashboardPage() {
                 <div className="stat-value" style={{ color: 'var(--accent-blue)' }}>{avgScore}</div>
                 <div className="stat-label">Avg Score</div>
                 <Trend value={profile?.avgScoreTrend} />
+              </div>
+              <div className="stat-card" style={{ border: subscription?.isPaid ? '1px solid rgba(0, 170, 255, 0.4)' : '1px solid rgba(0, 255, 135, 0.3)' }}>
+                <div className="stat-value" style={{ color: subscription?.isPaid ? '#00aaff' : '#00ff87', fontSize: '1.4rem' }}>
+                  {subscription?.isPaid ? 'PRO' : `${subscription?.usage?.debatesRemaining ?? (Math.max(0, 5 - (subscription?.usage?.debatesUsed ?? 0)))} / 5`}
+                </div>
+                <div className="stat-label">
+                  {subscription?.isPaid ? 'Unlimited Debates' : 'Free Debates Left'}
+                </div>
+                {!subscription?.isPaid && (
+                  <Link to="/pricing" style={{ fontSize: '0.74rem', color: '#00ff87', textDecoration: 'none', fontWeight: 700, marginTop: 4, display: 'inline-block' }}>
+                    ⚡ Upgrade (Pass ₹49)
+                  </Link>
+                )}
               </div>
             </>
           )}
