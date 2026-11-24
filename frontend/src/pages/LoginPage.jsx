@@ -36,8 +36,15 @@ export default function LoginPage() {
       
       const userData = res.data.user;
       const userRole = userData?.role ? String(userData.role).replace(/["'\\]/g, '').trim().toLowerCase() : '';
-      const fromPath = location.state?.from?.pathname;
-      const target = fromPath || (userRole === 'admin' ? '/admin' : '/lobby');
+      const from = location.state?.from;
+      let returnDestination = '';
+      if (typeof from === 'string' && from.trim()) {
+        returnDestination = from;
+      } else if (from && typeof from === 'object' && from.pathname) {
+        returnDestination = `${from.pathname}${from.search || ''}${from.hash || ''}`;
+      }
+
+      const target = returnDestination || (userRole === 'admin' ? '/admin' : '/lobby');
       navigate(target, { replace: true });
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed. Please try again.';
