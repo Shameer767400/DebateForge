@@ -22,6 +22,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
+import { useAuth } from '../context/AuthContext';
 
 import { useToast } from '../context/ToastContext';
 import { useDebateSocket } from '../hooks/useDebateSocket';
@@ -268,6 +269,7 @@ function StreamText({ text }) {
 ───────────────────────────────────────── */
 export default function DebateRoomPage() {
   const api = useApi();
+  const { user } = useAuth();
   const { id: debateId } = useParams();
   const navigate          = useNavigate();
 
