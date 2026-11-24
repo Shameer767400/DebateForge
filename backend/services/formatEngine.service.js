@@ -55,6 +55,17 @@ const FORMATS = {
       { key: 'judging',   name: 'Judge Scoring',         turnsEach: 0, timeLimit: 0   },
     ],
   },
+
+  group_discussion: {
+    name: 'Campus GD Simulation',
+    phases: [
+      { key: 'opening',            name: 'Opening & Stance Entry',   turnsEach: 1, timeLimit: 90 },
+      { key: 'rebuttal',           name: 'Group Cross-Debate',       turnsEach: 2, timeLimit: 90 },
+      { key: 'cross_examination',  name: 'Challenge & Interjection', turnsEach: 2, timeLimit: 60 },
+      { key: 'closing',            name: 'Consensus & Summary',      turnsEach: 1, timeLimit: 90 },
+      { key: 'judging',            name: 'Recruiter Evaluation',     turnsEach: 0, timeLimit: 0  },
+    ],
+  },
 };
 
 /* ═══════════════════════════════════════
@@ -167,6 +178,22 @@ class DebateFormatEngine {
     if (phase.key === 'cross_examination') {
       // In cross-exam, user asks questions, AI answers
       addition += 'The user is cross-examining you. Answer their questions directly and concisely.';
+    }
+
+    if (formatName === 'group_discussion') {
+      addition += `\n\nCRITICAL MULTI-CANDIDATE GROUP DISCUSSION INSTRUCTION:
+You are simulating a 4-person Campus Placement / MBA Admissions Group Discussion.
+Participants at the table:
+1. USER (The candidate being evaluated)
+2. Aarav (Candidate 2 - Assertive, contrarian, challenges assumptions rapidly)
+3. Priya (Candidate 3 - Analytical, quotes market statistics, industry & economic trends)
+4. Karan (Candidate 4 - Diplomatic, looks for consensus, connects different arguments)
+
+In this turn, simulate 1 or 2 of the AI candidates (e.g. Aarav, Priya, or Karan) reacting to the user and each other.
+Always start each candidate's speech with their name in brackets, e.g.:
+[Aarav]: "While I understand that point, in a competitive corporate landscape..."
+[Priya]: "To add to what was said, the recent industry data shows..."
+Keep each candidate's speech focused, conversational, and direct (2-4 sentences per candidate). Directly challenge the user to step in, back up their claims with facts, or synthesize the discussion!`;
     }
 
     return addition;

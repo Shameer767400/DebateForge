@@ -196,6 +196,29 @@ function sanitizeJudgeResponse(judgeResponse, fallbackFeedback = '') {
       : 'Solid effort, but there are still clear weaknesses to tighten up.')
   ).trim();
 
+  let gdVerdict = null;
+  if (judgeResponse?.gdVerdict && typeof judgeResponse.gdVerdict === 'object') {
+    const g = judgeResponse.gdVerdict;
+    const userScore = Number(judgeResponse?.userScore ?? 65);
+    const defaultStatus = userScore >= 75 ? 'SELECTED' : userScore >= 60 ? 'WAITLISTED' : 'REJECTED';
+    gdVerdict = {
+      status: ['SELECTED', 'WAITLISTED', 'REJECTED'].includes(g.status) ? g.status : defaultStatus,
+      selectionTitle: String(
+        g.selectionTitle ||
+        (defaultStatus === 'SELECTED'
+          ? 'Selected for Next Round (Technical Interview)'
+          : defaultStatus === 'WAITLISTED'
+          ? 'Waitlisted for Final Placement Review'
+          : 'Needs Practice in Content & Structure')
+      ).trim(),
+      entryTimingScore: Math.min(100, Math.max(0, Number(g.entryTimingScore ?? Math.round(userScore * 0.95)))),
+      contentDepthScore: Math.min(100, Math.max(0, Number(g.contentDepthScore ?? Math.round(userScore * 0.98)))),
+      listeningSynthesisScore: Math.min(100, Math.max(0, Number(g.listeningSynthesisScore ?? Math.round(userScore * 1.02)))),
+      leadershipScore: Math.min(100, Math.max(0, Number(g.leadershipScore ?? Math.round(userScore * 0.92)))),
+      panelRemarks: String(g.panelRemarks || 'Actively contributed to the group discussion. Continue refining structured points and crisp summaries.').trim(),
+    };
+  }
+
   return {
     userScore: Number(judgeResponse?.userScore ?? 65),
     aiScore: Number(judgeResponse?.aiScore ?? 60),
@@ -208,6 +231,7 @@ function sanitizeJudgeResponse(judgeResponse, fallbackFeedback = '') {
     fallacies,
     reportCardHeadline,
     improvementSummary: buildImprovementSummary(areasToImprove, grammarMistakes),
+    gdVerdict,
   };
 }
 
@@ -1028,8 +1052,22 @@ No real-time ML scores are available for this debate. You must determine the use
       forfeitContext = `\n\nCRITICAL CONTEXT: The user FORFEITED the debate by ending it early before all rounds were completed. Therefore, you MUST declare the "ai" as the winner and heavily penalize the user's score for quitting early.`;
     }
 
-    const judgePrompt = `You are an impartial debate judge.
-Review this complete debate transcript and score both sides.${forfeitContext}
+    const isGD = session.format === 'group_discussion';
+    const gdPromptContext = isGD
+      ? `\n\nCAMPUS PLACEMENT & GROUP DISCUSSION EVALUATION:
+This session is a simulated 4-person Campus Placement / MBA Admissions Group Discussion.
+In addition to the standard fields, you MUST evaluate the candidate's performance as a Senior Campus Recruiter and include a "gdVerdict" object in the JSON with:
+- "status": "SELECTED" (if userScore >= 75), "WAITLISTED" (if userScore between 60 and 74), or "REJECTED" (if userScore < 60)
+- "selectionTitle": "Selected for Round 2 (Technical & HR Interview)" or "Waitlisted for Placement Review" or "Needs Improvement in Argument Structure"
+- "entryTimingScore": score out of 100 on how effectively they timed their entrances and interjections
+- "contentDepthScore": score out of 100 on facts, market data, and depth of arguments
+- "listeningSynthesisScore": score out of 100 on actively listening, synthesizing peers' points, and avoiding talking over others
+- "leadershipScore": score out of 100 on group moderation, steering discussions back on track, and building consensus
+- "panelRemarks": 2-3 sentences of direct, actionable recruiter feedback on hiring potential.`
+      : '';
+
+    const judgePrompt = `You are an impartial debate judge and corporate evaluator.
+Review this complete debate transcript and score both sides.${forfeitContext}${gdPromptContext}
 
 TOPIC: ${session.topic}
 USER POSITION: ${session.userSide}
@@ -1038,7 +1076,7 @@ FORMAT: ${session.format}
 
 FULL TRANSCRIPT:
 ${debate.arguments.map(a =>
-  `[${a.speaker.toUpperCase()}]: ${a.content}`
+  `[${(a.speakerName || a.speaker).toUpperCase()}]: ${a.content}`
 ).join('\n\n')}
 ${mlScoresText}
 
@@ -1058,7 +1096,16 @@ Respond ONLY in this JSON format:
   "userWeaknesses": "Could improve rebuttal directness...",
   "areasToImprove": ["Rebuttals need more evidence", "Avoid ad hominem attacks"],
   "grammarMistakes": ["'their' instead of 'there'", "missing commas in compound sentences"],
-  "fallacies": ["hasty generalization", "ad hominem"]
+  "fallacies": ["hasty generalization", "ad hominem"]${isGD ? `,
+  "gdVerdict": {
+    "status": "SELECTED",
+    "selectionTitle": "Selected for Round 2 (Technical & HR Interview)",
+    "entryTimingScore": 86,
+    "contentDepthScore": 82,
+    "listeningSynthesisScore": 88,
+    "leadershipScore": 84,
+    "panelRemarks": "Strong articulation and respectful mediation between polarizing viewpoints."
+  }` : ''}
 }`;
 
     // Use the AI Orchestrator to get judge response (cascading failover)

@@ -93,6 +93,7 @@ const PERSONAS = [
 
 const FORMATS = [
   { key: 'freeform',          icon: '💬', name: 'Freeform',          desc: 'Open debate, no strict rules',       badge: 'RECOMMENDED',  badgeColor: '#00ff87' },
+  { key: 'group_discussion',  icon: '👥', name: 'Campus GD Table',   desc: '4-peer group discussion with placement verdict', badge: 'NEW · POPULAR', badgeColor: '#00e5ff' },
   { key: 'oxford',            icon: '🎓', name: 'Oxford Union',      desc: 'Opening → Rebuttal → Cross-Exam → Closing', badge: 'INTERMEDIATE', badgeColor: '#ffcc00' },
   { key: 'lincoln_douglas',   icon: '⚖️',  name: 'Lincoln-Douglas',   desc: 'Classic 1v1 value debate format',    badge: 'ADVANCED',     badgeColor: '#ff9500' },
   { key: 'parliamentary',     icon: '🏛️', name: 'Parliamentary',     desc: 'British Parliamentary style',        badge: 'EXPERT',       badgeColor: '#ff3366' },

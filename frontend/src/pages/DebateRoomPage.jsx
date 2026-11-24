@@ -808,15 +808,54 @@ export default function DebateRoomPage() {
             </div>
           </div>
 
+          {/* Virtual GD Round Table Bar */}
+          {debateInfo?.format === 'group_discussion' && (
+            <div className="gd-table-strip" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-around',
+              padding: '10px 16px',
+              background: 'linear-gradient(180deg, rgba(14, 20, 36, 0.95), rgba(9, 13, 24, 0.95))',
+              borderBottom: '1px solid rgba(0, 229, 255, 0.2)',
+              gap: '8px',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: 'rgba(0, 255, 135, 0.1)', border: '1px solid rgba(0, 255, 135, 0.3)' }}>
+                <span style={{ fontSize: '1rem' }}>👤</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#00ff87' }}>You (Candidate 1)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: isAISpeaking ? 'rgba(255, 170, 0, 0.18)' : 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 170, 0, 0.3)' }}>
+                <span style={{ fontSize: '1rem' }}>⚡</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#ffaa00' }}>Aarav (Assertive)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: isAISpeaking ? 'rgba(0, 229, 255, 0.18)' : 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(0, 229, 255, 0.3)' }}>
+                <span style={{ fontSize: '1rem' }}>📊</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#00e5ff' }}>Priya (Analytical)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '20px', background: isAISpeaking ? 'rgba(180, 100, 255, 0.18)' : 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(180, 100, 255, 0.3)' }}>
+                <span style={{ fontSize: '1rem' }}>🤝</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#d8b4fe' }}>Karan (Diplomat)</span>
+              </div>
+            </div>
+          )}
+
           {/* Chat area */}
           <div className="debate-chat">
-            {messages.map((msg) => (
+            {messages.map((msg) => {
+              const isGDRoom = debateInfo?.format === 'group_discussion';
+              let customAvatar = msg.speaker === 'user' ? '🎤' : '🤖';
+              if (isGDRoom && msg.speaker === 'ai') {
+                if (msg.text?.includes('[Aarav]')) customAvatar = '⚡';
+                else if (msg.text?.includes('[Priya]')) customAvatar = '📊';
+                else if (msg.text?.includes('[Karan]')) customAvatar = '🤝';
+              }
+              return (
               <div
                 key={msg.id}
                 className={`msg-row msg-row--${msg.speaker}`}
               >
                 <div className={`msg-avatar msg-avatar--${msg.speaker}`}>
-                  {msg.speaker === 'user' ? '🎤' : '🤖'}
+                  {customAvatar}
                 </div>
                 <div className="msg-body">
                   <div className={`msg-bubble msg-bubble--${msg.speaker}${msg.isPlaceholder ? ' msg-bubble--generating' : ''}`}>
@@ -845,7 +884,8 @@ export default function DebateRoomPage() {
                   )}
                 </div>
               </div>
-            ))}
+            );
+            })}
 
             {/* AI thinking indicator */}
             {isProcessing && (
@@ -1095,6 +1135,61 @@ export default function DebateRoomPage() {
               </div>
             </div>
 
+            {/* GD Placement Recruiter Verdict */}
+            {judgeVerdict.gdVerdict && (
+              <div className="judge-gd-card" style={{
+                background: 'linear-gradient(135deg, rgba(14, 25, 45, 0.95), rgba(7, 12, 22, 0.95))',
+                border: '1px solid rgba(0, 229, 255, 0.35)',
+                borderRadius: '12px',
+                padding: '16px',
+                margin: '16px 0',
+                textAlign: 'left'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#00e5ff', fontWeight: 700 }}>
+                    🎯 Campus Placement GD Verdict
+                  </span>
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    background: judgeVerdict.gdVerdict.status === 'SELECTED' ? 'rgba(0, 255, 135, 0.2)' : judgeVerdict.gdVerdict.status === 'WAITLISTED' ? 'rgba(255, 204, 0, 0.2)' : 'rgba(255, 51, 102, 0.2)',
+                    color: judgeVerdict.gdVerdict.status === 'SELECTED' ? '#00ff87' : judgeVerdict.gdVerdict.status === 'WAITLISTED' ? '#ffcc00' : '#ff3366',
+                    border: '1px solid currentColor',
+                  }}>
+                    {judgeVerdict.gdVerdict.status === 'SELECTED' ? '🟢 SELECTED' : judgeVerdict.gdVerdict.status === 'WAITLISTED' ? '🟡 WAITLISTED' : '🔴 REJECTED'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '1.02rem', fontWeight: 700, color: '#fff', marginBottom: '6px' }}>
+                  {judgeVerdict.gdVerdict.selectionTitle}
+                </div>
+                <p style={{ fontSize: '0.84rem', color: 'rgba(255, 255, 255, 0.75)', margin: '0 0 12px', lineHeight: 1.5 }}>
+                  {judgeVerdict.gdVerdict.panelRemarks}
+                </p>
+
+                {/* GD 4-Dimension Metric Bars */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px' }}>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.6)' }}>Entry Timing</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#00e5ff' }}>{judgeVerdict.gdVerdict.entryTimingScore || 85}%</div>
+                  </div>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.6)' }}>Content Depth</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#00e5ff' }}>{judgeVerdict.gdVerdict.contentDepthScore || 82}%</div>
+                  </div>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.6)' }}>Active Listening</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#00e5ff' }}>{judgeVerdict.gdVerdict.listeningSynthesisScore || 88}%</div>
+                  </div>
+                  <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.6)' }}>Leadership</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#00e5ff' }}>{judgeVerdict.gdVerdict.leadershipScore || 84}%</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {judgeVerdict.feedback && (
               <div className="judge-feedback">
                 <div className="judge-feedback-title">Judge's Feedback</div>
@@ -1201,6 +1296,7 @@ export default function DebateRoomPage() {
         userScore={judgeVerdict?.userScore || 0}
         winner={judgeVerdict?.winner || 'draw'}
         debateId={debateId}
+        gdVerdict={judgeVerdict?.gdVerdict}
       />
     </>
   );

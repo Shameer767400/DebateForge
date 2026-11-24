@@ -9,6 +9,10 @@ const ArgumentSchema = new Schema(
       required: true,
       enum: ['user', 'ai'],
     },
+    speakerName: {
+      type: String,
+      default: null,
+    },
     content: {
       type: String,
       required: true,
@@ -127,7 +131,7 @@ const DebateSchema = new Schema(
     format: {
       type: String,
       default: 'freeform',
-      enum: ['freeform', 'oxford', 'lincoln_douglas', 'parliamentary'],
+      enum: ['freeform', 'oxford', 'lincoln_douglas', 'parliamentary', 'group_discussion'],
     },
     currentPhase: {
       type: String,
@@ -151,6 +155,15 @@ const DebateSchema = new Schema(
       },
       reportCardHeadline: { type: String, default: null },
       improvementSummary: { type: String, default: null },
+      gdVerdict: {
+        status: { type: String, enum: ['SELECTED', 'WAITLISTED', 'REJECTED', null], default: null },
+        selectionTitle: { type: String, default: null },
+        entryTimingScore: { type: Number, default: null },
+        contentDepthScore: { type: Number, default: null },
+        listeningSynthesisScore: { type: Number, default: null },
+        leadershipScore: { type: Number, default: null },
+        panelRemarks: { type: String, default: null },
+      },
     },
     phaseHistory: [PhaseEntrySchema],
     /* ── End Addition 6 ── */
