@@ -14,7 +14,7 @@ const topicSchema = new Schema(
     category: {
       type: String,
       required: true,
-      enum: ['technology', 'society', 'politics', 'education', 'environment', 'economy'],
+      enum: ['technology', 'society', 'politics', 'education', 'environment', 'economy', 'placement', 'mun'],
     },
     difficulty: {
       type: String,

@@ -104,10 +104,29 @@ async function seedTopics() {
       { title: 'Remote work is better for both employees and companies', category: 'economy', difficulty: 'easy' },
       { title: 'Universal healthcare is an economic necessity, not a luxury', category: 'economy', difficulty: 'medium' },
       { title: 'Capitalism is the root cause of global inequality', category: 'economy', difficulty: 'hard' },
+
+      // ═══════════════════════════════════════
+      // PLACEMENT & GROUP DISCUSSION (15)
+      // ═══════════════════════════════════════
+      { title: 'Work From Home vs Return to Office: What is better for young careers?', category: 'placement', difficulty: 'medium' },
+      { title: 'Should Generative AI tools be allowed during campus placement coding tests?', category: 'placement', difficulty: 'hard' },
+      { title: 'AI Copilots vs Junior Software Developers: Will entry-level tech hiring shrink permanently?', category: 'placement', difficulty: 'hard' },
+      { title: '70-Hour Work Week vs Work-Life Balance: Is extreme hustle essential for high GDP growth?', category: 'placement', difficulty: 'medium' },
+      { title: 'Moonlighting in IT: Legitimate entrepreneurial freedom or breach of employer trust?', category: 'placement', difficulty: 'medium' },
+      { title: 'Startups: Hyper-growth with cash burn vs sustainable unit economics and profitability', category: 'placement', difficulty: 'hard' },
+      { title: 'Manufacturing vs Services: What should be India\'s primary engine to become a $5T economy?', category: 'placement', difficulty: 'hard' },
+      { title: 'Electric Vehicles vs Hybrids: What is the practical transition path for developing markets?', category: 'placement', difficulty: 'medium' },
+      { title: 'UPI and Central Bank Digital Currency: Will paper currency become obsolete by 2030?', category: 'placement', difficulty: 'medium' },
+      { title: 'Algorithmic Hiring & AI Video Interviews: Objective screening or biased exclusion?', category: 'placement', difficulty: 'hard' },
+      { title: 'Privatization of Public Sector Banks and PSUs: Economic boon or social bane?', category: 'placement', difficulty: 'medium' },
+      { title: 'CGPA vs Hands-on Open Source Projects: What defines engineering competence in 2026?', category: 'placement', difficulty: 'easy' },
+      { title: 'Brain Drain to Global Tech Hubs: Unstoppable career aspiration or critical national loss?', category: 'placement', difficulty: 'medium' },
+      { title: 'Diversity & Inclusion (DEI) vs Pure Meritocracy in corporate leadership promotions', category: 'placement', difficulty: 'hard' },
+      { title: 'Freebies and Subsidies in Electoral Politics: Social safety net vs long-term fiscal debt', category: 'placement', difficulty: 'medium' },
     ];
 
     await Topic.insertMany(topics);
-    console.log('✅ Seeded 60 topics successfully (10 per category)');
+    console.log(`✅ Seeded ${topics.length} topics successfully`);
   } catch (error) {
     console.error('❌ Error seeding topics:', error);
     process.exitCode = 1;

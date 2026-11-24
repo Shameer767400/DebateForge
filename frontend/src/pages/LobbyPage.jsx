@@ -19,20 +19,41 @@ const CATEGORIES = [
 ];
 
 const CURATED_TOPICS = [
+  // ── Placement & Group Discussion (GD) ──
   { id: 'gd-1', title: 'Work From Home vs Return to Office: What is better for young careers?', category: 'Placement & GD', difficulty: 'medium' },
   { id: 'gd-2', title: 'Should Generative AI tools be allowed during campus placement coding tests?', category: 'Placement & GD', difficulty: 'hard' },
-  { id: 'gd-3', title: 'Cryptocurrency & Digital Currency: Financial future or speculative bubble?', category: 'Placement & GD', difficulty: 'hard' },
-  { id: 'gd-4', title: 'Privatization of Public Sector Banks and PSUs: Economic boon or bane?', category: 'Placement & GD', difficulty: 'medium' },
-  { id: 'gd-5', title: 'Electric Vehicles in developing nations: Are power grids and infra ready?', category: 'Placement & GD', difficulty: 'medium' },
-  { id: 'gd-6', title: 'Gig Economy: Flexible workforce empowerment or lack of labor security?', category: 'Placement & GD', difficulty: 'easy' },
-  { id: 'gd-7', title: 'Data localization vs cross-border cloud innovation: Which must policy prioritize?', category: 'Placement & GD', difficulty: 'hard' },
-  { id: 'gd-8', title: 'College degrees vs specialized portfolio skills: What recruiters value more in 2026', category: 'Placement & GD', difficulty: 'easy' },
+  { id: 'gd-3', title: 'AI Copilots vs Junior Software Developers: Will entry-level tech hiring shrink permanently?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-4', title: '70-Hour Work Week vs Work-Life Balance: Is extreme hustle essential for high GDP growth?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-5', title: 'Moonlighting in IT: Legitimate entrepreneurial freedom or breach of employer trust?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-6', title: 'Startups: Hyper-growth with heavy cash burn vs sustainable unit economics & profitability', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-7', title: 'Manufacturing vs Services: What should be India\'s primary engine to become a $5T economy?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-8', title: 'Electric Vehicles vs Hybrids & Biofuels: What is the realistic transition path for developing markets?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-9', title: 'UPI and Central Bank Digital Currencies (CBDC): Will paper currency become obsolete by 2030?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-10', title: 'Algorithmic Hiring & AI Video Interviews: Objective screening or biased exclusion?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-11', title: 'Privatization of Public Sector Banks and PSUs: Economic boon or social safety compromise?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-12', title: 'CGPA vs Live Open Source Projects: What truly defines engineering competence in modern hiring?', category: 'Placement & GD', difficulty: 'easy' },
+  { id: 'gd-13', title: 'Brain Drain to Global Tech Hubs: Unstoppable personal ambition or critical national economic loss?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-14', title: 'Diversity & Inclusion (DEI) vs Strict Meritocracy in corporate promotions and executive boards', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-15', title: 'Freebies and Subsidies in Electoral Politics: Essential social welfare vs looming fiscal crisis', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-16', title: 'Gig Economy (Swiggy, Uber, Zomato): Workforce empowerment or precarious exploitation?', category: 'Placement & GD', difficulty: 'easy' },
+  { id: 'gd-17', title: 'Cloud Dependency & Outages: Should mission-critical enterprises mandate on-premise fallbacks?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-18', title: 'Generalists vs Deep Specialists: Who will make the most impactful corporate leaders in the AI era?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-19', title: 'Quiet Quitting vs Hustle Culture: Setting healthy boundaries or declining workplace productivity?', category: 'Placement & GD', difficulty: 'easy' },
+  { id: 'gd-20', title: 'Data localization vs cross-border cloud innovation: Which must national policy prioritize?', category: 'Placement & GD', difficulty: 'hard' },
+  { id: 'gd-21', title: 'Hard Work vs Smart Work: Which genuinely creates sustainable leadership in high-stress industries?', category: 'Placement & GD', difficulty: 'easy' },
+  { id: 'gd-22', title: 'He who speaks first controls the room vs He who listens longest controls the conclusion', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-23', title: 'E-Commerce Giants vs Local Kirana Stores: Threat to local retail or catalyst for digital adoption?', category: 'Placement & GD', difficulty: 'medium' },
+  { id: 'gd-24', title: 'Social Media Background Checks during Hiring: Prudent HR risk management or invasion of privacy?', category: 'Placement & GD', difficulty: 'easy' },
+
+  // ── Model UN (MUN) ──
   { id: 'mun-1', title: 'The UN Security Council veto power should be permanently restructured', category: 'Model UN (MUN)', difficulty: 'hard' },
   { id: 'mun-2', title: 'Developed nations owe legally binding climate reparations to the Global South', category: 'Model UN (MUN)', difficulty: 'hard' },
   { id: 'mun-3', title: 'An international treaty must ban fully autonomous lethal military systems', category: 'Model UN (MUN)', difficulty: 'hard' },
   { id: 'mun-4', title: 'Developing nations should have guaranteed sovereign access to outer space resources', category: 'Model UN (MUN)', difficulty: 'medium' },
   { id: 'mun-5', title: 'Universal human rights vs cultural sovereignty in international trade sanctions', category: 'Model UN (MUN)', difficulty: 'hard' },
   { id: 'mun-6', title: 'Global governance of artificial intelligence should be managed by a UN specialized agency', category: 'Model UN (MUN)', difficulty: 'medium' },
+  { id: 'mun-7', title: 'BRICS expansion and De-Dollarization: Viable alternative financial system or geopolitical friction?', category: 'Model UN (MUN)', difficulty: 'hard' },
+  { id: 'mun-8', title: 'State-sponsored deepfakes and cyber warfare: Establishing Geneva Convention equivalents for cyberspace', category: 'Model UN (MUN)', difficulty: 'hard' },
 ];
 
 const DIFFICULTIES = [
