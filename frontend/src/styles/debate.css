@@ -1044,3 +1044,611 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════
+   CAMPUS GD VIRTUAL GAME ARENA 3D STAGE & WHATSAPP SHARING
+   ═══════════════════════════════════════════════════════ */
+
+.arena-stage-container {
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at 50% 0%, #151c32 0%, #080c16 85%);
+  border-bottom: 2px solid rgba(0, 229, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  position: relative;
+  z-index: 5;
+  overflow: hidden;
+}
+
+/* ── Broadcast Match Ribbon ── */
+.arena-match-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: rgba(5, 10, 20, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.arena-ribbon-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.arena-live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #ff3366;
+  background: rgba(255, 51, 102, 0.15);
+  border: 1px solid rgba(255, 51, 102, 0.4);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.arena-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff3366;
+  box-shadow: 0 0 8px #ff3366;
+  animation: arenaBlink 1.2s infinite;
+}
+
+@keyframes arenaBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.8); }
+}
+
+.arena-ribbon-title {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #00e5ff;
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+}
+
+.arena-room-pill {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #00ff87;
+  background: rgba(0, 255, 135, 0.12);
+  border: 1px solid rgba(0, 255, 135, 0.35);
+  padding: 3px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.arena-room-pill:hover {
+  background: rgba(0, 255, 135, 0.25);
+  box-shadow: 0 0 12px rgba(0, 255, 135, 0.5);
+}
+
+.arena-lang-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffaa00;
+  background: rgba(255, 170, 0, 0.15);
+  border: 1px solid rgba(255, 170, 0, 0.4);
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+
+.arena-ribbon-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.arena-invite-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #25d366;
+  background: rgba(37, 211, 102, 0.14);
+  border: 1px solid rgba(37, 211, 102, 0.4);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.arena-invite-btn:hover {
+  background: rgba(37, 211, 102, 0.28);
+  box-shadow: 0 0 16px rgba(37, 211, 102, 0.4);
+  transform: translateY(-1px);
+}
+
+.arena-crossfire-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #d8b4fe;
+  background: rgba(180, 100, 255, 0.15);
+  border: 1px solid rgba(180, 100, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.arena-crossfire-btn--active:hover {
+  background: rgba(180, 100, 255, 0.3);
+  box-shadow: 0 0 16px rgba(180, 100, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ── 3D Circular Arena Ring Stage ── */
+.arena-stage-3d {
+  padding: 18px 24px 22px;
+  perspective: 1200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.05) 0%, transparent 70%);
+}
+
+.arena-ring-floor {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
+  max-width: 980px;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+/* Central Core Banner */
+.arena-center-core {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.arena-core-topic {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 999px;
+  padding: 4px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+}
+
+.core-label {
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #00e5ff;
+}
+
+.core-topic-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffffff;
+  max-width: 480px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Combatant Podiums */
+.arena-podium {
+  position: relative;
+  background: linear-gradient(180deg, rgba(16, 24, 44, 0.85) 0%, rgba(9, 13, 25, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+}
+
+.arena-podium:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Spotlight Beam Effect when Speaking */
+.podium-spotlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.spotlight--cyan { background: linear-gradient(90deg, transparent, #00ff87, transparent); }
+.spotlight--amber { background: linear-gradient(90deg, transparent, #ffaa00, transparent); }
+.spotlight--blue { background: linear-gradient(90deg, transparent, #00e5ff, transparent); }
+.spotlight--purple { background: linear-gradient(90deg, transparent, #d8b4fe, transparent); }
+
+.podium--speaking {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+
+.podium--speaking .podium-spotlight {
+  opacity: 1;
+}
+
+.podium--seat1.podium--speaking {
+  border-color: #00ff87;
+  box-shadow: 0 0 25px rgba(0, 255, 135, 0.35);
+}
+
+.podium--seat2.podium--speaking {
+  border-color: #ffaa00;
+  box-shadow: 0 0 25px rgba(255, 170, 0, 0.35);
+}
+
+.podium--seat3.podium--speaking {
+  border-color: #00e5ff;
+  box-shadow: 0 0 25px rgba(0, 229, 255, 0.35);
+}
+
+.podium--seat4.podium--speaking {
+  border-color: #d8b4fe;
+  box-shadow: 0 0 25px rgba(216, 180, 254, 0.35);
+}
+
+/* Avatar Ring & Sonic Waves */
+.podium-avatar-ring {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  position: relative;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid;
+}
+
+.ring--cyan { border-color: rgba(0, 255, 135, 0.5); }
+.ring--amber { border-color: rgba(255, 170, 0, 0.5); }
+.ring--blue { border-color: rgba(0, 229, 255, 0.5); }
+.ring--purple { border-color: rgba(216, 180, 254, 0.5); }
+
+.podium-speaker-wave {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: speakerWave 1.4s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes speakerWave {
+  0% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.podium-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.podium-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.name--cyan { color: #00ff87; }
+.name--amber { color: #ffaa00; }
+.name--blue { color: #00e5ff; }
+.name--purple { color: #d8b4fe; }
+
+.podium-role {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.podium-status-pill {
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.podium--speaking .podium-status-pill {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+/* ── WhatsApp Share & Invite Modal ── */
+.arena-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(5, 8, 16, 0.85);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.arena-modal-card {
+  background: linear-gradient(135deg, rgba(16, 24, 44, 0.98) 0%, rgba(8, 12, 24, 0.98) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 32px rgba(0, 229, 255, 0.2);
+  width: 100%;
+  max-width: 520px;
+  padding: 24px 28px;
+  position: relative;
+  animation: modalPop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes modalPop {
+  0% { transform: scale(0.92); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.arena-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.arena-modal-badge {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.arena-modal-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 6px 0 0;
+}
+
+.arena-modal-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.arena-modal-close:hover {
+  color: #ffffff;
+}
+
+.arena-modal-topic {
+  font-size: 0.86rem;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 0 0 16px;
+  line-height: 1.4;
+}
+
+.arena-modal-capacity-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #00ff87;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+.capacity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00ff87;
+  box-shadow: 0 0 8px #00ff87;
+}
+
+.arena-modal-wa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  text-decoration: none;
+  box-shadow: 0 4px 20px rgba(37, 211, 102, 0.35);
+  transition: all 0.25s ease;
+  margin-bottom: 20px;
+}
+
+.arena-modal-wa-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(37, 211, 102, 0.55);
+}
+
+.arena-modal-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.arena-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.field-val-wrap {
+  display: flex;
+  gap: 8px;
+}
+
+.field-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #ffffff;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.field-input.code-input {
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #00e5ff;
+}
+
+.field-copy-btn {
+  padding: 8px 14px;
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 8px;
+  color: #00e5ff;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.field-copy-btn:hover {
+  background: rgba(0, 229, 255, 0.28);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+}
+
+.arena-modal-hint {
+  font-size: 0.76rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid #00e5ff;
+}
+
+/* ── Adrenaline Battle Timer Alert ── */
+.timer-ring-wrap--urgent {
+  animation: adrenalinePulse 0.9s infinite alternate cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes adrenalinePulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px #ff3366); }
+  100% { transform: scale(1.08); filter: drop-shadow(0 0 20px #ff3366); }
+}
+
+.timer-ring-fg--urgent {
+  stroke: #ff3366 !important;
+}
+
+.timer-value--urgent {
+  color: #ff3366 !important;
+  text-shadow: 0 0 12px #ff3366;
+}
+
+.timer-urgent-tag {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #ff3366;
+  background: rgba(255, 51, 102, 0.15);
+  border: 1px solid rgba(255, 51, 102, 0.4);
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-top: 8px;
+  text-align: center;
+  animation: arenaBlink 1s infinite;
+}
+
+/* ── Responsive adjustments ── */
+@media (max-width: 860px) {
+  .arena-ring-floor {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .arena-ring-floor {
+    grid-template-columns: 1fr;
+  }
+  .core-topic-text {
+    max-width: 220px;
+  }
+}
+

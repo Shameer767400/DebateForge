@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
@@ -117,6 +117,7 @@ export default function LobbyPage() {
   const { user } = useAuth();
   const api = useApi();
   const navigate = useNavigate();
+  const { roomCode } = useParams();
 
   // "browse" | "custom"
   const [mode, setMode] = useState('browse');
@@ -164,7 +165,7 @@ export default function LobbyPage() {
     return () => { mounted = false; };
   }, []);
 
-  /* ── Auto-select shared challenge topic from URL ── */
+  /* ── Auto-select shared challenge topic or roomCode from URL ── */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sharedTopic = params.get('topic');
@@ -173,7 +174,14 @@ export default function LobbyPage() {
       setCustomTopicText(sharedTopic.trim());
       setSelectedTopic({ title: sharedTopic.trim(), category: 'Challenge', difficulty: 'medium' });
     }
-  }, []);
+
+    const targetCode = roomCode || params.get('code') || params.get('join');
+    if (targetCode && targetCode.trim()) {
+      const clean = targetCode.trim().toUpperCase();
+      setJoinRoomCode(clean);
+      setFormat('group_discussion');
+    }
+  }, [roomCode]);
 
   /* ── Reset step-2 / step-3 when mode or topic changes ── */
   const resetSteps = () => {
@@ -338,6 +346,46 @@ export default function LobbyPage() {
           )}
         </div>
       )}
+
+      {/* ── Universal Quick-Join Station (Prominent everywhere) ── */}
+      <div className="lobby-quick-join-card">
+        <div className="quick-join-header">
+          <div className="quick-join-title-row">
+            <span className="quick-join-badge">⚡ LIVE MULTIPLAYER</span>
+            <h3 className="quick-join-title">Have a Group Discussion Room Code?</h3>
+          </div>
+          <p className="quick-join-sub">
+            Received a 6-character code on WhatsApp? Paste it below to jump directly into your classmate's table!
+          </p>
+        </div>
+
+        <div className="quick-join-action-row">
+          <div className="quick-join-input-wrap">
+            <span className="quick-join-input-icon">🔑</span>
+            <input
+              type="text"
+              placeholder="ENTER ROOM CODE (e.g. GDE807)"
+              value={joinRoomCode}
+              onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase())}
+              maxLength={8}
+              className="quick-join-input"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={!joinRoomCode.trim() || joiningRoom}
+            onClick={handleJoinByCode}
+            className={`quick-join-btn ${joinRoomCode.trim() ? 'quick-join-btn--active' : ''}`}
+          >
+            {joiningRoom ? 'Connecting to Room...' : 'Enter Table ➔'}
+          </button>
+        </div>
+        {roomCode && (
+          <div className="quick-join-autofill-hint">
+            🔗 Room code <strong>{roomCode}</strong> detected from your invite link! Click "Enter Table" to connect.
+          </div>
+        )}
+      </div>
 
       {/* ── Mode toggle ── */}
       <div className="mode-toggle">

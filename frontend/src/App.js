@@ -66,6 +66,14 @@ function App() {
                     }
                   />
                   <Route
+                    path="/join/:roomCode"
+                    element={
+                      <ProtectedRoute>
+                        <LobbyPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
                     path="/debate/:id"
                     element={
                       <ProtectedRoute>

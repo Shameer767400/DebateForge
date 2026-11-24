@@ -298,11 +298,29 @@ export default function DebateRoomPage() {
   const [streakMilestone, setStreakMilestone] = useState(null);
   const [streakFreezeUsed, setStreakFreezeUsed] = useState(false);
   const [activeGDSpeaker, setActiveGDSpeaker] = useState(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   /* Incrementing key used to guarantee the timer resets every new user_turn */
   const [timerKey, setTimerKey] = useState(0);
 
   const toast = useToast();
+
+  const generateInviteDetails = () => {
+    const code = debateInfo?.roomCode || '';
+    const topic = debateInfo?.topic?.title || 'Campus Placement Group Discussion';
+    const origin = window.location.origin;
+    const directLink = `${origin}/join/${code}`;
+    const whatsappText = `🔥 *Join my Campus Group Discussion on DebateForge!*
+
+📌 *Topic:* ${topic}
+🔑 *Room Code:* ${code}
+
+👉 *Tap here to enter my table immediately:*
+${directLink}
+
+_4-Seat Campus GD Arena · English & Telugu Support_`;
+    return { code, topic, directLink, whatsappText };
+  };
 
   const renderGDCandidateMessages = (msg) => {
     const text = msg.text || '';
@@ -908,214 +926,236 @@ export default function DebateRoomPage() {
             </div>
           </div>
 
-          {/* Virtual GD Round Table Bar */}
+          {/* Virtual 3D Game Arena Stage */}
           {debateInfo?.format === 'group_discussion' && (
-            <div className="gd-table-strip" style={{
-              display: 'flex',
-              flexDirection: 'column',
-              padding: '12px 16px',
-              background: 'linear-gradient(180deg, rgba(14, 20, 36, 0.98), rgba(9, 13, 24, 0.98))',
-              borderBottom: '1px solid rgba(0, 229, 255, 0.25)',
-              gap: '10px',
-            }}>
-              {/* Table Header with Room Code & Invite button */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#00e5ff', letterSpacing: '0.04em' }}>
-                    👥 CAMPUS GD TABLE (4 SEATS)
+            <div className="arena-stage-container">
+              {/* Arena Broadcast Ribbon */}
+              <div className="arena-match-ribbon">
+                <div className="arena-ribbon-left">
+                  <span className="arena-live-indicator">
+                    <span className="arena-live-dot" /> LIVE ARENA
+                  </span>
+                  <span className="arena-ribbon-title">
+                    ⚔️ CAMPUS GD TABLE · 4 SEATS
                   </span>
                   {debateInfo?.roomCode && (
-                    <span style={{
-                      padding: '3px 8px',
-                      borderRadius: '8px',
-                      background: 'rgba(0, 229, 255, 0.12)',
-                      border: '1px solid rgba(0, 229, 255, 0.35)',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      color: '#00e5ff',
-                      letterSpacing: '0.08em',
-                    }}>
-                      ROOM: {debateInfo.roomCode}
+                    <span className="arena-room-pill" onClick={() => setShowInviteModal(true)} title="Click to share">
+                      🔑 ROOM: {debateInfo.roomCode}
                     </span>
                   )}
                   {debateLanguage === 'te' && (
-                    <span style={{
-                      padding: '3px 8px',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 170, 0, 0.15)',
-                      border: '1px solid rgba(255, 170, 0, 0.4)',
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      color: '#ffaa00',
-                    }}>
+                    <span className="arena-lang-pill">
                       🇮🇳 తెలుగు మోడ్
                     </span>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {debateInfo?.roomCode && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const url = `${window.location.origin}/lobby`;
-                        navigator.clipboard.writeText(`Join my Campus GD on DebateForge! Room Code: ${debateInfo.roomCode}\n${url}`);
-                        toast.success(`Copied! Share room code "${debateInfo.roomCode}" with classmates.`);
-                      }}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 229, 255, 0.1)',
-                        border: '1px solid rgba(0, 229, 255, 0.3)',
-                        color: '#00e5ff',
-                        fontSize: '0.74rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      📋 Copy Invite
-                    </button>
-                  )}
+                <div className="arena-ribbon-actions">
+                  <button
+                    type="button"
+                    onClick={() => setShowInviteModal(true)}
+                    className="arena-invite-btn"
+                  >
+                    📱 Invite (WhatsApp)
+                  </button>
                   <button
                     type="button"
                     disabled={phase !== 'user_turn'}
                     onClick={() => {
-                      sendText("Let's hear other perspectives on this topic. Who has an alternative take?");
+                      sendText("Let's hear other perspectives on this topic. Aarav, Priya, what is your counter-argument?");
                     }}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      background: 'rgba(180, 100, 255, 0.12)',
-                      border: '1px solid rgba(180, 100, 255, 0.35)',
-                      color: '#d8b4fe',
-                      fontSize: '0.74rem',
-                      fontWeight: 700,
-                      cursor: phase === 'user_turn' ? 'pointer' : 'not-allowed',
-                    }}
+                    className={`arena-crossfire-btn ${phase === 'user_turn' ? 'arena-crossfire-btn--active' : ''}`}
                   >
-                    ⚡ Prompt Peer Debate
+                    ⚡ Trigger Arena Cross-Fire
                   </button>
                 </div>
               </div>
 
-              {/* 4 Seats Visualization with Auto-Fill Badges */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                {/* Seat 1: Host / You */}
-                <div style={{
-                  flex: '1 1 120px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '7px 12px',
-                  borderRadius: '12px',
-                  background: activeGDSpeaker === 'user' ? 'rgba(0, 255, 135, 0.25)' : 'rgba(0, 255, 135, 0.08)',
-                  border: activeGDSpeaker === 'user' ? '2px solid #00ff87' : '1px solid rgba(0, 255, 135, 0.3)',
-                  boxShadow: activeGDSpeaker === 'user' ? '0 0 15px rgba(0, 255, 135, 0.4)' : 'none',
-                  transition: 'all 0.3s ease',
-                }}>
-                  <span style={{ fontSize: '1.1rem' }}>👤</span>
-                  <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#00ff87' }}>You (Candidate 1)</div>
-                    <div style={{ fontSize: '0.66rem', color: '#64748b' }}>{activeGDSpeaker === 'user' ? '🎙️ Speaking' : '🟢 Ready'}</div>
+              {/* 3D Circular Arena Ring Stage */}
+              <div className="arena-stage-3d">
+                <div className="arena-ring-floor">
+                  {/* Central Holographic Topic Core */}
+                  <div className="arena-center-core">
+                    <div className="arena-core-ring ring--outer" />
+                    <div className="arena-core-ring ring--inner" />
+                    <div className="arena-core-topic">
+                      <span className="core-label">CAMPUS PLACEMENT GD</span>
+                      <span className="core-topic-text">{debateInfo?.topic?.title || 'Open Topic'}</span>
+                    </div>
                   </div>
+
+                  {/* Seat 1: Host / You (Bottom Center) */}
+                  <div className={`arena-podium podium--seat1 ${activeGDSpeaker === 'user' ? 'podium--speaking' : ''}`}>
+                    <div className="podium-spotlight spotlight--cyan" />
+                    <div className="podium-avatar-ring ring--cyan">
+                      <span className="podium-avatar-icon">👤</span>
+                      {activeGDSpeaker === 'user' && <span className="podium-speaker-wave" />}
+                    </div>
+                    <div className="podium-info">
+                      <div className="podium-name name--cyan">{user?.username || 'You'} (Seat 1)</div>
+                      <div className="podium-role">Host · In Ring</div>
+                      <div className="podium-status-pill">
+                        {activeGDSpeaker === 'user' ? '🎙️ IN SPOTLIGHT' : '🟢 READY'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Seat 2: Aarav or Real Participant (Left) */}
+                  {(() => {
+                    const p2 = (debateInfo?.participants || [])[1];
+                    const isAarav = !p2;
+                    const isSpeaking = activeGDSpeaker === 'Aarav';
+                    return (
+                      <div className={`arena-podium podium--seat2 ${isSpeaking ? 'podium--speaking' : ''}`}>
+                        <div className="podium-spotlight spotlight--amber" />
+                        <div className="podium-avatar-ring ring--amber">
+                          <span className="podium-avatar-icon">{isAarav ? '⚡' : '👤'}</span>
+                          {isSpeaking && <span className="podium-speaker-wave" />}
+                        </div>
+                        <div className="podium-info">
+                          <div className="podium-name name--amber">
+                            {isAarav ? 'Aarav' : (p2.name || 'Candidate 2')}
+                          </div>
+                          <div className="podium-role">{isAarav ? 'Assertive Challenger' : 'Real Peer (Seat 2)'}</div>
+                          <div className="podium-status-pill">
+                            {isSpeaking ? '🎙️ CHALLENGING' : (isAarav ? '🤖 AI AUTO-FILLED' : '🟢 PEER READY')}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Seat 3: Priya or Real Participant (Top) */}
+                  {(() => {
+                    const p3 = (debateInfo?.participants || [])[2];
+                    const isPriya = !p3;
+                    const isSpeaking = activeGDSpeaker === 'Priya';
+                    return (
+                      <div className={`arena-podium podium--seat3 ${isSpeaking ? 'podium--speaking' : ''}`}>
+                        <div className="podium-spotlight spotlight--blue" />
+                        <div className="podium-avatar-ring ring--blue">
+                          <span className="podium-avatar-icon">{isPriya ? '📊' : '👤'}</span>
+                          {isSpeaking && <span className="podium-speaker-wave" />}
+                        </div>
+                        <div className="podium-info">
+                          <div className="podium-name name--blue">
+                            {isPriya ? 'Priya' : (p3.name || 'Candidate 3')}
+                          </div>
+                          <div className="podium-role">{isPriya ? 'Analytical Evaluator' : 'Real Peer (Seat 3)'}</div>
+                          <div className="podium-status-pill">
+                            {isSpeaking ? '🎙️ ANALYZING' : (isPriya ? '🤖 AI AUTO-FILLED' : '🟢 PEER READY')}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Seat 4: Karan or Real Participant (Right) */}
+                  {(() => {
+                    const p4 = (debateInfo?.participants || [])[3];
+                    const isKaran = !p4;
+                    const isSpeaking = activeGDSpeaker === 'Karan';
+                    return (
+                      <div className={`arena-podium podium--seat4 ${isSpeaking ? 'podium--speaking' : ''}`}>
+                        <div className="podium-spotlight spotlight--purple" />
+                        <div className="podium-avatar-ring ring--purple">
+                          <span className="podium-avatar-icon">{isKaran ? '🤝' : '👤'}</span>
+                          {isSpeaking && <span className="podium-speaker-wave" />}
+                        </div>
+                        <div className="podium-info">
+                          <div className="podium-name name--purple">
+                            {isKaran ? 'Karan' : (p4.name || 'Candidate 4')}
+                          </div>
+                          <div className="podium-role">{isKaran ? 'Diplomatic Mediator' : 'Real Peer (Seat 4)'}</div>
+                          <div className="podium-status-pill">
+                            {isSpeaking ? '🎙️ MEDIATING' : (isKaran ? '🤖 AI AUTO-FILLED' : '🟢 PEER READY')}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-
-                {/* Seat 2: Real Participant or Aarav */}
-                {(() => {
-                  const p2 = (debateInfo?.participants || [])[1];
-                  const isAarav = !p2;
-                  const isSpeaking = activeGDSpeaker === 'Aarav';
-                  return (
-                    <div style={{
-                      flex: '1 1 120px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '7px 12px',
-                      borderRadius: '12px',
-                      background: isSpeaking ? 'rgba(255, 170, 0, 0.25)' : 'rgba(255, 170, 0, 0.08)',
-                      border: isSpeaking ? '2px solid #ffaa00' : '1px solid rgba(255, 170, 0, 0.3)',
-                      boxShadow: isSpeaking ? '0 0 15px rgba(255, 170, 0, 0.4)' : 'none',
-                      transition: 'all 0.3s ease',
-                    }}>
-                      <span style={{ fontSize: '1.1rem' }}>{isAarav ? '⚡' : '👤'}</span>
-                      <div>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffaa00' }}>
-                          {isAarav ? 'Aarav (Assertive)' : (p2.name || 'Candidate 2')}
-                        </div>
-                        <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
-                          {isSpeaking ? '🎙️ Speaking' : (isAarav ? '🤖 AI Auto-Filled' : '🟢 Real Peer')}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Seat 3: Real Participant or Priya */}
-                {(() => {
-                  const p3 = (debateInfo?.participants || [])[2];
-                  const isPriya = !p3;
-                  const isSpeaking = activeGDSpeaker === 'Priya';
-                  return (
-                    <div style={{
-                      flex: '1 1 120px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '7px 12px',
-                      borderRadius: '12px',
-                      background: isSpeaking ? 'rgba(0, 229, 255, 0.25)' : 'rgba(0, 229, 255, 0.08)',
-                      border: isSpeaking ? '2px solid #00e5ff' : '1px solid rgba(0, 229, 255, 0.3)',
-                      boxShadow: isSpeaking ? '0 0 15px rgba(0, 229, 255, 0.4)' : 'none',
-                      transition: 'all 0.3s ease',
-                    }}>
-                      <span style={{ fontSize: '1.1rem' }}>{isPriya ? '📊' : '👤'}</span>
-                      <div>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#00e5ff' }}>
-                          {isPriya ? 'Priya (Analytical)' : (p3.name || 'Candidate 3')}
-                        </div>
-                        <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
-                          {isSpeaking ? '🎙️ Speaking' : (isPriya ? '🤖 AI Auto-Filled' : '🟢 Real Peer')}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Seat 4: Real Participant or Karan */}
-                {(() => {
-                  const p4 = (debateInfo?.participants || [])[3];
-                  const isKaran = !p4;
-                  const isSpeaking = activeGDSpeaker === 'Karan';
-                  return (
-                    <div style={{
-                      flex: '1 1 120px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '7px 12px',
-                      borderRadius: '12px',
-                      background: isSpeaking ? 'rgba(180, 100, 255, 0.25)' : 'rgba(180, 100, 255, 0.08)',
-                      border: isSpeaking ? '2px solid #d8b4fe' : '1px solid rgba(180, 100, 255, 0.3)',
-                      boxShadow: isSpeaking ? '0 0 15px rgba(180, 100, 255, 0.4)' : 'none',
-                      transition: 'all 0.3s ease',
-                    }}>
-                      <span style={{ fontSize: '1.1rem' }}>{isKaran ? '🤝' : '👤'}</span>
-                      <div>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#d8b4fe' }}>
-                          {isKaran ? 'Karan (Diplomat)' : (p4.name || 'Candidate 4')}
-                        </div>
-                        <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
-                          {isSpeaking ? '🎙️ Speaking' : (isKaran ? '🤖 AI Auto-Filled' : '🟢 Real Peer')}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
             </div>
           )}
+
+          {/* WhatsApp Share & Invite Modal */}
+          {showInviteModal && debateInfo?.roomCode && (() => {
+            const invite = generateInviteDetails();
+            return (
+              <div className="arena-modal-backdrop" onClick={() => setShowInviteModal(false)}>
+                <div className="arena-modal-card" onClick={(e) => e.stopPropagation()}>
+                  <div className="arena-modal-header">
+                    <div>
+                      <span className="arena-modal-badge">⚡ MULTIPLAYER GD INVITE</span>
+                      <h3 className="arena-modal-title">Invite Friends to Your Table</h3>
+                    </div>
+                    <button className="arena-modal-close" onClick={() => setShowInviteModal(false)}>✕</button>
+                  </div>
+
+                  <p className="arena-modal-topic">
+                    📌 <strong>Topic:</strong> {invite.topic}
+                  </p>
+
+                  <div className="arena-modal-capacity-bar">
+                    <span className="capacity-dot filled" />
+                    <span className="capacity-label">1/4 Joined (You) · 3 Vacant Seats Auto-Filled by AI</span>
+                  </div>
+
+                  {/* Big WhatsApp CTA */}
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(invite.whatsappText)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="arena-modal-wa-btn"
+                  >
+                    <span>📱</span> Share on WhatsApp Group
+                  </a>
+
+                  {/* 1-Click Link Copy */}
+                  <div className="arena-modal-field-row">
+                    <div className="arena-modal-field">
+                      <span className="field-label">1-Click Direct Join Link</span>
+                      <div className="field-val-wrap">
+                        <input type="text" readOnly value={invite.directLink} className="field-input" />
+                        <button
+                          type="button"
+                          className="field-copy-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(invite.directLink);
+                            toast.success('1-Click Join Link copied to clipboard!');
+                          }}
+                        >
+                          📋 Copy Link
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="arena-modal-field">
+                      <span className="field-label">Room Code Only</span>
+                      <div className="field-val-wrap">
+                        <input type="text" readOnly value={invite.code} className="field-input code-input" />
+                        <button
+                          type="button"
+                          className="field-copy-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(invite.code);
+                            toast.success(`Room Code ${invite.code} copied!`);
+                          }}
+                        >
+                          🔑 Copy Code
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="arena-modal-hint">
+                    💡 <strong>How it works:</strong> When your friends tap your link in WhatsApp, DebateForge automatically reads room code <strong>{invite.code}</strong> and connects them straight to Seat 2, Seat 3, or Seat 4!
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Chat area */}
           <div className="debate-chat">
@@ -1278,12 +1318,14 @@ export default function DebateRoomPage() {
 
           {/* Timer */}
           <div className="timer-section">
-            <div className="panel-section-title">Time Remaining</div>
-            <div className="timer-ring-wrap">
+            <div className="panel-section-title">
+              {timer <= 20 ? '🔥 Adrenaline Countdown' : 'Time Remaining'}
+            </div>
+            <div className={`timer-ring-wrap ${timer <= 20 ? 'timer-ring-wrap--urgent' : ''}`}>
               <svg className="timer-ring-svg" width="100" height="100" viewBox="0 0 100 100">
                 <circle className="timer-ring-bg" cx="50" cy="50" r={RING_R} />
                 <circle
-                  className="timer-ring-fg"
+                  className={`timer-ring-fg ${timer <= 20 ? 'timer-ring-fg--urgent' : ''}`}
                   cx="50"
                   cy="50"
                   r={RING_R}
@@ -1292,10 +1334,15 @@ export default function DebateRoomPage() {
                   stroke={timerColor(timer)}
                 />
               </svg>
-              <div className="timer-value" style={{ color: timerColor(timer) }}>
+              <div className={`timer-value ${timer <= 20 ? 'timer-value--urgent' : ''}`} style={{ color: timerColor(timer) }}>
                 {timer}
               </div>
             </div>
+            {timer <= 20 && (
+              <div className="timer-urgent-tag">
+                ⚠️ FINAL SECONDS · WRAP UP!
+              </div>
+            )}
           </div>
 
           {/* Score rings */}

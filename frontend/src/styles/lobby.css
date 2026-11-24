@@ -1,5 +1,152 @@
 /* ── Lobby page ── */
 
+/* ── Universal Quick-Join Station ── */
+.lobby-quick-join-card {
+  margin-bottom: 26px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(14, 20, 36, 0.95) 60%, rgba(0, 255, 135, 0.05) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(0, 229, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.lobby-quick-join-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00e5ff, #00ff87, transparent);
+}
+
+.quick-join-header {
+  margin-bottom: 14px;
+}
+
+.quick-join-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-join-badge {
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  color: #00e5ff;
+}
+
+.quick-join-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.quick-join-sub {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+.quick-join-action-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.quick-join-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.quick-join-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+  color: #00e5ff;
+  pointer-events: none;
+}
+
+.quick-join-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px 12px 42px;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 12px;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.quick-join-input:focus {
+  border-color: #00e5ff;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.quick-join-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-size: 0.82rem;
+}
+
+.quick-join-btn {
+  padding: 12px 24px;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 800;
+  border-radius: 12px;
+  border: none;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.08);
+  color: #64748b;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  white-space: nowrap;
+}
+
+.quick-join-btn--active {
+  cursor: pointer;
+  background: linear-gradient(135deg, #00e5ff 0%, #00ff87 100%);
+  color: #050c18;
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
+}
+
+.quick-join-btn--active:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 32px rgba(0, 255, 135, 0.6);
+}
+
+.quick-join-autofill-hint {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: #00ff87;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ── Mode toggle ── */
 .mode-toggle {
   display: flex;
