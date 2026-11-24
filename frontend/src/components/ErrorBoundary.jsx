@@ -43,22 +43,32 @@ class ErrorBoundary extends React.Component {
   render() {
     if (!this.state.hasError) return this.props.children;
 
+    const msg = this.state.error?.message || String(this.state.error || '');
+    const isChunkOrPreload =
+      /Unable to preload CSS/i.test(msg) ||
+      /Failed to fetch dynamically imported module/i.test(msg) ||
+      /Loading chunk/i.test(msg);
+
     return (
       <div style={styles.root}>
         <div style={styles.card}>
-          <div style={styles.icon}>⚠️</div>
-          <h1 style={styles.title}>Something went wrong</h1>
+          <div style={styles.icon}>{isChunkOrPreload ? '🔄' : '⚠️'}</div>
+          <h1 style={styles.title}>
+            {isChunkOrPreload ? 'New Version Available' : 'Something went wrong'}
+          </h1>
           <p style={styles.desc}>
-            An unexpected error occurred. Don't worry — your data is safe.
+            {isChunkOrPreload
+              ? 'DebateForge has just been updated with new improvements. Please reload to load the latest version.'
+              : "An unexpected error occurred. Don't worry — your data is safe."}
           </p>
-          {this.state.error && (
+          {!isChunkOrPreload && this.state.error && (
             <pre style={styles.detail}>
               {this.state.error.message || String(this.state.error)}
             </pre>
           )}
           <div style={styles.btns}>
             <button style={styles.primaryBtn} onClick={this.handleReload}>
-              Reload Page
+              {isChunkOrPreload ? 'Update Now' : 'Reload Page'}
             </button>
             <button style={styles.secondaryBtn} onClick={this.handleGoHome}>
               Go Home

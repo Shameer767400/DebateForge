@@ -65,7 +65,7 @@ async function createOrder(req, res) {
       return res.status(400).json({ error: `Invalid plan: ${planId}` });
     }
 
-    if (!['monthly', 'yearly'].includes(billingCycle)) {
+    if (!['daily', 'monthly', 'yearly'].includes(billingCycle)) {
       return res.status(400).json({ error: `Invalid billing cycle: ${billingCycle}` });
     }
 
@@ -137,7 +137,10 @@ async function createOrder(req, res) {
       planId,
       billingCycle,
       name: 'DebateForge',
-      description: `${planId.toUpperCase()} (${billingCycle}) Prepaid Access Pass`,
+      description:
+        billingCycle === 'daily'
+          ? 'DebateForge 24-Hour Pass'
+          : `${planId.toUpperCase()} (${billingCycle}) Prepaid Access Pass`,
       prefill: {
         name: user.username || '',
         email: user.email || '',
@@ -236,7 +239,12 @@ async function applyPaymentEntitlement({
 
             // D. Authoritative Payment Timestamp and Expiry Calculation
             const paymentTime = new Date(txPayment.verifiedAt || txPayment.createdAt || Date.now()).getTime();
-            const periodDays = txPayment.billingCycle === 'yearly' ? 365 : 30;
+            const periodDays =
+              txPayment.billingCycle === 'yearly'
+                ? 365
+                : txPayment.billingCycle === 'daily'
+                ? 1
+                : 30;
             const durationMs = periodDays * 24 * 60 * 60 * 1000;
 
             const existingExpiry = txUser.subscription?.currentPeriodEnd

@@ -33,7 +33,7 @@ const paymentSchema = new Schema(
     },
     billingCycle: {
       type: String,
-      enum: ['monthly', 'yearly'],
+      enum: ['daily', 'monthly', 'yearly'],
       default: 'monthly',
     },
     amount: {

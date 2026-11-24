@@ -43,6 +43,30 @@ const PLANS = [
     ],
   },
   {
+    id: 'day_pass',
+    name: '24-Hour Pass',
+    tagline: 'Instant sprint for placements, MUN & tournaments',
+    monthlyPrice: 49,
+    yearlyPrice: 49,
+    isDayPass: true,
+    color: '#ffaa00',
+    accent: 'rgba(255, 170, 0, 0.12)',
+    badge: 'Quick Practice',
+    cta: 'Get 24h Pass (₹49)',
+    ctaAction: 'checkout',
+    features: [
+      { text: '24 hours unlimited AI debates', included: true },
+      { text: 'All debate formats (Oxford, GD, LD)', included: true },
+      { text: 'Real-time fallacy detection & scoring', included: true },
+      { text: 'Full PDF report cards', included: true },
+      { text: 'Custom AI opponent personas', included: true },
+      { text: 'Instant activation via UPI & Cards', included: true },
+      { text: 'One-time charge (no recurring commitment)', included: true },
+      { text: 'Long-term analytics history', included: false },
+      { text: 'Institution dashboard', included: false },
+    ],
+  },
+  {
     id: 'pro',
     name: 'Pro',
     tagline: 'For serious individual debaters',
@@ -112,6 +136,10 @@ const PLANS = [
 ];
 
 const FAQ = [
+  {
+    q: 'How does the 24-Hour Day Pass work?',
+    a: 'The 24-Hour Pass (₹49) gives you full, unrestricted Pro access for exactly 24 hours from the moment of payment. It does not renew automatically and requires no subscription commitment — perfect for preparing for an upcoming placement GD, tournament, or job interview.',
+  },
   {
     q: 'Can I switch plans anytime?',
     a: 'Yes. Upgrades take effect immediately. Downgrades take effect at the end of your current active billing cycle.',
@@ -229,10 +257,13 @@ export default function PricingPage() {
           return;
         }
 
+        const effectivePlanId = plan.isDayPass ? 'pro' : plan.id;
+        const effectiveBillingCycle = plan.isDayPass ? 'daily' : billing;
+
         // 2. Create Razorpay order on backend
         const { data: orderData } = await api.post('/api/billing/create-order', {
-          planId: plan.id,
-          billingCycle: billing,
+          planId: effectivePlanId,
+          billingCycle: effectiveBillingCycle,
         });
 
         if (!orderData?.orderId || !orderData?.keyId) {
@@ -245,7 +276,7 @@ export default function PricingPage() {
           amount: orderData.amount,
           currency: orderData.currency || 'INR',
           name: 'DebateForge',
-          description: orderData.description || `${plan.name} (${billing}) Subscription`,
+          description: orderData.description || (plan.isDayPass ? '24-Hour Pro Pass' : `${plan.name} (${billing}) Subscription`),
           order_id: orderData.orderId,
           prefill: {
             name: orderData.prefill?.name || user.username || '',
@@ -270,8 +301,8 @@ export default function PricingPage() {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                planId: plan.id,
-                billingCycle: billing,
+                planId: effectivePlanId,
+                billingCycle: effectiveBillingCycle,
               });
 
               if (verifyRes.data?.success) {
@@ -313,16 +344,19 @@ export default function PricingPage() {
   const getPrice = (plan) => {
     if (plan.monthlyPrice === null) return 'Custom';
     if (plan.monthlyPrice === 0) return 'Free';
+    if (plan.isDayPass) return '₹49';
     const price = billing === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
     return `₹${price.toLocaleString('en-IN')}`;
   };
 
   const getPeriodLabel = (plan) => {
     if (plan.monthlyPrice === null || plan.monthlyPrice === 0) return '';
+    if (plan.isDayPass) return '/ 24 hours';
     return billing === 'yearly' ? '/year' : '/month';
   };
 
   const getSavings = (plan) => {
+    if (plan.isDayPass) return null;
     if (!plan.monthlyPrice || !plan.yearlyPrice) return null;
     const annualIfMonthly = plan.monthlyPrice * 12;
     const savings = annualIfMonthly - plan.yearlyPrice;

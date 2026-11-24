@@ -4,16 +4,30 @@ import './index.css';
 import App from './App';
 
 // Automatically recover when a new deployment updates chunk hashes on the CDN
+const handleChunkError = (e) => {
+  const reason = e?.reason?.message || e?.message || String(e || '');
+  if (
+    /Unable to preload CSS/i.test(reason) ||
+    /Failed to fetch dynamically imported module/i.test(reason) ||
+    /Loading chunk .* failed/i.test(reason)
+  ) {
+    if (e.preventDefault) e.preventDefault();
+    const lastReload = sessionStorage.getItem('df_last_chunk_reload');
+    const now = Date.now();
+    if (!lastReload || now - parseInt(lastReload, 10) > 30000) {
+      sessionStorage.setItem('df_last_chunk_reload', String(now));
+      window.location.reload();
+    }
+  }
+};
+
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
-  const lastReload = sessionStorage.getItem('df_last_chunk_reload');
-  const now = Date.now();
-  // Throttle to one auto-reload per 30s to prevent infinite loops if user is offline
-  if (!lastReload || now - parseInt(lastReload, 10) > 30000) {
-    sessionStorage.setItem('df_last_chunk_reload', String(now));
-    window.location.reload();
-  }
+  handleChunkError(event);
 });
+
+window.addEventListener('unhandledrejection', handleChunkError);
+
 
 // Google Analytics 4 (GA4) auto-initialization when VITE_GA_MEASUREMENT_ID is configured
 const gaMeasurementId = import.meta.env.VITE_GA_MEASUREMENT_ID;

@@ -178,10 +178,10 @@ const userSchema = new Schema(
       // Durable idempotency ledger: records every order ID successfully credited
       appliedOrderIds:       { type: [String], default: [] },
 
-      // Billing cycle: monthly | yearly
+      // Billing cycle: daily | monthly | yearly
       billingCycle: {
         type: String,
-        enum: ['monthly', 'yearly'],
+        enum: ['daily', 'monthly', 'yearly'],
         default: 'monthly',
       },
 

@@ -18,6 +18,7 @@ let _razorpayClient = null;
  */
 const PLAN_PRICING = {
   pro: {
+    daily:   parseInt(process.env.PLAN_PRO_DAILY_PAISE, 10)   || 4900,       // ₹49
     monthly: parseInt(process.env.PLAN_PRO_MONTHLY_PAISE, 10) || 99900,      // ₹999
     yearly:  parseInt(process.env.PLAN_PRO_YEARLY_PAISE, 10)  || 799900,     // ₹7,999
   },
