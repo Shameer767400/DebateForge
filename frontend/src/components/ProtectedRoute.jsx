@@ -18,6 +18,11 @@ function ProtectedRoute({ children }) {
   }
 
   if (!isAuthenticated) {
+    if (location.pathname.startsWith('/join/') || location.search.includes('code=') || location.search.includes('join=')) {
+      try {
+        sessionStorage.setItem('df_post_login_redirect', `${location.pathname}${location.search || ''}`);
+      } catch { /* ignore */ }
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

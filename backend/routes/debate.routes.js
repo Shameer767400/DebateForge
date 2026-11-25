@@ -6,6 +6,7 @@ const {
   getDebateById,
   endDebate,
   joinGDRoomByCode,
+  startGDFromLobby,
 } = require('../controllers/debate.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { checkDebateQuota } = require('../controllers/billing.controller');
@@ -16,6 +17,7 @@ const router = express.Router();
 router.use(protect);
 
 router.post('/join-gd', joinGDRoomByCode);
+router.post('/:id/start-gd', startGDFromLobby);
 
 /**
  * @swagger

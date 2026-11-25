@@ -44,7 +44,13 @@ export default function LoginPage() {
         returnDestination = `${from.pathname}${from.search || ''}${from.hash || ''}`;
       }
 
-      const target = returnDestination || (userRole === 'admin' ? '/admin' : '/lobby');
+      let savedRedirect = '';
+      try {
+        savedRedirect = sessionStorage.getItem('df_post_login_redirect') || '';
+        if (savedRedirect) sessionStorage.removeItem('df_post_login_redirect');
+      } catch { /* ignore */ }
+
+      const target = returnDestination || savedRedirect || (userRole === 'admin' ? '/admin' : '/lobby');
       navigate(target, { replace: true });
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Login failed. Please try again.';

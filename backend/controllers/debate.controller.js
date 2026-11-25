@@ -40,6 +40,7 @@ async function startDebate(req, res) {
       });
     }
 
+    const isGD = format === 'group_discussion';
     const debate = new Debate({
       userId: req.user.id,
       topicId: resolvedTopicId,
@@ -48,6 +49,7 @@ async function startDebate(req, res) {
       difficulty: resolvedDifficulty,
       persona: persona || 'balanced',
       format: format || 'freeform',
+      status: isGD ? 'waiting' : 'active',
       language: language || 'en',
       roomCode,
       capacity: 4,
@@ -64,6 +66,7 @@ async function startDebate(req, res) {
       difficulty: debate.difficulty,
       persona: debate.persona,
       format: debate.format,
+      status: debate.status,
       language: debate.language,
       roomCode: debate.roomCode,
       participants: debate.participants,
@@ -167,6 +170,7 @@ async function joinGDRoomByCode(req, res) {
       roomCode: debate.roomCode,
       topicSnapshot: debate.topicSnapshot,
       format: debate.format,
+      status: debate.status,
       language: debate.language,
       seatNumber,
       participants: debate.participants,
@@ -174,6 +178,40 @@ async function joinGDRoomByCode(req, res) {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error in joinGDRoomByCode controller:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+async function startGDFromLobby(req, res) {
+  try {
+    const debate = await Debate.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!debate) {
+      return res.status(404).json({ error: 'GD room not found or only the host can start the discussion.' });
+    }
+    if (debate.endedAt) {
+      return res.status(400).json({ error: 'This GD session has already ended.' });
+    }
+
+    debate.status = 'active';
+    await debate.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(debate._id.toString()).emit('gd_session_started', {
+        debateId: debate._id.toString(),
+        status: 'active',
+        participants: debate.participants,
+      });
+    }
+
+    return res.status(200).json({
+      debateId: debate._id,
+      status: debate.status,
+      participants: debate.participants,
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error in startGDFromLobby controller:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -233,5 +271,6 @@ module.exports = {
   getDebateById,
   endDebate,
   joinGDRoomByCode,
+  startGDFromLobby,
 };
 

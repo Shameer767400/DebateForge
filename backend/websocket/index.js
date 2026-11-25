@@ -336,6 +336,7 @@ function initWebSocket(server) {
     // eslint-disable-next-line no-console
 
     socket._turnInFlight = false;
+    socket._io = io;
 
 
     /* ────────────────────────────────────────
@@ -365,9 +366,20 @@ function initWebSocket(server) {
         const existingRaw = await redisClient.get(`session:${debateId}`);
         if (existingRaw) {
           const existing = JSON.parse(existingRaw);
+          // Sync latest participants & status from MongoDB so newly joined friends are recognized
+          const syncedParticipants = (debate.participants && debate.participants.length > 0)
+            ? debate.participants.map((p) => ({
+                id: p.userId ? p.userId.toString() : socket.user.id,
+                name: p.name || 'Candidate',
+                seatNumber: p.seatNumber || 1,
+              }))
+            : existing.participants || [];
+          existing.participants = syncedParticipants;
+          existing.status = debate.status || existing.status || 'active';
+
           const isParticipant =
             existing.userId === socket.user.id ||
-            (existing.participants && existing.participants.some((p) => p.id === socket.user.id));
+            syncedParticipants.some((p) => p.id === socket.user.id);
 
           if (isParticipant) {
             // Restore existing session — do NOT overwrite round/history.
@@ -388,6 +400,7 @@ function initWebSocket(server) {
               aiPosition:   existing.aiPosition,
               difficulty:   debate.difficulty,
               format:       debate.format || 'freeform',
+              status:       existing.status,
               language:     existing.currentLanguage || 'en',
               roomCode:     debate.roomCode || null,
               participants: existing.participants || [],
@@ -398,6 +411,7 @@ function initWebSocket(server) {
               participants: existing.participants || [],
               roomCode:     debate.roomCode || null,
               capacity:     debate.capacity || 4,
+              status:       existing.status,
             });
             return;
           }
@@ -472,6 +486,7 @@ function initWebSocket(server) {
           aiPosition,
           difficulty:   debate.difficulty,
           format:       debateFormat,
+          status:       debate.status || 'active',
           language:     sessionState.currentLanguage,
           roomCode:     debate.roomCode || null,
           participants: initialParticipants,
@@ -482,6 +497,7 @@ function initWebSocket(server) {
           participants: initialParticipants,
           roomCode:     debate.roomCode || null,
           capacity:     debate.capacity || 4,
+          status:       debate.status || 'active',
         });
 
         /* ── Emit initial phase info for format debates ── */
@@ -786,9 +802,10 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
    processTranscript — ML pipeline → GPT-4 stream → TTS stream
 ═══════════════════════════════════════════════════════════════ */
 async function processTranscript(socket, session, debateId, transcript) {
+  const roomTarget = socket._io ? socket._io.to(debateId) : socket;
   try {
     session.currentLanguage = resolveActiveLanguage(session);
-    socket.emit('ai_thinking', { language: session.currentLanguage });
+    roomTarget.emit('ai_thinking', { language: session.currentLanguage });
 
     const historyCtx = session.conversationHistory.slice(-4).map((m) => m.content);
 
@@ -864,7 +881,7 @@ async function processTranscript(socket, session, debateId, transcript) {
     const suppressRawStream = !!(targetLang && targetLang !== 'en');
 
     if (suppressRawStream) {
-      socket.emit('ai_text_chunk', { text: '\u2026', isPlaceholder: true, turnId });
+      roomTarget.emit('ai_text_chunk', { text: '\u2026', isPlaceholder: true, turnId });
     }
 
     // Strip parenthetical meta-notes Ollama tends to add e.g. "(Note: I've used the APA study...)"
@@ -890,7 +907,7 @@ async function processTranscript(socket, session, debateId, transcript) {
 
         // *** Only stream raw chunks when language is English ***
         if (!suppressRawStream && cleanChunk.trim()) {
-          socket.emit('ai_text_chunk', { text: cleanChunk, turnId });
+          roomTarget.emit('ai_text_chunk', { text: cleanChunk, turnId });
         }
 
         // *** Only do sentence-level TTS for English ***
@@ -940,7 +957,7 @@ async function processTranscript(socket, session, debateId, transcript) {
             // Trigger AI judge scoring
             await runJudgeScoring(socket, session, debateId, false, session.tzOffset || 0);
           } else {
-            socket.emit('phase_update', {
+            roomTarget.emit('phase_update', {
               phase:       nextInfo.phaseKey,
               phaseName:   nextInfo.phaseName,
               timeLimit:   nextInfo.timeLimit,
@@ -1008,7 +1025,7 @@ async function processTranscript(socket, session, debateId, transcript) {
     }
 
     /* ── 9. Signal turn complete — ALWAYS fires regardless of upstream errors ── */
-    socket.emit('ai_turn_complete', {
+    roomTarget.emit('ai_turn_complete', {
       fullText: finalText,
       round: session.round,
       detectedLanguage: targetLang || session.currentLanguage || session.detectedLanguage || 'en',

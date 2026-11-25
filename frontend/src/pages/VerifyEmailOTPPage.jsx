@@ -95,7 +95,14 @@ export default function VerifyEmailOTPPage() {
           <button
             className="auth-submit"
             style={{ marginTop: '16px' }}
-            onClick={() => navigate('/lobby')}
+            onClick={() => {
+              let savedRedirect = '';
+              try {
+                savedRedirect = sessionStorage.getItem('df_post_login_redirect') || '';
+                if (savedRedirect) sessionStorage.removeItem('df_post_login_redirect');
+              } catch { /* ignore */ }
+              navigate(savedRedirect || '/lobby');
+            }}
           >
             Go to Lobby
           </button>

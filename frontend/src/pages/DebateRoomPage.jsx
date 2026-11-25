@@ -301,6 +301,8 @@ export default function DebateRoomPage() {
   const [streakFreezeUsed, setStreakFreezeUsed] = useState(false);
   const [activeGDSpeaker, setActiveGDSpeaker] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showMobileControls, setShowMobileControls] = useState(false);
+  const [startingGD, setStartingGD] = useState(false);
 
   /* Incrementing key used to guarantee the timer resets every new user_turn */
   const [timerKey, setTimerKey] = useState(0);
@@ -592,6 +594,16 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         }
         break;
 
+      case 'gd_session_started':
+        setDebateInfo((prev) => prev ? {
+          ...prev,
+          status: 'active',
+          participants: data?.participants || prev.participants,
+        } : prev);
+        setTimerKey((k) => k + 1);
+        toast.success('🚀 Group Discussion started! Round 1 is live.');
+        break;
+
       case 'error':
         console.error('[DebateRoom] socket error:', data);
         if (data?.message) toast.error(data.message);
@@ -721,9 +733,29 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
   const phaseRef = useRef(phase);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
+  const isGDWaiting = debateInfo?.format === 'group_discussion' && debateInfo?.status === 'waiting';
+
+  const handleStartGDFromLobby = async () => {
+    setStartingGD(true);
+    try {
+      const res = await api.post(`/api/debates/${debateId}/start-gd`);
+      setDebateInfo((prev) => prev ? {
+        ...prev,
+        status: 'active',
+        participants: res.data?.participants || prev.participants,
+      } : prev);
+      setTimerKey((k) => k + 1);
+      toast.success('🚀 Discussion started! All participants are live.');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not start discussion.');
+    } finally {
+      setStartingGD(false);
+    }
+  };
+
   useEffect(() => {
-    // Only run timer during active user phases
-    if (phase !== 'user_turn' && phase !== 'recording') {
+    // Only run timer during active user phases (and never while waiting in GD lobby)
+    if (isGDWaiting || (phase !== 'user_turn' && phase !== 'recording')) {
       clearInterval(timerRef.current);
       return;
     }
@@ -745,7 +777,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
     return () => clearInterval(timerRef.current);
   // timerKey is bumped every ai_turn_complete so the effect re-fires reliably
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timerKey, phase === 'recording' ? 'recording' : 'user_turn', timerMax]);
+  }, [timerKey, phase === 'recording' ? 'recording' : 'user_turn', timerMax, isGDWaiting]);
 
   /* ── Fallacy alert auto-dismiss ── */
   const dismissAlert = useCallback(() => {
@@ -875,11 +907,30 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
 
           {/* Top bar */}
           <div className="debate-topbar">
-            <span className="debate-topic">
-              {debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? 'Loading topic…'}
-            </span>
-            <span className="debate-round">Round {round}</span>
-            <div className="debate-topbar-controls">
+            <div className="debate-topbar-primary">
+              <span className="debate-topic">
+                {debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? 'Loading topic…'}
+              </span>
+              <span className="debate-round">Round {round}</span>
+              <button
+                type="button"
+                className="debate-mobile-settings-btn"
+                onClick={() => setShowMobileControls((v) => !v)}
+                aria-label="Toggle voice and language settings"
+              >
+                {showMobileControls ? '✕' : '⚙️'}
+              </button>
+              <button
+                className="debate-end-btn debate-end-btn--mobile-inline"
+                onClick={() => {
+                  endDebate();
+                  setPhase('ended');
+                }}
+              >
+                End
+              </button>
+            </div>
+            <div className={`debate-topbar-controls ${showMobileControls ? 'debate-topbar-controls--open' : ''}`}>
               <select 
                 value={selectedVoiceURI} 
                 onChange={(e) => setSelectedVoiceURI(e.target.value)}
@@ -917,7 +968,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
               </select>
 
               <button
-                className="debate-end-btn"
+                className="debate-end-btn debate-end-btn--desktop"
                 onClick={() => {
                   endDebate();
                   setPhase('ended');
@@ -1159,6 +1210,67 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
             );
           })()}
 
+          {/* GD Waiting Room / Lobby OR Active Chat */}
+          {isGDWaiting ? (() => {
+            const invite = generateInviteDetails();
+            const joinedCount = (debateInfo?.participants || []).length || 1;
+            const isHost = !debateInfo?.userId || !user?.id ||
+              debateInfo.userId === user.id || debateInfo.userId === user._id;
+            return (
+              <div className="gd-waiting-lobby">
+                <div className="gd-waiting-badge">🏛️ GROUP DISCUSSION WAITING ROOM</div>
+                <h2 className="gd-waiting-heading">
+                  {debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? 'Campus Group Discussion'}
+                </h2>
+                <p className="gd-waiting-sub">
+                  {joinedCount}/4 human seats joined. Empty seats automatically fill with AI candidates (Aarav, Priya, Karan) when you start!
+                </p>
+
+                <div className="gd-waiting-invite-box">
+                  <div className="gd-waiting-code-block">
+                    <span className="gd-waiting-code-label">ROOM CODE</span>
+                    <span className="gd-waiting-code-value">{invite.code}</span>
+                  </div>
+                  <div className="gd-waiting-invite-actions">
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(invite.whatsappText)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="gd-waiting-wa-btn"
+                    >
+                      📱 Share on WhatsApp
+                    </a>
+                    <button
+                      type="button"
+                      className="gd-waiting-copy-btn"
+                      onClick={() => {
+                        navigator.clipboard.writeText(invite.directLink);
+                        toast.success('1-Click Join Link copied!');
+                      }}
+                    >
+                      📋 Copy Invite Link
+                    </button>
+                  </div>
+                </div>
+
+                {isHost ? (
+                  <button
+                    type="button"
+                    disabled={startingGD}
+                    onClick={handleStartGDFromLobby}
+                    className="gd-waiting-start-btn"
+                  >
+                    {startingGD ? 'Launching Arena…' : '🚀 Start Group Discussion'}
+                  </button>
+                ) : (
+                  <div className="gd-waiting-guest-banner">
+                    ⏳ You have joined this table! Waiting for the host to click <strong>Start Discussion</strong>…
+                  </div>
+                )}
+              </div>
+            );
+          })() : (
+          <>
           {/* Chat area */}
           <div className="debate-chat">
             {messages.map((msg) => {
@@ -1313,6 +1425,8 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
               ))}
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {/* ──── RIGHT PANEL ──── */}

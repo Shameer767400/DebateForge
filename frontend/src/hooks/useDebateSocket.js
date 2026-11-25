@@ -21,8 +21,18 @@ const SERVER_EVENTS = [
   'ai_translation',
   'user_translation',
   'gd_table_update',
+  'gd_session_started',
   'error',
 ];
+
+/** Collapses adjacent duplicate words/phrases emitted by Android Chrome SpeechRecognition. */
+function collapseConsecutiveRepeats(text) {
+  if (!text) return '';
+  return text
+    .replace(/\b(\S+(?:\s+\S+){0,3})\s+\1\b/gi, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 
 /**
  * useDebateSocket
@@ -508,11 +518,17 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
   }, [debateId, startSpeechRecognition]);
 
   /** FALLBACK path: SpeechRecognition only → emit transcript_direct on final result */
-  const startRecordingFallback = useCallback(() => {
+  const startRecordingFallback = useCallback((baseText = '') => {
     isRecordingRef.current = true;
     usedMediaRecorderRef.current = false;
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
+
+    // Prevent duplicate concurrent SpeechRecognition instances
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
 
     const recognition       = new SR();
     recognition.continuous      = true;
@@ -521,19 +537,23 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       recognition.lang = speechRecognitionLangFromIso(preferredLangRef.current);
     }
 
-    /* Track all final results separately — on Android Chrome, interim results
-       can reset between speech pauses, losing earlier text */
-    let accumulatedFinal = '';
+    /* Track only newly finalized indices (e.resultIndex) so prior results
+       are never re-appended on subsequent onresult events. */
+    let sessionFinal = baseText ? `${baseText.trim()} ` : '';
 
     recognition.onresult = (e) => {
       let interim = '';
-      let finalInBatch = '';
-      for (const result of e.results) {
-        if (result.isFinal) finalInBatch += result[0].transcript;
-        else                 interim      += result[0].transcript;
+      for (let i = e.resultIndex; i < e.results.length; i += 1) {
+        const result = e.results[i];
+        const chunk = result[0]?.transcript || '';
+        if (result.isFinal) {
+          sessionFinal += `${chunk.trim()} `;
+        } else {
+          interim += chunk;
+        }
       }
-      if (finalInBatch) accumulatedFinal += finalInBatch;
-      const display = accumulatedFinal + (interim ? interim : '');
+      const rawDisplay = `${sessionFinal}${interim}`.trim();
+      const display = collapseConsecutiveRepeats(rawDisplay);
       setLiveTranscript(display);
       liveTranscriptRef.current = display;
     };
@@ -553,15 +573,16 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
       recognitionRef.current = null;
       if (!shouldKeepRecognizingRef.current || !isRecordingRef.current) return;
       /* On Android Chrome, SpeechRecognition stops after a speech pause.
-         Restart it to keep listening. Small delay avoids rapid restart loops. */
+         Restart it while preserving already-finalized text as baseText. */
+      const preserved = liveTranscriptRef.current || '';
       setTimeout(() => {
         if (!shouldKeepRecognizingRef.current || !isRecordingRef.current) return;
         try {
-          startRecordingFallback();
+          startRecordingFallback(preserved);
         } catch (err) {
           console.warn('[useDebateSocket] SpeechRecognition fallback restart failed:', err);
         }
-      }, 100);
+      }, 150);
     };
 
     recognition.start();

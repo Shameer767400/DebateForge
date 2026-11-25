@@ -391,7 +391,8 @@ if (require.main === module) {
         console.log('✅ MongoDB reconnected.')
       );
 
-      initWebSocket(server);
+      const io = initWebSocket(server);
+      app.set('io', io);
       scheduleNotificationJobs();
 
       server.on('error', (err) => {

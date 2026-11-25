@@ -180,8 +180,23 @@ export default function LobbyPage() {
       const clean = targetCode.trim().toUpperCase();
       setJoinRoomCode(clean);
       setFormat('group_discussion');
+      // Auto-join immediately when arriving from a direct invite link (/join/:roomCode)
+      if (roomCode) {
+        setJoiningRoom(true);
+        apiRef.current
+          .post('/api/debates/join-gd', { roomCode: clean })
+          .then((res) => {
+            navigate(`/debate/${res.data.debateId}`, { replace: true });
+          })
+          .catch((err) => {
+            setError(err.response?.data?.error || err.message || 'Could not join GD room. Check the code.');
+          })
+          .finally(() => {
+            setJoiningRoom(false);
+          });
+      }
     }
-  }, [roomCode]);
+  }, [roomCode, navigate]);
 
   /* ── Reset step-2 / step-3 when mode or topic changes ── */
   const resetSteps = () => {

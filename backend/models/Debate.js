@@ -161,6 +161,11 @@ const DebateSchema = new Schema(
       default: 'freeform',
       enum: ['freeform', 'oxford', 'lincoln_douglas', 'parliamentary', 'group_discussion'],
     },
+    status: {
+      type: String,
+      enum: ['waiting', 'active', 'completed'],
+      default: 'active',
+    },
     currentPhase: {
       type: String,
       default: 'opening',
