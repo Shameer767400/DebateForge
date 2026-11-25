@@ -98,7 +98,7 @@ async function finalizeDebate(userId, debateId, winner, durationSecs = 0, tzOffs
   const avgScore = debate.getAverageScore();
 
   await Debate.findByIdAndUpdate(debateId, {
-    winner, userFinalScore: avgScore, durationSecs, endedAt: new Date(),
+    winner, userFinalScore: avgScore, durationSecs, endedAt: new Date(), status: 'completed',
   });
 
   const user = await User.findById(userId);

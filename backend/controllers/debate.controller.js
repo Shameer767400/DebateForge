@@ -341,6 +341,16 @@ async function endDebate(req, res) {
 
     const result = await debateEngine.finalizeDebate(req.user.id, debateId, resolvedWinner, durationSecs, tzOffset);
 
+    const io = req.app.get('io');
+    if (io) {
+      io.to(debateId).emit('debate_ended', {
+        winner: resolvedWinner,
+        userFinalScore: result.avgScore,
+        endedByHost: true,
+        message: 'The host has ended the Group Discussion session.',
+      });
+    }
+
     return res.status(200).json({
       winner: resolvedWinner,
       userFinalScore: result.avgScore,

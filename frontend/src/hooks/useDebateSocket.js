@@ -326,6 +326,23 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     /* subscribe to all server events */
     SERVER_EVENTS.forEach((event) => {
       socket.on(event, (data) => {
+        if (event === 'debate_ended' || event === 'judge_verdict') {
+          isRecordingRef.current = false;
+          shouldKeepRecognizingRef.current = false;
+          try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }
+          setIsAISpeaking(false);
+          if (recognitionRef.current) {
+            try { recognitionRef.current.abort(); } catch { /* ignore */ }
+            recognitionRef.current = null;
+          }
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+          if (mediaRecRef.current && mediaRecRef.current.state !== 'inactive') {
+            try { mediaRecRef.current.stop(); } catch { /* ignore */ }
+          }
+          mediaRecRef.current = null;
+        }
+
         if (event === 'transcript_final') {
           const lang = data?.language;
           if (lang) detectedLanguageRef.current = lang;

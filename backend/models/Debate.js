@@ -13,6 +13,15 @@ const ArgumentSchema = new Schema(
       type: String,
       default: null,
     },
+    speakerUserId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    speakerAvatar: {
+      type: String,
+      default: null,
+    },
     content: {
       type: String,
       required: true,
@@ -157,6 +166,7 @@ const DebateSchema = new Schema(
         score: { type: Number, default: null },
         verdict: { type: String, enum: ['SELECTED', 'WAITLISTED', 'REJECTED', null], default: null },
         feedback: { type: String, default: null },
+        judgeScoreSnapshot: { type: Schema.Types.Mixed, default: null },
       },
     ],
     format: {

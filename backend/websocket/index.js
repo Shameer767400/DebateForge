@@ -586,6 +586,13 @@ function initWebSocket(server) {
 
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
+        const closedDebate = await Debate.findById(debateId).select('status endedAt');
+        if (closedDebate && (closedDebate.status === 'completed' || closedDebate.endedAt)) {
+          return socket.emit('debate_ended', {
+            endedByHost: true,
+            message: 'This discussion has already ended.',
+          });
+        }
         return socket.emit('error', { message: 'Session expired' });
       }
       const session = JSON.parse(sessionRaw);
@@ -654,7 +661,14 @@ function initWebSocket(server) {
 
       const sessionRaw = await redisClient.get(`session:${debateId}`);
       if (!sessionRaw) {
-         return;
+        const closedDebate = await Debate.findById(debateId).select('status endedAt');
+        if (closedDebate && (closedDebate.status === 'completed' || closedDebate.endedAt)) {
+          return socket.emit('debate_ended', {
+            endedByHost: true,
+            message: 'This discussion has already ended.',
+          });
+        }
+        return;
       }
       const session = JSON.parse(sessionRaw);
 
@@ -746,11 +760,12 @@ function initWebSocket(server) {
         /* Too few arguments for a proper judge evaluation — instant forfeit */
         const winner = 'ai';
         const result = await finalizeDebate(socket.user.id, debateId, winner, 0, tzOffset);
-        socket.emit('debate_ended', {
+        io.to(debateId).emit('debate_ended', {
           winner,
           userFinalScore: result.avgScore,
           forfeit: true,
-          message: 'You forfeited by leaving too early. Complete all rounds to get a fair judgment!',
+          endedByHost: true,
+          message: 'The host ended the Group Discussion.',
         });
         await redisClient.del(`session:${debateId}`);
       } catch (e) {
@@ -1084,10 +1099,12 @@ async function processTranscript(socket, session, debateId, transcript, speakerN
 
     Promise.allSettled([fallacyPromise, scorerPromise]).then(async () => {
       try {
-        await saveTurnToMongo(debateId, transcript, finalText, session.round - 1, scoresResult, fallacyResult);
+        const speakerUserId = socket.user?.id || null;
+        await saveTurnToMongo(debateId, transcript, finalText, session.round - 1, scoresResult, fallacyResult, speakerUserId, speakerName);
 
+        const targetStatsUserId = speakerUserId || session.userId;
         if (scoresResult && (scoresResult.logic || scoresResult.evidence || scoresResult.clarity)) {
-          User.findByIdAndUpdate(session.userId, {
+          User.findByIdAndUpdate(targetStatsUserId, {
             $inc: {
               totalLogicScore:    scoresResult.logic    || 0,
               totalEvidenceScore: scoresResult.evidence || 0,
@@ -1183,6 +1200,33 @@ No real-time ML scores are available for this debate. You must determine the use
     }
 
     const isGD = session.format === 'group_discussion';
+    const humanParticipants = (debate.participants || []).filter((p) => !p.isAI && p.userId);
+    const isMultiplayerGD = isGD && humanParticipants.length > 1;
+
+    let perParticipantBreakdown = '';
+    if (isMultiplayerGD) {
+      perParticipantBreakdown = '\n\nINDIVIDUAL HUMAN PARTICIPANT DATA:\n' + humanParticipants.map((p) => {
+        const uid = p.userId.toString();
+        const pArgs = userArgs.filter(
+          (a) => (a.speakerUserId && a.speakerUserId.toString() === uid) || (a.speakerName && a.speakerName === p.name)
+        );
+        const pScored = pArgs.filter((a) => a.scores && a.scores.overall != null);
+        const pAvg = pScored.length
+          ? Math.round(pScored.reduce((s, a) => s + (a.scores.overall || 0), 0) / pScored.length)
+          : (pArgs.length ? 65 : 20);
+        const pLogic = pScored.length
+          ? Math.round(pScored.reduce((s, a) => s + (a.scores.logic || 0), 0) / pScored.length)
+          : pAvg;
+        const pEvidence = pScored.length
+          ? Math.round(pScored.reduce((s, a) => s + (a.scores.evidence || 0), 0) / pScored.length)
+          : pAvg;
+        const pClarity = pScored.length
+          ? Math.round(pScored.reduce((s, a) => s + (a.scores.clarity || 0), 0) / pScored.length)
+          : pAvg;
+        return `- User "${p.name}" (userId: "${uid}", Seat ${p.seatNumber}): spoke ${pArgs.length} time(s). ML Avg=${pAvg}, Logic=${pLogic}, Evidence=${pEvidence}, Clarity=${pClarity}.`;
+      }).join('\n');
+    }
+
     const gdPromptContext = isGD
       ? `\n\nCAMPUS PLACEMENT & GROUP DISCUSSION EVALUATION:
 This session is a simulated 4-person Campus Placement / MBA Admissions Group Discussion.
@@ -1193,7 +1237,10 @@ In addition to the standard fields, you MUST evaluate the candidate's performanc
 - "contentDepthScore": score out of 100 on facts, market data, and depth of arguments
 - "listeningSynthesisScore": score out of 100 on actively listening, synthesizing peers' points, and avoiding talking over others
 - "leadershipScore": score out of 100 on group moderation, steering discussions back on track, and building consensus
-- "panelRemarks": 2-3 sentences of direct, actionable recruiter feedback on hiring potential.`
+- "panelRemarks": 2-3 sentences of direct, actionable recruiter feedback on hiring potential.${isMultiplayerGD ? `
+
+MULTIPLAYER INDIVIDUAL EVALUATION REQUIREMENT:
+Because multiple real human students participated in this GD, you MUST ALSO include a top-level "participantVerdicts" JSON object keyed by each user's exact "userId" string shown above. Each entry MUST have the exact same schema (userScore, aiScore, winner, reportCardHeadline, feedback, userStrengths, userWeaknesses, areasToImprove, grammarMistakes, fallacies, gdVerdict) reflecting ONLY that specific student's spoken turns and weaknesses! If a student spoke 0 times, score them low (<40) and explain they need to speak up in GDs.${perParticipantBreakdown}` : ''}`
       : '';
 
     const judgePrompt = `You are an impartial debate judge and corporate evaluator.
@@ -1268,22 +1315,87 @@ Respond ONLY in this JSON format:
       };
     }
 
+    const rawParticipantVerdicts = (judgeResponse && typeof judgeResponse.participantVerdicts === 'object' && judgeResponse.participantVerdicts)
+      ? judgeResponse.participantVerdicts
+      : {};
+
     judgeResponse = sanitizeJudgeResponse(judgeResponse, judgeText);
 
-    const persistedProfile = await persistReportCard(session.userId, judgeResponse);
+    const participantVerdicts = {};
+    if (isGD && humanParticipants.length > 0) {
+      for (const p of humanParticipants) {
+        const uid = p.userId.toString();
+        const pArgs = userArgs.filter(
+          (a) => (a.speakerUserId && a.speakerUserId.toString() === uid) || (a.speakerName && a.speakerName === p.name)
+        );
+        const pScored = pArgs.filter((a) => a.scores && a.scores.overall != null);
+        const fallbackScore = pScored.length
+          ? Math.round(pScored.reduce((s, a) => s + (a.scores.overall || 0), 0) / pScored.length)
+          : (pArgs.length ? (judgeResponse.userScore || 65) : 35);
+
+        const rawPv = rawParticipantVerdicts[uid];
+        const fallbackPv = {
+          userScore: fallbackScore,
+          aiScore: judgeResponse.aiScore || 65,
+          winner: (isForfeit ? 'ai' : (fallbackScore >= 60 ? 'user' : 'ai')),
+          reportCardHeadline: pArgs.length > 0
+            ? `${p.name}: You made ${pArgs.length} contribution(s) — focus on structured data & stronger counter-rebuttals.`
+            : `${p.name}: You stayed quiet during the Group Discussion. Active entry and speaking up are essential!`,
+          feedback: pArgs.length > 0
+            ? `Based on ${p.name}'s ${pArgs.length} turn(s), average logic/evidence/clarity score was ${fallbackScore}/100.`
+            : `${p.name} did not contribute spoken/written points during the GD rounds.`,
+          userStrengths: pArgs.length > 0 ? 'Attentive to the ongoing group thread.' : 'Observed peer flow.',
+          userWeaknesses: pArgs.length > 0 ? 'Could interject more decisively with factual evidence.' : 'Zero verbal/text participation recorded.',
+          areasToImprove: pArgs.length > 0 ? ['Quote concrete facts', 'Interject proactively'] : ['Initiate at least 1–2 clear points per round'],
+          grammarMistakes: [],
+          fallacies: pArgs.filter((a) => a.fallacy?.detected && a.fallacy?.type).map((a) => a.fallacy.type.replace(/_/g, ' ')),
+          gdVerdict: {
+            status: fallbackScore >= 75 ? 'SELECTED' : fallbackScore >= 60 ? 'WAITLISTED' : 'REJECTED',
+            selectionTitle: fallbackScore >= 75 ? 'Selected for Round 2' : fallbackScore >= 60 ? 'Waitlisted for Review' : 'Needs Improvement',
+            entryTimingScore: pArgs.length ? fallbackScore : 25,
+            contentDepthScore: pArgs.length ? fallbackScore : 25,
+            listeningSynthesisScore: pArgs.length ? Math.min(100, fallbackScore + 5) : 40,
+            leadershipScore: pArgs.length ? fallbackScore : 20,
+            panelRemarks: pArgs.length > 0 ? 'Good participation; sharpen factual backing.' : 'Step into the discussion early to demonstrate leadership.',
+          },
+        };
+
+        const sanitizedPv = rawPv
+          ? sanitizeJudgeResponse({ ...fallbackPv, ...rawPv }, JSON.stringify(rawPv))
+          : fallbackPv;
+        if (!sanitizedPv.gdVerdict) sanitizedPv.gdVerdict = fallbackPv.gdVerdict;
+
+        participantVerdicts[uid] = sanitizedPv;
+        p.score = sanitizedPv.userScore;
+        p.verdict = sanitizedPv.gdVerdict?.status || null;
+        p.feedback = sanitizedPv.feedback || null;
+        p.judgeScoreSnapshot = sanitizedPv;
+
+        // Save individualized weaknesses/focus areas for this user
+        await persistReportCard(uid, sanitizedPv).catch(() => {});
+      }
+    }
+
+    const hostVerdict = participantVerdicts[session.userId] || judgeResponse;
+    const persistedProfile = await persistReportCard(session.userId, hostVerdict);
 
     await Debate.findByIdAndUpdate(debateId, {
-      judgeScore: judgeResponse,
+      judgeScore: hostVerdict,
+      participants: debate.participants,
       currentPhase: 'judging',
+      status: 'completed',
     });
     
-    // Process final stats (wins, streaks, etc.)
-    const statsResult = await finalizeDebate(session.userId, debateId, judgeResponse.winner, 0, tzOffset);
+    // Process final stats (wins, streaks, etc.) for host
+    const statsResult = await finalizeDebate(session.userId, debateId, hostVerdict.winner, 0, tzOffset);
     const streakResult = statsResult?.streakResult || {};
 
-    // Emit judge results to client
-    socket.emit('judge_verdict', {
-      ...judgeResponse,
+    // Emit judge results to EVERYONE in the debate room so all friends end together & get their own report card
+    const roomTarget = socket._io ? socket._io.to(debateId) : socket;
+    roomTarget.emit('judge_verdict', {
+      ...hostVerdict,
+      participantVerdicts,
+      endedByHost: true,
       savedFocusAreas: persistedProfile.savedFocusAreas,
       savedGrammarPatterns: persistedProfile.savedGrammarPatterns,
       streak: {
@@ -1362,10 +1474,12 @@ async function callMLService(path, data, method = 'POST') {
 /* ═══════════════════════════════════════════════════════════════
    Helper: Persist one debate turn to MongoDB
 ═══════════════════════════════════════════════════════════════ */
-async function saveTurnToMongo(debateId, userText, aiText, round, scores, fallacy) {
+async function saveTurnToMongo(debateId, userText, aiText, round, scores, fallacy, speakerUserId = null, speakerName = null) {
   const userArg = {
-    speaker:     'user',
-    content:     userText,
+    speaker:       'user',
+    speakerName:   speakerName || null,
+    speakerUserId: speakerUserId || null,
+    content:       userText,
     scores: {
       logic:     scores.logic     ?? null,
       evidence:  scores.evidence  ?? null,

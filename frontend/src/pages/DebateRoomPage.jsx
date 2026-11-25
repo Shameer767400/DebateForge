@@ -292,6 +292,8 @@ function StreamText({ text }) {
 export default function DebateRoomPage() {
   const api = useApi();
   const { user } = useAuth();
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
   const { id: debateId } = useParams();
   const navigate          = useNavigate();
 
@@ -573,9 +575,12 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         break;
       }
 
-      /* Legacy Debate over — still set phase to 'ended' to disable inputs */
+      /* Debate ended (forfeit or host terminated for all participants) */
       case 'debate_ended':
+        setDebateInfo((prev) => prev ? { ...prev, status: 'completed' } : prev);
+        setEndResult(data || { winner: 'ai' });
         setPhase('ended');
+        if (data?.message) toast.info(data.message);
         break;
 
       case 'debate_joined':
@@ -625,16 +630,26 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         }
         break;
 
-      /* AI Judge verdict (Addition 6 & 9 Report Card) */
-      case 'judge_verdict':
-        setJudgeVerdict(data);
+      /* AI Judge verdict (Addition 6 & 9 Report Card) — pick individual user verdict in multiplayer GD */
+      case 'judge_verdict': {
+        const myUid = userRef.current?.id || userRef.current?._id;
+        const myPersonalVerdict = (data?.participantVerdicts && myUid && data.participantVerdicts[myUid])
+          ? data.participantVerdicts[myUid]
+          : data;
+        const mergedVerdict = {
+          ...myPersonalVerdict,
+          streak: data?.streak || myPersonalVerdict?.streak,
+          participantVerdicts: data?.participantVerdicts || null,
+        };
+        setJudgeVerdict(mergedVerdict);
+        setDebateInfo((prev) => prev ? { ...prev, status: 'completed' } : prev);
         setPhase('ended');
-        if (data?.winner === 'user') {
+        if (mergedVerdict?.winner === 'user') {
           setUserWins((w) => w + 1);
           setShowConfetti(true);
           playVictory();
         }
-        if (data?.winner === 'ai') setAiWins((w) => w + 1);
+        if (mergedVerdict?.winner === 'ai') setAiWins((w) => w + 1);
         // Streak celebration (Addition 7)
         if (data?.streak?.milestoneReached) {
           setStreakMilestone(data.streak.milestoneReached);
@@ -643,6 +658,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
           setStreakFreezeUsed(true);
         }
         break;
+      }
 
       case 'gd_session_started':
         clearInterval(countdownTimerRef.current);
@@ -719,6 +735,17 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
             if (data?.language) {
               setDebateLanguage(data.language);
             }
+            if (data?.status === 'completed' || data?.endedAt) {
+              const myUid = userRef.current?.id || userRef.current?._id;
+              const myPart = (data?.participants || []).find(
+                (p) => !p.isAI && (p.userId === myUid || p.userId?._id === myUid)
+              );
+              const savedVerdict = myPart?.judgeScoreSnapshot || (data?.judgeScore?.feedback ? data.judgeScore : null);
+              if (savedVerdict) {
+                setJudgeVerdict(savedVerdict);
+              }
+              setPhase('ended');
+            }
           }
         })
         .catch((err) => {
@@ -746,32 +773,94 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debateId]);
 
+  /* ── Real-time sync guard for GD Waiting Room & Host End-Debate termination ──
+       Ensures friends waiting on mobile/background tabs automatically enter Round 1
+       as soon as host starts AND exit cleanly as soon as host ends the room. ── */
+  const gdStatusRef = useRef(debateInfo?.status);
+  useEffect(() => { gdStatusRef.current = debateInfo?.status; }, [debateInfo?.status]);
+
+  useEffect(() => {
+    if (!debateId || debateInfo?.format !== 'group_discussion' || phase === 'ended') return;
+    let cancelled = false;
+    const pollIv = setInterval(async () => {
+      try {
+        const res = await api.get(`/api/debates/${debateId}`);
+        if (cancelled) return;
+        const fresh = res.data?.debate ?? res.data;
+        if (!fresh) return;
+
+        // 1. Transition friend automatically from Waiting Hall into active GD when host starts
+        if (gdStatusRef.current === 'waiting' && fresh.status === 'active') {
+          clearInterval(countdownTimerRef.current);
+          setGdCountdown(null);
+          setDebateInfo(fresh);
+          setTimerKey((k) => k + 1);
+          toast.success('🚀 Group Discussion started! Round 1 is live.');
+          return;
+        }
+
+        // 2. Sync new human arrivals in Waiting Hall
+        if (gdStatusRef.current === 'waiting' && Array.isArray(fresh.participants)) {
+          setDebateInfo((prev) => prev ? { ...prev, participants: fresh.participants } : fresh);
+        }
+
+        // 3. Terminate friend's session immediately if host ended the discussion
+        if (fresh.status === 'completed' || fresh.endedAt) {
+          setDebateInfo(fresh);
+          const myUid = userRef.current?.id || userRef.current?._id;
+          const myPart = (fresh.participants || []).find(
+            (p) => !p.isAI && (p.userId === myUid || p.userId?._id === myUid)
+          );
+          const personalVerdict = myPart?.judgeScoreSnapshot || (fresh.judgeScore?.feedback ? fresh.judgeScore : null);
+          if (personalVerdict) {
+            setJudgeVerdict(personalVerdict);
+          } else {
+            setEndResult((prev) => prev || { winner: fresh.winner || 'ai', endedByHost: true });
+          }
+          setPhase('ended');
+        }
+      } catch { /* ignore transient network blips */ }
+    }, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(pollIv);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debateId, debateInfo?.format, debateInfo?.status, phase]);
+
   /* ── Navigate to dashboard after debate ends ──
-       Only auto-redirect when the user explicitly ended early (Esc / End button)
+       Only auto-redirect when ended early (Esc / End button)
        and there's no judge verdict to display. ── */
   useEffect(() => {
     if (phase !== 'ended') return;
-    if (judgeVerdict) return; // Let user dismiss the verdict overlay manually
+    if (judgeVerdict) return; // Let user inspect their individual report card manually
+    if (endResult?.endedByHost) {
+      toast.info('Host ended the discussion. Redirecting to dashboard…');
+      const fastT = setTimeout(() => navigate('/dashboard'), 3000);
+      return () => clearTimeout(fastT);
+    }
     if (endResult?.winner === 'user') toast.success('🏆 You won the debate!');
     else if (endResult?.winner === 'ai') toast.error('The AI won this round. Keep forging!');
     else toast.info('Debate ended.');
-    // Give user 10 seconds before auto-redirect — longer than before to avoid
-    // accidental redirects when phase toggles unexpectedly.
     const t = setTimeout(() => navigate('/dashboard'), 10000);
     return () => clearTimeout(t);
   }, [phase, navigate, endResult, toast, judgeVerdict]);
 
-  /* ── Keyboard shortcut: Escape to end debate ── */
+  /* ── Keyboard shortcut: Escape to end debate (host only in GD) ── */
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Escape' && phase !== 'ended') {
-        endDebate();
-        setPhase('ended');
+        const myId = userRef.current?.id || userRef.current?._id;
+        const canEnd = debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !myId || debateInfo.userId === myId;
+        if (canEnd) {
+          endDebate();
+          setPhase('ended');
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, endDebate]);
+  }, [phase, endDebate, debateInfo]);
 
   /* ── Auto-scroll chat ── */
   useEffect(() => {
@@ -993,11 +1082,17 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
               <button
                 className="debate-end-btn debate-end-btn--mobile-inline"
                 onClick={() => {
-                  endDebate();
-                  setPhase('ended');
+                  const myId = user?.id || user?._id;
+                  const canEnd = debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !myId || debateInfo.userId === myId;
+                  if (canEnd) {
+                    endDebate();
+                    setPhase('ended');
+                  } else {
+                    navigate('/lobby');
+                  }
                 }}
               >
-                End
+                {(debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !(user?.id || user?._id) || debateInfo.userId === (user?.id || user?._id)) ? 'End' : 'Leave'}
               </button>
             </div>
             <div className={`debate-topbar-controls ${showMobileControls ? 'debate-topbar-controls--open' : ''}`}>
@@ -1040,11 +1135,19 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
               <button
                 className="debate-end-btn debate-end-btn--desktop"
                 onClick={() => {
-                  endDebate();
-                  setPhase('ended');
+                  const myId = user?.id || user?._id;
+                  const canEnd = debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !myId || debateInfo.userId === myId;
+                  if (canEnd) {
+                    endDebate();
+                    setPhase('ended');
+                  } else {
+                    navigate('/lobby');
+                  }
                 }}
               >
-                End Debate <span className="debate-esc-text">(Esc)</span>
+                {(debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !(user?.id || user?._id) || debateInfo.userId === (user?.id || user?._id))
+                  ? <>End Debate <span className="debate-esc-text">(Esc)</span></>
+                  : 'Leave Table'}
               </button>
             </div>
           </div>
@@ -1717,16 +1820,53 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
                 <span className="judge-score-number judge-score-number--user">
                   {judgeVerdict.userScore}
                 </span>
-                <span className="judge-score-label">You</span>
+                <span className="judge-score-label">{user?.username || 'You'}</span>
               </div>
               <span className="judge-vs">VS</span>
               <div className="judge-score-col">
                 <span className="judge-score-number judge-score-number--ai">
                   {judgeVerdict.aiScore}
                 </span>
-                <span className="judge-score-label">AI</span>
+                <span className="judge-score-label">AI Panel</span>
               </div>
             </div>
+
+            {judgeVerdict.participantVerdicts && Object.keys(judgeVerdict.participantVerdicts).length > 1 && (
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                gap: '8px',
+                margin: '10px 0',
+                padding: '10px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+              }}>
+                {(debateInfo?.participants || []).filter((p) => !p.isAI && (p.id || p.userId)).map((p) => {
+                  const uid = (p.id || p.userId).toString();
+                  const pv = judgeVerdict.participantVerdicts[uid];
+                  if (!pv) return null;
+                  const isMe = uid === (user?.id || user?._id);
+                  return (
+                    <span
+                      key={uid}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        background: isMe ? 'rgba(0, 255, 135, 0.14)' : 'rgba(0, 229, 255, 0.09)',
+                        border: `1px solid ${isMe ? '#00ff87' : 'rgba(0, 229, 255, 0.35)'}`,
+                        color: isMe ? '#00ff87' : '#e2e8f0',
+                      }}
+                    >
+                      {p.name}{isMe ? ' (You)' : ''}: {pv.userScore}/100
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
             {/* GD Placement Recruiter Verdict */}
             {judgeVerdict.gdVerdict && (
