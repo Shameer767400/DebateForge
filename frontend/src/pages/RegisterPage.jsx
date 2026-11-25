@@ -76,6 +76,10 @@ export default function RegisterPage() {
         { baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001', withCredentials: true }
       );
       login(res.data.token, res.data.user);
+      const redirectParam = new URLSearchParams(window.location.search).get('redirect');
+      if (redirectParam && redirectParam.startsWith('/')) {
+        try { sessionStorage.setItem('df_post_login_redirect', redirectParam); } catch { /* ignore */ }
+      }
       toast.success('Account created! Please check your email for a verification code.');
       const otpParam = res.data.verificationOTP ? `&demo_otp=${res.data.verificationOTP}` : '';
       navigate(`/verify-email-otp?email=${encodeURIComponent(email)}${otpParam}`);

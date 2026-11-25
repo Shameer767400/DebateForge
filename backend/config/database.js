@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 async function connectDB() {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      maxPoolSize: 25,
+      minPoolSize: 5,
       serverSelectionTimeoutMS: 5000,
       heartbeatFrequencyMS: 10000,
       socketTimeoutMS: 45000,

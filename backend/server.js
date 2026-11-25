@@ -156,7 +156,8 @@ app.use(morgan(IS_PROD ? 'combined' : 'dev'));
 ═══════════════════════════════════════════ */
 const BLOCKED_USER_AGENTS = [
   /curl/i, /wget/i, /python-requests/i, /scrapy/i, /httpclient/i,
-  /bot(?!.*googlebot)/i, /spider/i, /crawler/i, /scraper/i,
+  /bot(?!.*(?:googlebot|bingbot|linkedinbot|whatsapp|duckduckbot|slackbot))/i,
+  /spider/i, /crawler/i, /scraper/i,
 ];
 
 function botGuard(req, res, next) {
@@ -201,30 +202,30 @@ function rateLimitHandler(endpoint) {
 const IS_TEST = NODE_ENV === 'test';
 const skipInTest = () => IS_TEST;
 
-// 5a. Global limiter: 300 requests per 15 minutes per IP (production-safe)
+// 5a. Global limiter: 1000 requests per 15 min per IP (supports shared college campus NAT Wi-Fi)
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => IS_TEST || req.path === '/health', // never rate-limit health check or tests
   handler: rateLimitHandler('global'),
 }));
 
-// 5b. Auth routes: 30 attempts per 15 min (brute-force protection)
+// 5b. Auth routes: 80 attempts per 15 min
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 80,
   standardHeaders: true,
   legacyHeaders: false,
   skip: skipInTest,
   handler: rateLimitHandler('auth'),
 });
 
-// 5c. Account creation: 5 registrations per hour per IP (mass account creation prevention)
+// 5c. Account creation: 30 registrations per hour per IP (allows multiple students on campus Wi-Fi)
 const registrationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   skip: skipInTest,
@@ -241,10 +242,10 @@ const passwordResetLimiter = rateLimit({
   handler: rateLimitHandler('password-reset'),
 });
 
-// 5e. Debate creation (AI generation): 50 per hour per IP
+// 5e. Debate creation (AI generation): 150 per hour per IP (supports simultaneous campus drives)
 const debateCreationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 50,
+  max: 150,
   standardHeaders: true,
   legacyHeaders: false,
   skip: skipInTest,

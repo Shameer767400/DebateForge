@@ -2,14 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api.service';
 import InteractiveSparringDemo from '../components/InteractiveSparringDemo';
+import SEOHead from '../components/SEOHead';
 import '../styles/landing.css';
 
 const FEATURES = [
   { icon: '🎙️', title: 'Voice Debate', desc: 'Argue out loud with low-latency transcription tuned for real debate cadence.' },
+  { icon: '👥', title: '4-Seat Campus GD Arena', desc: 'Invite classmates via WhatsApp into a shared Waiting Hall; empty slots auto-fill with AI candidates.' },
+  { icon: '🌐', title: 'English & Telugu Voice', desc: 'Speak naturally in English or Telugu with native campus placement coaching and bilingual support.' },
   { icon: '⚠️', title: 'Live Fallacy Radar', desc: 'Real-time detection of slippery slopes, ad hominems, false dichotomies and more.' },
-  { icon: '🧠', title: 'AI Memory Engine', desc: 'Long-term memory of every argument so the AI actually learns your habits over time.' },
-  { icon: '📊', title: 'Score Tracking', desc: 'Logic, evidence, clarity scores every round — with Elo-style rating for progress.' },
-  { icon: '🏆', title: 'Global Leaderboard', desc: 'Compete with debaters worldwide and climb the ranks as your skills sharpen.' },
+  { icon: '📊', title: 'Individual Evaluation', desc: 'Logic, evidence, clarity scores plus personal GD hiring verdicts for every joined participant.' },
+  { icon: '🏆', title: 'Global Leaderboard', desc: 'Compete with students and debaters worldwide and climb the Elo ranks as your skills sharpen.' },
 ];
 
 const STATS = [
@@ -119,6 +121,11 @@ export default function LandingPage() {
 
   return (
     <div className="lp-page" ref={pageRef}>
+      <SEOHead
+        title="AI Debate & Campus Placement Group Discussion Arena"
+        description="Practice real-time voice debates and 4-seat Campus Placement Group Discussions with classmates or AI peers (Aarav, Priya, Karan) in English and Telugu."
+        path="/"
+      />
       {/* Particle canvas background */}
       <canvas ref={canvasRef} className="lp-canvas" />
 
@@ -131,6 +138,7 @@ export default function LandingPage() {
         <div className={`lp-nav-links ${menuOpen ? 'lp-nav-links--open' : ''}`}>
           <a href="#how" className="lp-nav-link" onClick={() => setMenuOpen(false)}>How It Works</a>
           <a href="#features" className="lp-nav-link" onClick={() => setMenuOpen(false)}>Features</a>
+          <button className="lp-nav-link lp-footer-btn" onClick={() => { navigate('/gd-topics'); setMenuOpen(false); }}>GD Topics</button>
           <button className="lp-nav-link lp-footer-btn" onClick={() => { navigate('/pricing'); setMenuOpen(false); }}>Pricing</button>
           <button className="lp-nav-link lp-footer-btn" onClick={() => { navigate('/about'); setMenuOpen(false); }}>About</button>
           <div className="lp-nav-mobile-only">
@@ -335,6 +343,7 @@ export default function LandingPage() {
           <a href="#top" className="lp-footer-link">Home</a>
           <a href="#features" className="lp-footer-link">Features</a>
           <a href="#how" className="lp-footer-link">How It Works</a>
+          <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/gd-topics')}>GD Topics</button>
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/pricing')}>Pricing</button>
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/about')}>About</button>
           <button className="lp-footer-link lp-footer-btn" onClick={() => navigate('/feedback')}>Feedback</button>

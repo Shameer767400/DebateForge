@@ -194,7 +194,7 @@ export default function ShareDebateModal({
 
   const isGD = format?.toLowerCase().includes('gd') || !!gdVerdict;
   const isWin = winner === 'user';
-  const domain = 'https://www.debateforge.tech';
+  const domain = 'https://debateforge.tech';
   const challengeUrl = `${domain}/lobby?topic=${encodeURIComponent(topic)}`;
 
   const resultEmoji = isGD

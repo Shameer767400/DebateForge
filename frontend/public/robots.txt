@@ -2,6 +2,7 @@ User-agent: *
 Allow: /
 Allow: /pricing
 Allow: /about
+Allow: /gd-topics
 Allow: /feedback
 
 Disallow: /dashboard

@@ -23,6 +23,7 @@ const DebateHistoryPage = lazy(() => import('./pages/DebateHistoryPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
 const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
+const GDTopicsPage = lazy(() => import('./pages/GDTopicsPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'));
 const AdminLayout = lazy(() => import('./components/admin/AdminLayout'));
@@ -116,6 +117,7 @@ function App() {
 
                   <Route path="/feedback" element={<FeedbackPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/gd-topics" element={<GDTopicsPage />} />
                   <Route path="/privacy" element={<PrivacyPolicyPage />} />
                   <Route path="/terms" element={<TermsOfServicePage />} />
                   {/* Admin Dashboard */}

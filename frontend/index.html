@@ -78,6 +78,36 @@
           "priceCurrency": "INR"
         },
         "description": "Real-time AI debate sparring and 4-seat Campus Placement Group Discussion arena with live scoring, fallacy detection, and English & Telugu voice support."
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is DebateForge (Debate Force)?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "DebateForge is a free AI-powered debate sparring and 4-seat Campus Placement Group Discussion (GD) platform with live voice analysis, logical fallacy detection, ELO rankings, and individual placement feedback."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I invite my college friends to a Campus Group Discussion?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Hosts can create a 4-seat GD Waiting Hall, share a 1-click WhatsApp invite link or room code, wait for classmates to join, and automatically fill remaining empty slots with AI candidates (Aarav, Priya, and Karan)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does DebateForge support Telugu alongside English?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, DebateForge supports full Telugu and English voice recognition and native AI responses tailored for AP, Telangana, and national campus placement preparation."
+            }
+          }
+        ]
       }
     ]
     </script>
@@ -87,7 +117,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+      <main style="max-width:720px;margin:40px auto;font-family:sans-serif;padding:0 16px;">
+        <h1>DebateForge — AI Debate &amp; Campus Placement Group Discussion Arena</h1>
+        <p>Practice real-time voice debates and 4-seat campus placement group discussions with live AI opponents (Aarav, Priya, Karan), Telugu &amp; English speech support, logical fallacy detection, and individual recruiter report cards.</p>
+        <p><a href="/gd-topics">Campus Placement GD Topics</a> · <a href="/pricing">Pricing</a> · <a href="/about">About</a></p>
+      </main>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/index.jsx"></script>
   </body>
