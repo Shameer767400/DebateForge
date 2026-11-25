@@ -17,4 +17,4 @@ Disallow: /reset-password
 Disallow: /verify-email-otp
 Disallow: /admin/
 
-Sitemap: https://debateforge.tech/sitemap.xml
+Sitemap: https://www.debateforge.tech/sitemap.xml

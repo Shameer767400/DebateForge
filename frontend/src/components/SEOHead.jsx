@@ -4,7 +4,7 @@ const defaults = {
   title: 'DebateForge — AI-Powered Debate Practice Platform',
   description:
     'Practice debates against AI opponents that adapt to your style. Get real-time fallacy detection, scoring, and analytics. Free to start.',
-  url: 'https://debateforge.tech',
+  url: 'https://www.debateforge.tech',
 };
 
 export default function SEOHead({ title, description, path = '/', noindex = false }) {
