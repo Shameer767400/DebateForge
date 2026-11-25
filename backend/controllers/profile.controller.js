@@ -174,11 +174,13 @@ async function getFallacyProfile(req, res) {
 async function getLeaderboard(req, res) {
   try {
     if (redisClient) {
-      const cached = await redisClient.get('leaderboard');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return res.status(200).json({ leaderboard: parsed, cached: true });
-      }
+      try {
+        const cached = await redisClient.get('leaderboard');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          return res.status(200).json({ leaderboard: parsed, cached: true });
+        }
+      } catch { /* cache read non-critical */ }
     }
 
     const users = await User.find({})
@@ -196,7 +198,9 @@ async function getLeaderboard(req, res) {
     }));
 
     if (redisClient) {
-      redisClient.setex('leaderboard', 60, JSON.stringify(ranked));
+      try {
+        await redisClient.setex('leaderboard', 60, JSON.stringify(ranked));
+      } catch { /* cache write non-critical */ }
     }
 
     return res.status(200).json({ leaderboard: ranked, cached: false });

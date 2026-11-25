@@ -1,7 +1,7 @@
 const { User, Topic, Debate } = require('../models');
 const { updateStreak } = require('../services/streak.service');
 const debateEngine = require('../services/debateEngine.service');
-const { redisClient } = require('../config/redis');
+const redisClient = require('../config/redis');
 
 const AI_GD_PERSONAS = [
   { name: 'Aarav', roleTitle: 'Assertive Challenger' },

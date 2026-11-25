@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 
 const connectDB = require('./config/database');
 const redisClient = require('./config/redis');
+const { createRateLimitStore } = require('./utils/rateLimitStore');
 
 const authRoutes    = require('./routes/auth.routes');
 const debateRoutes  = require('./routes/debate.routes');
@@ -218,6 +219,7 @@ const authLimiter = rateLimit({
   max: 80,
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRateLimitStore('auth'),
   skip: skipInTest,
   handler: rateLimitHandler('auth'),
 });
@@ -228,6 +230,7 @@ const registrationLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRateLimitStore('reg'),
   skip: skipInTest,
   handler: rateLimitHandler('registration'),
 });
@@ -238,6 +241,7 @@ const passwordResetLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRateLimitStore('pwreset'),
   skip: skipInTest,
   handler: rateLimitHandler('password-reset'),
 });
@@ -248,6 +252,7 @@ const debateCreationLimiter = rateLimit({
   max: 150,
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRateLimitStore('debate'),
   skip: skipInTest,
   handler: rateLimitHandler('debate-creation'),
 });
@@ -258,6 +263,7 @@ const topicProposalLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRateLimitStore('topic'),
   skip: skipInTest,
   handler: rateLimitHandler('topic-proposal'),
 });
@@ -268,6 +274,7 @@ const uploadLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRateLimitStore('upload'),
   skip: skipInTest,
   handler: rateLimitHandler('avatar-upload'),
 });

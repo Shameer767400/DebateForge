@@ -31,7 +31,12 @@ async function voteOnTopic(req, res) {
     let voted = false;
     let updatedTopic;
 
-    const alreadyVoted = redisClient ? await redisClient.get(key) : null;
+    let alreadyVoted = null;
+    if (redisClient) {
+      try {
+        alreadyVoted = await redisClient.get(key);
+      } catch { /* cache read non-critical */ }
+    }
 
     if (alreadyVoted) {
       // Remove vote
@@ -46,7 +51,9 @@ async function voteOnTopic(req, res) {
       }
 
       if (redisClient) {
-        await redisClient.del(key);
+        try {
+          await redisClient.del(key);
+        } catch { /* cache delete non-critical */ }
       }
 
       voted = false;
@@ -63,7 +70,9 @@ async function voteOnTopic(req, res) {
       }
 
       if (redisClient) {
-        await redisClient.set(key, '1');
+        try {
+          await redisClient.set(key, '1');
+        } catch { /* cache write non-critical */ }
       }
 
       voted = true;
