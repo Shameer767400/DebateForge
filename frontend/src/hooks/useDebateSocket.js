@@ -21,6 +21,7 @@ const SERVER_EVENTS = [
   'ai_translation',
   'user_translation',
   'gd_table_update',
+  'gd_starting_countdown',
   'gd_session_started',
   'error',
 ];
@@ -778,6 +779,11 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     socketRef.current?.emit('set_language', { debateId, lang: lang || 'auto' });
   }, [debateId]);
 
+  /** Notify all peers in GD Waiting Room that 3s start countdown began */
+  const broadcastGDCountdown = useCallback((seconds = 3) => {
+    socketRef.current?.emit('gd_starting_countdown', { debateId, seconds });
+  }, [debateId]);
+
   /** Allow callers to toggle voice output without forcing a socket reconnect. */
   const setVoiceEnabled = useCallback((enabled) => {
     voiceEnabledRef.current = !!enabled;
@@ -809,6 +815,7 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     stopRecording,
     endDebate,
     sendText,
+    broadcastGDCountdown,
     setLanguage,
     setVoiceEnabled,
     setTtsLanguageOverride,

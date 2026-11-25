@@ -1,6 +1,38 @@
 const { User, Topic, Debate } = require('../models');
 const { updateStreak } = require('../services/streak.service');
 const debateEngine = require('../services/debateEngine.service');
+const { redisClient } = require('../config/redis');
+
+const AI_GD_PERSONAS = [
+  { name: 'Aarav', roleTitle: 'Assertive Challenger' },
+  { name: 'Priya', roleTitle: 'Analytical Evaluator' },
+  { name: 'Karan', roleTitle: 'Diplomatic Mediator' },
+];
+
+function serializeParticipants(list) {
+  return (list || []).map((p) => ({
+    id: p.userId ? p.userId.toString() : null,
+    userId: p.userId ? p.userId.toString() : null,
+    name: p.name || 'Candidate',
+    avatar: p.avatar || null,
+    isAI: !!p.isAI,
+    roleTitle: p.roleTitle || null,
+    seatNumber: p.seatNumber || 1,
+  }));
+}
+
+async function syncRedisParticipants(debate) {
+  try {
+    const key = `session:${debate._id.toString()}`;
+    const raw = await redisClient.get(key);
+    if (raw) {
+      const session = JSON.parse(raw);
+      session.participants = serializeParticipants(debate.participants);
+      session.status = debate.status || session.status;
+      await redisClient.setex(key, 3600, JSON.stringify(session));
+    }
+  } catch { /* non-critical */ }
+}
 
 async function startDebate(req, res) {
   try {
@@ -33,9 +65,13 @@ async function startDebate(req, res) {
     const participants = [];
     if (format === 'group_discussion') {
       roomCode = 'GD' + crypto.randomBytes(2).toString('hex').toUpperCase();
+      const hostUser = await User.findById(req.user.id).select('username profilePicUrl');
       participants.push({
         userId: req.user.id,
-        name: req.user.name || 'Candidate 1 (Host)',
+        name: hostUser?.username || req.user.username || 'Host',
+        avatar: hostUser?.profilePicUrl || null,
+        isAI: false,
+        roleTitle: 'Host',
         seatNumber: 1,
       });
     }
@@ -146,23 +182,44 @@ async function joinGDRoomByCode(req, res) {
     }
 
     const existingIndex = (debate.participants || []).findIndex(
-      (p) => p.userId && p.userId.toString() === req.user.id
+      (p) => !p.isAI && p.userId && p.userId.toString() === req.user.id
     );
 
     let seatNumber;
     if (existingIndex !== -1) {
       seatNumber = debate.participants[existingIndex].seatNumber;
     } else {
-      if ((debate.participants || []).length >= (debate.capacity || 4)) {
-        return res.status(400).json({ error: 'This GD table is already full (maximum 4 participants)' });
+      const humanCount = (debate.participants || []).filter((p) => !p.isAI).length;
+      const capacity = debate.capacity || 4;
+      if (humanCount >= capacity) {
+        return res.status(400).json({ error: `This GD table is already full (maximum ${capacity} participants)` });
       }
-      seatNumber = (debate.participants || []).length + 1;
+      const joinUser = await User.findById(req.user.id).select('username profilePicUrl');
+      const takenSeats = new Set((debate.participants || []).map((p) => p.seatNumber));
+      seatNumber = 1;
+      while (takenSeats.has(seatNumber)) seatNumber += 1;
+
       debate.participants.push({
         userId: req.user.id,
-        name: req.user.name || `Candidate ${seatNumber}`,
+        name: joinUser?.username || req.user.username || `Participant ${seatNumber}`,
+        avatar: joinUser?.profilePicUrl || null,
+        isAI: false,
+        roleTitle: 'Peer',
         seatNumber,
       });
       await debate.save();
+    }
+
+    await syncRedisParticipants(debate);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(debate._id.toString()).emit('gd_table_update', {
+        participants: serializeParticipants(debate.participants),
+        roomCode: debate.roomCode,
+        capacity: debate.capacity || 4,
+        status: debate.status,
+      });
     }
 
     return res.status(200).json({
@@ -173,7 +230,7 @@ async function joinGDRoomByCode(req, res) {
       status: debate.status,
       language: debate.language,
       seatNumber,
-      participants: debate.participants,
+      participants: serializeParticipants(debate.participants),
     });
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -192,22 +249,63 @@ async function startGDFromLobby(req, res) {
       return res.status(400).json({ error: 'This GD session has already ended.' });
     }
 
+    // Preserve all real joined users; fill ONLY remaining empty slots with AI personas
+    const capacity = debate.capacity || 4;
+    const realParticipants = (debate.participants || []).filter((p) => !p.isAI);
+    const takenSeats = new Set(realParticipants.map((p) => p.seatNumber));
+    const existingAINames = new Set(
+      (debate.participants || []).filter((p) => p.isAI).map((p) => p.name)
+    );
+
+    const filledParticipants = [...debate.participants];
+    let aiIdx = 0;
+    for (let seat = 1; seat <= capacity; seat += 1) {
+      if (takenSeats.has(seat)) continue;
+      // Pick next unused AI personality
+      while (aiIdx < AI_GD_PERSONAS.length && existingAINames.has(AI_GD_PERSONAS[aiIdx].name)) {
+        aiIdx += 1;
+      }
+      if (aiIdx < AI_GD_PERSONAS.length) {
+        const aiPersona = AI_GD_PERSONAS[aiIdx];
+        aiIdx += 1;
+        existingAINames.add(aiPersona.name);
+        filledParticipants.push({
+          userId: null,
+          name: aiPersona.name,
+          avatar: null,
+          isAI: true,
+          roleTitle: aiPersona.roleTitle,
+          seatNumber: seat,
+        });
+      }
+    }
+
+    debate.participants = filledParticipants.sort((a, b) => a.seatNumber - b.seatNumber);
     debate.status = 'active';
     await debate.save();
 
+    await syncRedisParticipants(debate);
+
+    const serialized = serializeParticipants(debate.participants);
     const io = req.app.get('io');
     if (io) {
+      io.to(debate._id.toString()).emit('gd_table_update', {
+        participants: serialized,
+        roomCode: debate.roomCode,
+        capacity,
+        status: 'active',
+      });
       io.to(debate._id.toString()).emit('gd_session_started', {
         debateId: debate._id.toString(),
         status: 'active',
-        participants: debate.participants,
+        participants: serialized,
       });
     }
 
     return res.status(200).json({
       debateId: debate._id,
       status: debate.status,
-      participants: debate.participants,
+      participants: serialized,
     });
   } catch (error) {
     // eslint-disable-next-line no-console

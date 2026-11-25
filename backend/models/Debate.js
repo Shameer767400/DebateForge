@@ -145,8 +145,11 @@ const DebateSchema = new Schema(
     },
     participants: [
       {
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
         name: { type: String, default: 'Candidate' },
+        avatar: { type: String, default: null },
+        isAI: { type: Boolean, default: false },
+        roleTitle: { type: String, default: null },
         seatNumber: { type: Number, default: 1 },
         joinedAt: { type: Date, default: Date.now },
         speakingTimeSeconds: { type: Number, default: 0 },

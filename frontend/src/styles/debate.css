@@ -1877,3 +1877,96 @@
   font-size: 0.86rem;
 }
 
+/* ── Empty Invite Slots & 3s Countdown & Peer Chat Identity ── */
+.arena-podium--empty {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(12, 18, 34, 0.55);
+  cursor: pointer;
+  width: 100%;
+  font-family: var(--font-ui);
+}
+
+.arena-podium--empty:hover {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.08);
+}
+
+.podium-avatar-ring--empty {
+  border-style: dashed !important;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.podium-avatar-plus {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #00e5ff;
+}
+
+.podium-status-pill--empty {
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.gd-countdown-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 28px;
+  border-radius: 16px;
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  box-shadow: 0 0 32px rgba(0, 229, 255, 0.2);
+}
+
+.gd-countdown-number {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #00ff87;
+  text-shadow: 0 0 24px rgba(0, 255, 135, 0.6);
+  line-height: 1;
+}
+
+.gd-countdown-text {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.msg-row--peer {
+  flex-direction: row;
+}
+
+.msg-avatar--peer {
+  border: 2px solid #00e5ff;
+  background: rgba(0, 229, 255, 0.12);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-avatar--user {
+  overflow: hidden;
+}
+
+.msg-bubble--peer {
+  background: rgba(0, 229, 255, 0.09);
+  border: 1px solid rgba(0, 229, 255, 0.28);
+  color: var(--text-primary);
+  border-radius: 14px 14px 14px 4px;
+}
+
+.msg-sender-tag {
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+
+.msg-sender-tag--me {
+  color: #00ff87;
+  text-align: right;
+}
+

@@ -163,7 +163,7 @@ class DebateFormatEngine {
   /**
    * Get system prompt addition for current phase.
    */
-  static getPhaseSystemPromptAddition(formatName, phaseIndex, userSide) {
+  static getPhaseSystemPromptAddition(formatName, phaseIndex, userSide, participants = []) {
     if (formatName === 'freeform') return '';
 
     const format = this.getFormat(formatName);
@@ -181,23 +181,44 @@ class DebateFormatEngine {
     }
 
     if (formatName === 'group_discussion') {
-      addition += `\n\nCRITICAL MULTI-CANDIDATE GROUP DISCUSSION INSTRUCTION:
-You are simulating a 4-person Campus Placement / MBA Admissions Group Discussion.
-Participants at the table:
-1. USER (The candidate being evaluated)
-2. Aarav (Candidate 2 - Assertive, contrarian, challenges assumptions rapidly)
-3. Priya (Candidate 3 - Analytical, quotes market statistics, industry & economic trends)
-4. Karan (Candidate 4 - Diplomatic, looks for consensus, connects different arguments)
+      const realUsers = (participants || []).filter((p) => !p.isAI);
+      const aiPeers = (participants || []).filter((p) => p.isAI);
 
-In this turn, simulate 1 or 2 of the AI candidates (e.g. Aarav, Priya, or Karan) reacting to the user and each other.
-Always start each candidate's speech with their name in brackets, e.g.:
-[Aarav]: "While I understand that point, in a competitive corporate landscape..."
-[Priya]: "To add to what was said, the recent industry data shows..."
+      const activeAIs = aiPeers.length > 0
+        ? aiPeers
+        : (realUsers.length < 4
+            ? [
+                { name: 'Aarav', roleTitle: 'Assertive Challenger', seatNumber: 2 },
+                { name: 'Priya', roleTitle: 'Analytical Evaluator', seatNumber: 3 },
+                { name: 'Karan', roleTitle: 'Diplomatic Mediator', seatNumber: 4 },
+              ].slice(0, Math.max(0, 4 - Math.max(1, realUsers.length)))
+            : []);
+
+      const humanListStr = realUsers.length > 0
+        ? realUsers.map((h) => `- Seat ${h.seatNumber}: ${h.name} (REAL HUMAN USER — NEVER impersonate or speak on their behalf)`).join('\n')
+        : '- Seat 1: User (REAL HUMAN USER)';
+
+      const aiListStr = activeAIs.length > 0
+        ? activeAIs.map((a) => `- Seat ${a.seatNumber}: ${a.name} (${a.roleTitle || 'AI Peer'})`).join('\n')
+        : '- None (All 4 seats are filled by real humans; respond briefly as [Moderator] synthesizing their arguments).';
+
+      addition += `\n\nCRITICAL MULTI-CANDIDATE GROUP DISCUSSION INSTRUCTION:
+You are participating in a 4-person Campus Placement / MBA Admissions Group Discussion.
+REAL HUMAN PARTICIPANTS (do NOT roleplay these users, address them by their real names):
+${humanListStr}
+
+AI CANDIDATES YOU MUST ROLEPLAY (only generate dialogue for these AI seats):
+${aiListStr}
+
+In this turn, respond ONLY as the AI candidates listed above (1 or 2 of them reacting to the real human participants and each other).
+Always start each AI candidate's speech with their exact name in brackets, e.g.:
+[Aarav]: "While I understand your point..."
+[Priya]: "Building on that insight, industry metrics indicate..."
 
 LANGUAGE COHERENCE:
-If the active discussion language is Telugu (తెలుగు), all candidates MUST speak in natural, fluent Telugu (e.g., [Aarav]: "నేను ఆ వాదనతో పూర్తిగా విభేదిస్తున్నాను...", [Priya]: "మార్కెట్ గణాంకాలను పరిశీలిస్తే...", [Karan]: "ఇద్దరి అభిప్రాయాల్లోనూ నిజం ఉంది, కానీ...").
+If the active discussion language is Telugu (తెలుగు), all AI candidates MUST speak in natural, fluent Telugu.
 If the discussion language is English, candidates must speak in polished professional English.
-Keep each candidate's speech focused, conversational, and direct (2-4 sentences per candidate). Directly challenge the user to step in, back up their claims with facts, or synthesize the discussion!`;
+Keep each AI candidate's speech focused, conversational, and direct (2-4 sentences).`;
     }
 
     return addition;

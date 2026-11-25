@@ -369,8 +369,12 @@ function initWebSocket(server) {
           // Sync latest participants & status from MongoDB so newly joined friends are recognized
           const syncedParticipants = (debate.participants && debate.participants.length > 0)
             ? debate.participants.map((p) => ({
-                id: p.userId ? p.userId.toString() : socket.user.id,
+                id: p.userId ? p.userId.toString() : null,
+                userId: p.userId ? p.userId.toString() : null,
                 name: p.name || 'Candidate',
+                avatar: p.avatar || null,
+                isAI: !!p.isAI,
+                roleTitle: p.roleTitle || null,
                 seatNumber: p.seatNumber || 1,
               }))
             : existing.participants || [];
@@ -437,11 +441,23 @@ function initWebSocket(server) {
 
         const initialParticipants = (debate.participants && debate.participants.length > 0)
           ? debate.participants.map((p) => ({
-              id: p.userId ? p.userId.toString() : socket.user.id,
+              id: p.userId ? p.userId.toString() : null,
+              userId: p.userId ? p.userId.toString() : null,
               name: p.name || 'Candidate',
+              avatar: p.avatar || null,
+              isAI: !!p.isAI,
+              roleTitle: p.roleTitle || null,
               seatNumber: p.seatNumber || 1,
             }))
-          : [{ id: socket.user.id, name: user?.name || 'Candidate 1 (Host)', seatNumber: 1 }];
+          : [{
+              id: socket.user.id,
+              userId: socket.user.id,
+              name: user?.username || socket.user.username || 'Host',
+              avatar: user?.profilePicUrl || null,
+              isAI: false,
+              roleTitle: 'Host',
+              seatNumber: 1,
+            }];
 
         const sessionState = {
           debateId,
@@ -585,8 +601,9 @@ function initWebSocket(server) {
       const chunks = socket.audioBuffer || [];
       socket.audioBuffer = []; // Clear current buffer
       
-      const currentParticipant = (session.participants || []).find((p) => p.id === socket.user.id);
-      const speakerName = currentParticipant?.name || 'You';
+      const currentParticipant = (session.participants || []).find((p) => (p.id || p.userId) === socket.user.id);
+      const speakerName = currentParticipant?.name || socket.user.username || 'You';
+      const speakerAvatar = currentParticipant?.avatar || null;
       const seatNumber = currentParticipant?.seatNumber || 1;
 
       /* If no audio chunks but we have a transcript fallback from SpeechRecognition,
@@ -602,12 +619,13 @@ function initWebSocket(server) {
             text: fallbackText,
             language: session.currentLanguage,
             speakerName,
+            speakerAvatar,
             seatNumber,
             userId: socket.user.id,
           });
           socket._turnInFlight = true;
           try {
-            await processTranscript(socket, session, debateId, fallbackText);
+            await processTranscript(socket, session, debateId, fallbackText, speakerName);
           } finally {
             socket._turnInFlight = false;
           }
@@ -652,8 +670,9 @@ function initWebSocket(server) {
         return socket.emit('error', { message: 'Could not transcribe. Please try again.' });
       }
 
-      const currentParticipant = (session.participants || []).find((p) => p.id === socket.user.id);
-      const speakerName = currentParticipant?.name || 'You';
+      const currentParticipant = (session.participants || []).find((p) => (p.id || p.userId) === socket.user.id);
+      const speakerName = currentParticipant?.name || socket.user.username || 'You';
+      const speakerAvatar = currentParticipant?.avatar || null;
       const seatNumber = currentParticipant?.seatNumber || 1;
 
       const detectedLanguage = detectLanguageFromText(text) || session.detectedLanguage || session.currentLanguage || 'en';
@@ -664,15 +683,27 @@ function initWebSocket(server) {
         text,
         language: session.currentLanguage,
         speakerName,
+        speakerAvatar,
         seatNumber,
         userId: socket.user.id,
       });
       socket._turnInFlight = true;
       try {
-        await processTranscript(socket, session, debateId, text);
+        await processTranscript(socket, session, debateId, text, speakerName);
       } finally {
         socket._turnInFlight = false;
       }
+    });
+
+    /* ────────────────────────────────────────
+       gd_starting_countdown — broadcast 3s lobby countdown to all peers
+    ─────────────────────────────────────── */
+    socket.on('gd_starting_countdown', async ({ debateId, seconds = 3 } = {}) => {
+      if (!debateId) return;
+      io.to(debateId).emit('gd_starting_countdown', {
+        debateId,
+        seconds,
+      });
     });
 
     /* ────────────────────────────────────────
@@ -789,8 +820,21 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
     session.detectedLanguage = detectedLanguage;
     session.currentLanguage = resolveActiveLanguage(session, detectedLanguage);
 
-    socket.emit('transcript_final', { text: transcript, language: session.currentLanguage });
-    await processTranscript(socket, session, debateId, transcript);
+    const currentParticipant = (session.participants || []).find((p) => (p.id || p.userId) === socket.user.id);
+    const speakerName = currentParticipant?.name || socket.user?.username || 'You';
+    const speakerAvatar = currentParticipant?.avatar || null;
+    const seatNumber = currentParticipant?.seatNumber || 1;
+
+    const roomTarget = socket._io ? socket._io.to(debateId) : socket;
+    roomTarget.emit('transcript_final', {
+      text: transcript,
+      language: session.currentLanguage,
+      speakerName,
+      speakerAvatar,
+      seatNumber,
+      userId: socket.user?.id || null,
+    });
+    await processTranscript(socket, session, debateId, transcript, speakerName);
   } catch (e) {
     // eslint-disable-next-line no-console
     secLogger.error('[WS] processTurn error:', e);
@@ -801,7 +845,7 @@ async function processTurn(socket, session, debateId, transcriptFallback = '') {
 /* ═══════════════════════════════════════════════════════════════
    processTranscript — ML pipeline → GPT-4 stream → TTS stream
 ═══════════════════════════════════════════════════════════════ */
-async function processTranscript(socket, session, debateId, transcript) {
+async function processTranscript(socket, session, debateId, transcript, speakerName = null) {
   const roomTarget = socket._io ? socket._io.to(debateId) : socket;
   try {
     session.currentLanguage = resolveActiveLanguage(session);
@@ -849,14 +893,18 @@ async function processTranscript(socket, session, debateId, transcript) {
     Promise.allSettled([fallacyPromise, scorerPromise, weaknessPromise]);
 
     /* ── 5. Append user turn to history ── */
-    session.conversationHistory.push({ role: 'user', content: transcript });
+    const historyContent = session.format === 'group_discussion' && speakerName
+      ? `${speakerName}: ${transcript}`
+      : transcript;
+    session.conversationHistory.push({ role: 'user', content: historyContent });
     session.conversationHistory = trimHistory(session.conversationHistory);
 
     /* ── 5.5 Inject phase-specific prompt (Addition 6) ── */
     const phasePrompt = DebateFormatEngine.getPhaseSystemPromptAddition(
       session.format || 'freeform',
       session.phaseIndex || 0,
-      session.userSide
+      session.userSide,
+      session.participants || []
     );
     if (phasePrompt) {
       // Temporarily inject phase context into session for buildSystemPrompt

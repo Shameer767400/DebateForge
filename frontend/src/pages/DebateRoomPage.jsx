@@ -233,6 +233,28 @@ function timerColor(t) {
   return 'var(--accent-ai)';
 }
 
+const API_BASE = process.env.REACT_APP_API_URL || '';
+function resolveAvatarUrl(avatar) {
+  if (!avatar) return null;
+  if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('data:')) {
+    return avatar;
+  }
+  return `${API_BASE}${avatar}`;
+}
+
+const SEAT_THEMES = {
+  1: { podiumCls: 'podium--seat1', spotCls: 'spotlight--cyan',   ringCls: 'ring--cyan',   nameCls: 'name--cyan',   color: '#00ff87' },
+  2: { podiumCls: 'podium--seat2', spotCls: 'spotlight--amber',  ringCls: 'ring--amber',  nameCls: 'name--amber',  color: '#ffaa00' },
+  3: { podiumCls: 'podium--seat3', spotCls: 'spotlight--blue',   ringCls: 'ring--blue',   nameCls: 'name--blue',   color: '#00e5ff' },
+  4: { podiumCls: 'podium--seat4', spotCls: 'spotlight--purple', ringCls: 'ring--purple', nameCls: 'name--purple', color: '#d8b4fe' },
+};
+
+const AI_FALLBACK_INFO = {
+  Aarav: { icon: '⚡', roleTitle: 'Assertive Challenger', speakLabel: '🎙️ CHALLENGING' },
+  Priya: { icon: '📊', roleTitle: 'Analytical Evaluator', speakLabel: '🎙️ ANALYZING'   },
+  Karan: { icon: '🤝', roleTitle: 'Diplomatic Mediator',  speakLabel: '🎙️ MEDIATING'   },
+};
+
 /* ── Streaming text component ── */
 function StreamText({ text }) {
   const [visible, setVisible] = useState('');
@@ -303,6 +325,8 @@ export default function DebateRoomPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showMobileControls, setShowMobileControls] = useState(false);
   const [startingGD, setStartingGD] = useState(false);
+  const [gdCountdown, setGdCountdown] = useState(null);
+  const countdownTimerRef = useRef(null);
 
   /* Incrementing key used to guarantee the timer resets every new user_turn */
   const [timerKey, setTimerKey] = useState(0);
@@ -438,12 +462,21 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         setMessages((prev) => [
           ...prev,
           {
-            id:      `user-${Date.now()}`,
-            speaker: 'user',
-            text:    data.text,
-            scores:  null,
+            id:            `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            speaker:       'user',
+            text:          data.text,
+            speakerName:   data.speakerName || null,
+            speakerAvatar: data.speakerAvatar || null,
+            speakerUserId: data.userId || null,
+            seatNumber:    data.seatNumber || null,
+            scores:        null,
           },
         ]);
+        if (data.seatNumber) {
+          setActiveGDSpeaker(`seat-${data.seatNumber}`);
+        } else {
+          setActiveGDSpeaker('user');
+        }
         break;
 
       /* Fallacy detected in user's argument */
@@ -546,11 +579,12 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         break;
 
       case 'debate_joined':
-        if (data?.roomCode || data?.participants) {
+        if (data?.roomCode || data?.participants || data?.status) {
           setDebateInfo((prev) => ({
             ...prev,
             roomCode: data.roomCode || prev?.roomCode,
             participants: data.participants || prev?.participants,
+            status: data.status || prev?.status,
           }));
         }
         break;
@@ -561,10 +595,26 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
             ...prev,
             roomCode: data.roomCode || prev?.roomCode,
             participants: data.participants,
+            status: data.status || prev?.status,
           }));
         }
         break;
+
+      case 'gd_starting_countdown': {
+        const secs = Number(data?.seconds) || 3;
+        clearInterval(countdownTimerRef.current);
+        setGdCountdown(secs);
+        countdownTimerRef.current = setInterval(() => {
+          setGdCountdown((c) => {
+            if (c == null || c <= 1) {
+              clearInterval(countdownTimerRef.current);
+              return null;
+            }
+            return c - 1;
+          });
+        }, 1000);
         break;
+      }
 
       /* Phase transition (Addition 6) — also update timer max for new phase */
       case 'phase_update':
@@ -595,6 +645,8 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         break;
 
       case 'gd_session_started':
+        clearInterval(countdownTimerRef.current);
+        setGdCountdown(null);
         setDebateInfo((prev) => prev ? {
           ...prev,
           status: 'active',
@@ -622,6 +674,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
     stopRecording,
     endDebate,
     sendText,
+    broadcastGDCountdown,
     liveTranscript,
     isAISpeaking: hookIsAISpeaking,
     availableVoices,
@@ -735,22 +788,39 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
 
   const isGDWaiting = debateInfo?.format === 'group_discussion' && debateInfo?.status === 'waiting';
 
-  const handleStartGDFromLobby = async () => {
+  const handleStartGDFromLobby = () => {
+    if (startingGD || gdCountdown != null) return;
     setStartingGD(true);
-    try {
-      const res = await api.post(`/api/debates/${debateId}/start-gd`);
-      setDebateInfo((prev) => prev ? {
-        ...prev,
-        status: 'active',
-        participants: res.data?.participants || prev.participants,
-      } : prev);
-      setTimerKey((k) => k + 1);
-      toast.success('🚀 Discussion started! All participants are live.');
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Could not start discussion.');
-    } finally {
-      setStartingGD(false);
-    }
+    broadcastGDCountdown(3);
+    clearInterval(countdownTimerRef.current);
+    setGdCountdown(3);
+
+    countdownTimerRef.current = setInterval(async () => {
+      setGdCountdown((prev) => {
+        if (prev != null && prev > 1) return prev - 1;
+        clearInterval(countdownTimerRef.current);
+        return 0;
+      });
+    }, 1000);
+
+    setTimeout(async () => {
+      clearInterval(countdownTimerRef.current);
+      try {
+        const res = await api.post(`/api/debates/${debateId}/start-gd`);
+        setDebateInfo((prev) => prev ? {
+          ...prev,
+          status: 'active',
+          participants: res.data?.participants || prev.participants,
+        } : prev);
+        setGdCountdown(null);
+        setTimerKey((k) => k + 1);
+      } catch (err) {
+        setGdCountdown(null);
+        toast.error(err.response?.data?.error || 'Could not start discussion.');
+      } finally {
+        setStartingGD(false);
+      }
+    }, 3000);
   };
 
   useEffect(() => {
@@ -1037,96 +1107,106 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
                     </div>
                   </div>
 
-                  {/* Seat 1: Host / You (Bottom Center) */}
-                  <div className={`arena-podium podium--seat1 ${activeGDSpeaker === 'user' ? 'podium--speaking' : ''}`}>
-                    <div className="podium-spotlight spotlight--cyan" />
-                    <div className="podium-avatar-ring ring--cyan">
-                      <span className="podium-avatar-icon">👤</span>
-                      {activeGDSpeaker === 'user' && <span className="podium-speaker-wave" />}
-                    </div>
-                    <div className="podium-info">
-                      <div className="podium-name name--cyan">{user?.username || 'You'} (Seat 1)</div>
-                      <div className="podium-role">Host · In Ring</div>
-                      <div className="podium-status-pill">
-                        {activeGDSpeaker === 'user' ? '🎙️ IN SPOTLIGHT' : '🟢 READY'}
-                      </div>
-                    </div>
-                  </div>
+                  {/* Seats 1 to 4: Real joined humans first; empty '+' invite slots in Waiting Hall; AI auto-fill only when active */}
+                  {[1, 2, 3, 4].map((seatNum) => {
+                    const theme = SEAT_THEMES[seatNum];
+                    const list = debateInfo?.participants || [];
+                    const found = list.find((p) => p.seatNumber === seatNum) || list[seatNum - 1];
 
-                  {/* Seat 2: Aarav or Real Participant (Left) */}
-                  {(() => {
-                    const p2 = (debateInfo?.participants || [])[1];
-                    const isAarav = !p2;
-                    const isSpeaking = activeGDSpeaker === 'Aarav';
+                    // Fallback Host representation for Seat 1 if list hasn't hydrated yet
+                    const participant = found || (seatNum === 1 ? {
+                      id: user?.id || user?._id || null,
+                      userId: user?.id || user?._id || null,
+                      name: user?.username || 'You',
+                      avatar: user?.profilePicUrl || null,
+                      isAI: false,
+                      roleTitle: 'Host',
+                      seatNumber: 1,
+                    } : null);
+
+                    // Waiting Hall empty slot (shows '+' invite icon instead of premature AI)
+                    if (!participant && isGDWaiting) {
+                      return (
+                        <button
+                          key={seatNum}
+                          type="button"
+                          onClick={() => setShowInviteModal(true)}
+                          className={`arena-podium arena-podium--empty ${theme.podiumCls}`}
+                          title="Click to invite a friend to this seat"
+                        >
+                          <div className={`podium-avatar-ring podium-avatar-ring--empty ${theme.ringCls}`}>
+                            <span className="podium-avatar-plus">＋</span>
+                          </div>
+                          <div className="podium-info" style={{ textAlign: 'left' }}>
+                            <div className={`podium-name ${theme.nameCls}`}>Open Seat {seatNum}</div>
+                            <div className="podium-role">Tap + to Invite Friend</div>
+                            <div className="podium-status-pill podium-status-pill--empty">
+                              ➕ WAITING FOR FRIEND
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    }
+
+                    // Backward-compat AI fallback when session is active and slot still null
+                    const resolved = participant || (() => {
+                      const defaultNames = { 2: 'Aarav', 3: 'Priya', 4: 'Karan' };
+                      const aiName = defaultNames[seatNum];
+                      return {
+                        name: aiName,
+                        isAI: true,
+                        roleTitle: AI_FALLBACK_INFO[aiName]?.roleTitle || 'AI Peer',
+                        seatNumber: seatNum,
+                      };
+                    })();
+
+                    const isAI = !!resolved.isAI;
+                    const myId = user?.id || user?._id;
+                    const resolvedId = resolved.id || resolved.userId;
+                    const isMe = !isAI && ((myId && resolvedId && resolvedId === myId) || seatNum === 1 && !found);
+                    const isSpeaking = isAI
+                      ? activeGDSpeaker === resolved.name
+                      : (activeGDSpeaker === `seat-${seatNum}` || (isMe && activeGDSpeaker === 'user'));
+
+                    const aiMeta = isAI ? AI_FALLBACK_INFO[resolved.name] : null;
+                    const avatarSrc = !isAI ? resolveAvatarUrl(resolved.avatar || (isMe ? user?.profilePicUrl : null)) : null;
+
                     return (
-                      <div className={`arena-podium podium--seat2 ${isSpeaking ? 'podium--speaking' : ''}`}>
-                        <div className="podium-spotlight spotlight--amber" />
-                        <div className="podium-avatar-ring ring--amber">
-                          <span className="podium-avatar-icon">{isAarav ? '⚡' : '👤'}</span>
+                      <div key={seatNum} className={`arena-podium ${theme.podiumCls} ${isSpeaking ? 'podium--speaking' : ''}`}>
+                        <div className={`podium-spotlight ${theme.spotCls}`} />
+                        <div className={`podium-avatar-ring ${theme.ringCls}`} style={{ overflow: 'hidden' }}>
+                          {avatarSrc ? (
+                            <img
+                              src={avatarSrc}
+                              alt={resolved.name}
+                              crossOrigin="anonymous"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                            />
+                          ) : isAI ? (
+                            <span className="podium-avatar-icon">{aiMeta?.icon || '🤖'}</span>
+                          ) : (
+                            <span className="podium-avatar-initial" style={{ color: theme.color, fontWeight: 900 }}>
+                              {(resolved.name || 'U')[0].toUpperCase()}
+                            </span>
+                          )}
                           {isSpeaking && <span className="podium-speaker-wave" />}
                         </div>
                         <div className="podium-info">
-                          <div className="podium-name name--amber">
-                            {isAarav ? 'Aarav' : (p2.name || 'Candidate 2')}
+                          <div className={`podium-name ${theme.nameCls}`}>
+                            {resolved.name}{isMe ? ' (You)' : ''}
                           </div>
-                          <div className="podium-role">{isAarav ? 'Assertive Challenger' : 'Real Peer (Seat 2)'}</div>
+                          <div className="podium-role">
+                            {isAI ? (resolved.roleTitle || aiMeta?.roleTitle || 'AI Candidate') : (seatNum === 1 ? `Host · Seat 1` : `Real Peer · Seat ${seatNum}`)}
+                          </div>
                           <div className="podium-status-pill">
-                            {isSpeaking ? '🎙️ CHALLENGING' : (isAarav ? '🤖 AI AUTO-FILLED' : '🟢 PEER READY')}
+                            {isSpeaking
+                              ? (aiMeta?.speakLabel || '🎙️ SPEAKING')
+                              : (isAI ? '🤖 AI AUTO-FILLED' : (seatNum === 1 ? '🟢 HOST JOINED' : '🟢 FRIEND JOINED'))}
                           </div>
                         </div>
                       </div>
                     );
-                  })()}
-
-                  {/* Seat 3: Priya or Real Participant (Top) */}
-                  {(() => {
-                    const p3 = (debateInfo?.participants || [])[2];
-                    const isPriya = !p3;
-                    const isSpeaking = activeGDSpeaker === 'Priya';
-                    return (
-                      <div className={`arena-podium podium--seat3 ${isSpeaking ? 'podium--speaking' : ''}`}>
-                        <div className="podium-spotlight spotlight--blue" />
-                        <div className="podium-avatar-ring ring--blue">
-                          <span className="podium-avatar-icon">{isPriya ? '📊' : '👤'}</span>
-                          {isSpeaking && <span className="podium-speaker-wave" />}
-                        </div>
-                        <div className="podium-info">
-                          <div className="podium-name name--blue">
-                            {isPriya ? 'Priya' : (p3.name || 'Candidate 3')}
-                          </div>
-                          <div className="podium-role">{isPriya ? 'Analytical Evaluator' : 'Real Peer (Seat 3)'}</div>
-                          <div className="podium-status-pill">
-                            {isSpeaking ? '🎙️ ANALYZING' : (isPriya ? '🤖 AI AUTO-FILLED' : '🟢 PEER READY')}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Seat 4: Karan or Real Participant (Right) */}
-                  {(() => {
-                    const p4 = (debateInfo?.participants || [])[3];
-                    const isKaran = !p4;
-                    const isSpeaking = activeGDSpeaker === 'Karan';
-                    return (
-                      <div className={`arena-podium podium--seat4 ${isSpeaking ? 'podium--speaking' : ''}`}>
-                        <div className="podium-spotlight spotlight--purple" />
-                        <div className="podium-avatar-ring ring--purple">
-                          <span className="podium-avatar-icon">{isKaran ? '🤝' : '👤'}</span>
-                          {isSpeaking && <span className="podium-speaker-wave" />}
-                        </div>
-                        <div className="podium-info">
-                          <div className="podium-name name--purple">
-                            {isKaran ? 'Karan' : (p4.name || 'Candidate 4')}
-                          </div>
-                          <div className="podium-role">{isKaran ? 'Diplomatic Mediator' : 'Real Peer (Seat 4)'}</div>
-                          <div className="podium-status-pill">
-                            {isSpeaking ? '🎙️ MEDIATING' : (isKaran ? '🤖 AI AUTO-FILLED' : '🟢 PEER READY')}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  })}
                 </div>
               </div>
             </div>
@@ -1150,10 +1230,18 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
                     📌 <strong>Topic:</strong> {invite.topic}
                   </p>
 
-                  <div className="arena-modal-capacity-bar">
-                    <span className="capacity-dot filled" />
-                    <span className="capacity-label">1/4 Joined (You) · 3 Vacant Seats Auto-Filled by AI</span>
-                  </div>
+                  {(() => {
+                    const realHumans = (debateInfo?.participants || []).filter((p) => !p.isAI).length || 1;
+                    const openSlots = Math.max(0, 4 - realHumans);
+                    return (
+                      <div className="arena-modal-capacity-bar">
+                        <span className="capacity-dot filled" />
+                        <span className="capacity-label">
+                          {realHumans}/4 Real Users Joined · {openSlots} Empty {openSlots === 1 ? 'Slot' : 'Slots'} Remaining
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Big WhatsApp CTA */}
                   <a
@@ -1213,7 +1301,9 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
           {/* GD Waiting Room / Lobby OR Active Chat */}
           {isGDWaiting ? (() => {
             const invite = generateInviteDetails();
-            const joinedCount = (debateInfo?.participants || []).length || 1;
+            const realParticipants = (debateInfo?.participants || []).filter((p) => !p.isAI);
+            const joinedCount = realParticipants.length || 1;
+            const emptyCount = Math.max(0, 4 - joinedCount);
             const isHost = !debateInfo?.userId || !user?.id ||
               debateInfo.userId === user.id || debateInfo.userId === user._id;
             return (
@@ -1223,49 +1313,61 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
                   {debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? 'Campus Group Discussion'}
                 </h2>
                 <p className="gd-waiting-sub">
-                  {joinedCount}/4 human seats joined. Empty seats automatically fill with AI candidates (Aarav, Priya, Karan) when you start!
+                  {joinedCount}/4 real participants joined ({emptyCount} empty {emptyCount === 1 ? 'slot' : 'slots'}).
+                  Real friends appear in the seats above as soon as they join!
                 </p>
 
-                <div className="gd-waiting-invite-box">
-                  <div className="gd-waiting-code-block">
-                    <span className="gd-waiting-code-label">ROOM CODE</span>
-                    <span className="gd-waiting-code-value">{invite.code}</span>
+                {gdCountdown != null ? (
+                  <div className="gd-countdown-box">
+                    <div className="gd-countdown-number">{gdCountdown > 0 ? gdCountdown : 'GO!'}</div>
+                    <div className="gd-countdown-text">
+                      🤖 Auto-filling {emptyCount} empty {emptyCount === 1 ? 'slot' : 'slots'} with AI candidates… Keeping all {joinedCount} real participants!
+                    </div>
                   </div>
-                  <div className="gd-waiting-invite-actions">
-                    <a
-                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(invite.whatsappText)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="gd-waiting-wa-btn"
-                    >
-                      📱 Share on WhatsApp
-                    </a>
-                    <button
-                      type="button"
-                      className="gd-waiting-copy-btn"
-                      onClick={() => {
-                        navigator.clipboard.writeText(invite.directLink);
-                        toast.success('1-Click Join Link copied!');
-                      }}
-                    >
-                      📋 Copy Invite Link
-                    </button>
-                  </div>
-                </div>
-
-                {isHost ? (
-                  <button
-                    type="button"
-                    disabled={startingGD}
-                    onClick={handleStartGDFromLobby}
-                    className="gd-waiting-start-btn"
-                  >
-                    {startingGD ? 'Launching Arena…' : '🚀 Start Group Discussion'}
-                  </button>
                 ) : (
-                  <div className="gd-waiting-guest-banner">
-                    ⏳ You have joined this table! Waiting for the host to click <strong>Start Discussion</strong>…
-                  </div>
+                  <>
+                    <div className="gd-waiting-invite-box">
+                      <div className="gd-waiting-code-block">
+                        <span className="gd-waiting-code-label">ROOM CODE</span>
+                        <span className="gd-waiting-code-value">{invite.code}</span>
+                      </div>
+                      <div className="gd-waiting-invite-actions">
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(invite.whatsappText)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="gd-waiting-wa-btn"
+                        >
+                          📱 Share on WhatsApp
+                        </a>
+                        <button
+                          type="button"
+                          className="gd-waiting-copy-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(invite.directLink);
+                            toast.success('1-Click Join Link copied!');
+                          }}
+                        >
+                          📋 Copy Invite Link
+                        </button>
+                      </div>
+                    </div>
+
+                    {isHost ? (
+                      <button
+                        type="button"
+                        disabled={startingGD}
+                        onClick={handleStartGDFromLobby}
+                        className="gd-waiting-start-btn"
+                      >
+                        🚀 Start Discussion ({emptyCount > 0 ? `Fill ${emptyCount} Empty Seat${emptyCount > 1 ? 's' : ''} with AI` : 'All 4 Real Users Ready'})
+                      </button>
+                    ) : (
+                      <div className="gd-waiting-guest-banner">
+                        ⏳ You have joined this table! Waiting for the host to click <strong>Start Discussion</strong>…
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -1275,8 +1377,69 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
           <div className="debate-chat">
             {messages.map((msg) => {
               const isGDRoom = debateInfo?.format === 'group_discussion';
-              let customAvatar = msg.speaker === 'user' ? '🎤' : '🤖';
-              if (isGDRoom && msg.speaker === 'ai') {
+              const myId = user?.id || user?._id;
+
+              if (msg.speaker === 'user') {
+                const isMe = !msg.speakerUserId || (myId && msg.speakerUserId === myId);
+                const matchedParticipant = (debateInfo?.participants || []).find(
+                  (p) => (!p.isAI && ((msg.speakerUserId && (p.id || p.userId) === msg.speakerUserId) || (msg.seatNumber && p.seatNumber === msg.seatNumber)))
+                );
+                const displayName = msg.speakerName || matchedParticipant?.name || (isMe ? (user?.username || 'You') : 'Participant');
+                const rawAvatar = msg.speakerAvatar || matchedParticipant?.avatar || (isMe ? user?.profilePicUrl : null);
+                const avatarSrc = resolveAvatarUrl(rawAvatar);
+                const seatTheme = SEAT_THEMES[msg.seatNumber || (isMe ? 1 : 2)] || SEAT_THEMES[2];
+
+                return (
+                  <div
+                    key={msg.id}
+                    className={`msg-row ${isMe ? 'msg-row--user' : 'msg-row--peer'}`}
+                  >
+                    <div
+                      className={`msg-avatar ${isMe ? 'msg-avatar--user' : 'msg-avatar--peer'}`}
+                      style={!isMe ? { borderColor: seatTheme.color, color: seatTheme.color } : undefined}
+                    >
+                      {avatarSrc ? (
+                        <img
+                          src={avatarSrc}
+                          alt={displayName}
+                          crossOrigin="anonymous"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                        />
+                      ) : (
+                        <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                          {displayName[0]?.toUpperCase() || 'U'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="msg-body">
+                      {isGDRoom && (
+                        <div className={`msg-sender-tag ${isMe ? 'msg-sender-tag--me' : ''}`} style={!isMe ? { color: seatTheme.color } : undefined}>
+                          {displayName} {isMe ? '(You)' : `· Peer`}
+                        </div>
+                      )}
+                      <div className={`msg-bubble ${isMe ? 'msg-bubble--user' : 'msg-bubble--peer'}`}>
+                        {msg.text}
+                      </div>
+                      {msg.scores && (
+                        <div className="msg-scores">
+                          <span className="score-pill score-pill--logic">
+                            Logic: {msg.scores.logic ?? '—'}
+                          </span>
+                          <span className="score-pill score-pill--evidence">
+                            Evidence: {msg.scores.evidence ?? '—'}
+                          </span>
+                          <span className="score-pill score-pill--clarity">
+                            Clarity: {msg.scores.clarity ?? '—'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              let customAvatar = '🤖';
+              if (isGDRoom) {
                 if (msg.text?.includes('[Aarav]')) customAvatar = '⚡';
                 else if (msg.text?.includes('[Priya]')) customAvatar = '📊';
                 else if (msg.text?.includes('[Karan]')) customAvatar = '🤝';
@@ -1284,38 +1447,25 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
               return (
               <div
                 key={msg.id}
-                className={`msg-row msg-row--${msg.speaker}`}
+                className={`msg-row msg-row--ai`}
               >
-                <div className={`msg-avatar msg-avatar--${msg.speaker}`}>
+                <div className={`msg-avatar msg-avatar--ai`}>
                   {customAvatar}
                 </div>
                 <div className="msg-body">
-                  <div className={`msg-bubble msg-bubble--${msg.speaker}${msg.isPlaceholder ? ' msg-bubble--generating' : ''}`}>
-                    {msg.speaker === 'ai' && msg.isPlaceholder ? (
+                  <div className={`msg-bubble msg-bubble--ai${msg.isPlaceholder ? ' msg-bubble--generating' : ''}`}>
+                    {msg.isPlaceholder ? (
                       <span className="generating-dots">
                         <span /><span /><span />
                       </span>
-                    ) : isGDRoom && msg.speaker === 'ai' ? (
+                    ) : isGDRoom ? (
                       renderGDCandidateMessages(msg)
-                    ) : msg.speaker === 'ai' && !msg.isStreaming ? (
+                    ) : !msg.isStreaming ? (
                       <StreamText text={msg.text} />
                     ) : (
                       msg.text
                     )}
                   </div>
-                  {msg.scores && (
-                    <div className="msg-scores">
-                      <span className="score-pill score-pill--logic">
-                        Logic: {msg.scores.logic ?? '—'}
-                      </span>
-                      <span className="score-pill score-pill--evidence">
-                        Evidence: {msg.scores.evidence ?? '—'}
-                      </span>
-                      <span className="score-pill score-pill--clarity">
-                        Clarity: {msg.scores.clarity ?? '—'}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             );
