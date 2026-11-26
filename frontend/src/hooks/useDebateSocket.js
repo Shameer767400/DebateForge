@@ -780,7 +780,11 @@ export function useDebateSocket(debateId, { onEvent, selectedVoiceURI, preferred
     sentenceBufRef.current = '';
     spokenUpToRef.current = 0;
     chunksSpokenRef.current = false;
-    socketRef.current?.emit('end_debate', { debateId, tzOffsetMinutes: tzOffsetMinutesRef.current });
+    if (!socketRef.current?.connected) {
+      return false;
+    }
+    socketRef.current.emit('end_debate', { debateId, tzOffsetMinutes: tzOffsetMinutesRef.current });
+    return true;
   }, [debateId]);
 
   /** Notify server of language change mid-debate */

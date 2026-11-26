@@ -72,6 +72,34 @@ const timeSeries = require('../services/timeSeries.service');
 // Export immediately to prevent CommonJS circular dependency issues
 module.exports = initWebSocket;
 
+// Track in-flight deferred MongoDB turn saves & active end_debate scoring runs
+const pendingTurnSaves = new Map();
+const endingDebates = new Set();
+
+function emitCompletedDebateToSocket(socket, debate) {
+  if (!debate || (debate.status !== 'completed' && !debate.endedAt)) return false;
+  const userId = socket.user?.id;
+  const myPart = (debate.participants || []).find(
+    (p) => !p.isAI && p.userId && userId && p.userId.toString() === userId
+  );
+  const savedVerdict = myPart?.judgeScoreSnapshot || (
+    debate.judgeScore && (debate.judgeScore.feedback || debate.judgeScore.userScore != null)
+      ? debate.judgeScore
+      : null
+  );
+  if (savedVerdict) {
+    socket.emit('judge_verdict', savedVerdict);
+  } else {
+    socket.emit('debate_ended', {
+      winner: debate.winner || 'ai',
+      userFinalScore: debate.userFinalScore ?? 0,
+      forfeit: true,
+      endedByHost: true,
+    });
+  }
+  return true;
+}
+
 function normalizeList(items, limit = 25) {
   if (!Array.isArray(items)) return [];
   const seen = new Set();
@@ -417,6 +445,7 @@ function initWebSocket(server) {
               capacity:     debate.capacity || 4,
               status:       existing.status,
             });
+            emitCompletedDebateToSocket(socket, debate);
             return;
           }
         }
@@ -528,6 +557,7 @@ function initWebSocket(server) {
             phases:      DebateFormatEngine.getPhaseList(debateFormat),
           });
         }
+        emitCompletedDebateToSocket(socket, debate);
       } catch (e) {
         secLogger.error(`[WS] ERROR in join_debate:`, e);
         socket.emit('error', { message: e.message });
@@ -725,14 +755,15 @@ function initWebSocket(server) {
     ─────────────────────────────────────── */
     socket.on('end_debate', async ({ debateId, tzOffsetMinutes }) => {
       if (!wsRateLimiter(socket, 'end_debate')) return;
-      try {
-        const sessionRaw = await redisClient.get(`session:${debateId}`);
-        if (!sessionRaw) return;
+      if (!debateId) return;
+      if (endingDebates.has(debateId)) return;
+      endingDebates.add(debateId);
 
-        /* ── Ownership check on session ── */
-        const session = JSON.parse(sessionRaw);
-        if (session.userId !== socket.user.id) {
-          return socket.emit('error', { message: 'Unauthorized' });
+      try {
+        // Ensure any just-completed turn finishes persisting before checking arguments.length
+        const pendingSave = pendingTurnSaves.get(debateId);
+        if (pendingSave) {
+          await pendingSave.catch(() => {});
         }
 
         /* Store user timezone offset for streak calculation */
@@ -745,6 +776,45 @@ function initWebSocket(server) {
           return;
         }
 
+        // If debate already ended (e.g. reconnect or double-tap), return the saved verdict/result
+        if (emitCompletedDebateToSocket(socket, debate)) {
+          await redisClient.del(`session:${debateId}`).catch(() => {});
+          return;
+        }
+
+        const sessionRaw = await redisClient.get(`session:${debateId}`);
+        let session = sessionRaw ? JSON.parse(sessionRaw) : null;
+        if (session && session.userId !== socket.user.id) {
+          return socket.emit('error', { message: 'Unauthorized' });
+        }
+
+        // Reconstruct minimal session from MongoDB if Redis session expired/evicted
+        if (!session) {
+          session = {
+            debateId,
+            userId: socket.user.id,
+            topic: debate.topicSnapshot,
+            userSide: debate.userSide,
+            aiPosition: debate.userSide === 'for' ? 'against' : 'for',
+            difficulty: debate.difficulty,
+            persona: debate.persona || 'balanced',
+            format: debate.format || 'freeform',
+            round: (debate.totalRounds || 0) + 1,
+            phaseIndex: 0,
+            currentLanguage: debate.language || 'en',
+            participants: (debate.participants || []).map((p) => ({
+              id: p.userId ? p.userId.toString() : null,
+              userId: p.userId ? p.userId.toString() : null,
+              name: p.name || 'Candidate',
+              avatar: p.avatar || null,
+              isAI: !!p.isAI,
+              roleTitle: p.roleTitle || null,
+              seatNumber: p.seatNumber || 1,
+            })),
+            tzOffset,
+          };
+        }
+
         if (debate.arguments.length >= 2) {
           let isForfeit = false;
           // Determine if user ended debate before completing required rounds/phases
@@ -754,22 +824,30 @@ function initWebSocket(server) {
             isForfeit = true;
           }
           await runJudgeScoring(socket, session, debateId, isForfeit, tzOffset);
-          await redisClient.del(`session:${debateId}`);
+          await redisClient.del(`session:${debateId}`).catch(() => {});
           return;
         }
         /* Too few arguments for a proper judge evaluation — instant forfeit */
         const winner = 'ai';
         const result = await finalizeDebate(socket.user.id, debateId, winner, 0, tzOffset);
-        io.to(debateId).emit('debate_ended', {
+        const endPayload = {
           winner,
-          userFinalScore: result.avgScore,
+          userFinalScore: result?.avgScore ?? 0,
           forfeit: true,
           endedByHost: true,
-          message: 'The host ended the Group Discussion.',
-        });
-        await redisClient.del(`session:${debateId}`);
+          message: debate.format === 'group_discussion'
+            ? 'The host ended the Group Discussion.'
+            : 'Debate ended early.',
+        };
+        io.to(debateId).emit('debate_ended', endPayload);
+        if (!socket.rooms?.has(debateId)) {
+          socket.emit('debate_ended', endPayload);
+        }
+        await redisClient.del(`session:${debateId}`).catch(() => {});
       } catch (e) {
         socket.emit('error', { message: e.message });
+      } finally {
+        endingDebates.delete(debateId);
       }
     });
 
@@ -1097,7 +1175,7 @@ async function processTranscript(socket, session, debateId, transcript, speakerN
     // Clear the turnId after use
     delete session._currentTurnId;
 
-    Promise.allSettled([fallacyPromise, scorerPromise]).then(async () => {
+    const savePromise = Promise.allSettled([fallacyPromise, scorerPromise]).then(async () => {
       try {
         const speakerUserId = socket.user?.id || null;
         await saveTurnToMongo(debateId, transcript, finalText, session.round - 1, scoresResult, fallacyResult, speakerUserId, speakerName);
@@ -1126,7 +1204,12 @@ async function processTranscript(socket, session, debateId, transcript, speakerN
       } catch (persistErr) {
         secLogger.error('[WS] Deferred persistence error:', persistErr); // eslint-disable-line no-console
       }
+    }).finally(() => {
+      if (pendingTurnSaves.get(debateId) === savePromise) {
+        pendingTurnSaves.delete(debateId);
+      }
     });
+    pendingTurnSaves.set(debateId, savePromise);
 
     /* ── 10. Auto-end after MAX_ROUNDS (freeform only) ── */
     if (fmt === 'freeform' && session.round > MAX_ROUNDS) {
@@ -1285,33 +1368,46 @@ Respond ONLY in this JSON format:
   }` : ''}
 }`;
 
-    // Use the AI Orchestrator to get judge response (cascading failover)
+    // Use the AI Orchestrator to get judge response (cascading failover),
+    // falling back to ML scores if all AI providers fail.
     let judgeText = '';
-    for await (const chunk of aiOrchestrator.streamResponse(
-      { ...session, round: 1, conversationHistory: [] },
-      judgePrompt
-    )) {
-      judgeText += chunk;
+    try {
+      for await (const chunk of aiOrchestrator.streamResponse(
+        { ...session, round: 1, conversationHistory: [] },
+        judgePrompt
+      )) {
+        judgeText += chunk;
+      }
+    } catch (llmErr) {
+      secLogger.warn('[WS] Judge LLM failed, using ML score fallback:', llmErr.message);
     }
 
-    // Parse JSON from response
+    // Parse JSON from response (or build fallback from ML scores)
     let judgeResponse;
     try {
+      if (!judgeText.trim()) throw new Error('Empty judge response');
       // Try to extract JSON from the response
       const jsonMatch = judgeText.match(/\{[\s\S]*\}/);
       judgeResponse = JSON.parse(jsonMatch ? jsonMatch[0] : judgeText);
     } catch {
+      const fallbackUserScore = scoredArgs.length > 0 ? avgOverall : (isForfeit ? 45 : 65);
+      const fallbackAiScore = isForfeit ? Math.max(70, fallbackUserScore + 10) : 60;
+      const fallbackWinner = isForfeit ? 'ai' : (fallbackUserScore >= fallbackAiScore ? 'user' : 'ai');
       judgeResponse = {
-        reportCardHeadline: 'You finished the debate, but there are still weaknesses you need to fix.',
-        userScore: 65,
-        aiScore: 60,
-        winner: 'user',
-        feedback: judgeText,
-        userStrengths: 'Good argumentation',
-        userWeaknesses: 'Room for improvement',
-        areasToImprove: [],
+        reportCardHeadline: isForfeit
+          ? 'Debate ended early — complete all rounds for a higher score.'
+          : 'You finished the debate — keep sharpening your evidence and rebuttals.',
+        userScore: fallbackUserScore,
+        aiScore: fallbackAiScore,
+        winner: fallbackWinner,
+        feedback: judgeText.trim() || (scoredArgs.length > 0
+          ? `Score calculated from your ${scoredArgs.length} argument(s): Logic ${avgLogic}/100, Evidence ${avgEvidence}/100, Clarity ${avgClarity}/100.`
+          : 'Debate concluded. Continue supporting claims with clear evidence and direct rebuttals.'),
+        userStrengths: avgLogic >= avgEvidence ? 'Consistent logical structure.' : 'Good supporting points.',
+        userWeaknesses: avgEvidence < 65 ? 'Back claims with concrete facts and examples.' : 'Tighten counter-rebuttals.',
+        areasToImprove: avgEvidence < 65 ? ['Include more specific evidence or data'] : ['Sharpen rebuttal focus'],
         grammarMistakes: [],
-        fallacies: [],
+        fallacies: uniqueFallacies,
       };
     }
 
@@ -1377,7 +1473,10 @@ Respond ONLY in this JSON format:
     }
 
     const hostVerdict = participantVerdicts[session.userId] || judgeResponse;
-    const persistedProfile = await persistReportCard(session.userId, hostVerdict);
+    const persistedProfile = await persistReportCard(session.userId, hostVerdict).catch(() => ({
+      savedFocusAreas: [],
+      savedGrammarPatterns: [],
+    }));
 
     await Debate.findByIdAndUpdate(debateId, {
       judgeScore: hostVerdict,
@@ -1385,14 +1484,23 @@ Respond ONLY in this JSON format:
       currentPhase: 'judging',
       status: 'completed',
     });
-    
-    // Process final stats (wins, streaks, etc.) for host
-    const statsResult = await finalizeDebate(session.userId, debateId, hostVerdict.winner, 0, tzOffset);
-    const streakResult = statsResult?.streakResult || {};
 
-    // Emit judge results to EVERYONE in the debate room so all friends end together & get their own report card
-    const roomTarget = socket._io ? socket._io.to(debateId) : socket;
-    roomTarget.emit('judge_verdict', {
+    // Process final stats (wins, streaks, etc.) for host — non-fatal so verdict still delivers
+    let streakResult = {};
+    try {
+      const statsResult = await finalizeDebate(session.userId, debateId, hostVerdict.winner, 0, tzOffset);
+      streakResult = statsResult?.streakResult || {};
+    } catch (finErr) {
+      secLogger.warn('[WS] finalizeDebate fallback after judgeScore save:', finErr.message);
+      await Debate.findByIdAndUpdate(debateId, {
+        winner: hostVerdict.winner,
+        userFinalScore: hostVerdict.userScore ?? 0,
+        endedAt: new Date(),
+        status: 'completed',
+      }).catch(() => {});
+    }
+
+    const verdictPayload = {
       ...hostVerdict,
       participantVerdicts,
       endedByHost: true,
@@ -1403,7 +1511,14 @@ Respond ONLY in this JSON format:
         milestoneReached: streakResult.milestoneReached || null,
         freezeUsed:       streakResult.freezeUsed       || false,
       },
-    });
+    };
+
+    // Emit judge results to EVERYONE in the debate room AND directly to caller if not in room
+    const roomTarget = socket._io ? socket._io.to(debateId) : socket;
+    roomTarget.emit('judge_verdict', verdictPayload);
+    if (socket._io && !socket.rooms?.has(debateId)) {
+      socket.emit('judge_verdict', verdictPayload);
+    }
   } catch (e) {
     // eslint-disable-next-line no-console
     secLogger.error('[WS] Judge scoring error:', e.message);

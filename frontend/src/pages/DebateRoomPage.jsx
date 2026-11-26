@@ -227,6 +227,18 @@ const RING_C = 2 * Math.PI * RING_R;  // circumference
 const SCORE_R = 24;
 const SCORE_C = 2 * Math.PI * SCORE_R;
 
+function extractSavedVerdict(data, uid) {
+  if (!data) return null;
+  const myPart = (data.participants || []).find(
+    (p) => !p.isAI && uid && (p.userId === uid || p.userId?._id === uid || p.id === uid)
+  );
+  if (myPart?.judgeScoreSnapshot) return myPart.judgeScoreSnapshot;
+  if (data.judgeScore && (data.judgeScore.feedback || data.judgeScore.userScore != null)) {
+    return data.judgeScore;
+  }
+  return null;
+}
+
 function timerColor(t) {
   if (t > 30) return 'var(--accent-user)';
   if (t > 10) return 'var(--accent-score)';
@@ -311,6 +323,7 @@ export default function DebateRoomPage() {
   const [aiWins,         setAiWins]         = useState(0);
   const [alertExiting,   setAlertExiting]   = useState(false);
   const [endResult,      setEndResult]      = useState(null);
+  const [isEvaluating,   setIsEvaluating]   = useState(false);
   const [showConfetti,   setShowConfetti]   = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [textInput,      setTextInput]      = useState('');
@@ -451,6 +464,9 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
   const timerRef      = useRef(null);
   const alertTimerRef = useRef(null);
   const stopRecRef    = useRef(null); // holds hook's stopRecording for timer callback
+  const endRequestedRef = useRef(false);
+  const endEmittedRef = useRef(false);
+  const fallbackEndAttemptedRef = useRef(false);
 
   /* ─────────────────────────────────────
      handleEvent — single dispatcher for
@@ -577,6 +593,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
 
       /* Debate ended (forfeit or host terminated for all participants) */
       case 'debate_ended':
+        setIsEvaluating(false);
         setDebateInfo((prev) => prev ? { ...prev, status: 'completed' } : prev);
         setEndResult(data || { winner: 'ai' });
         setPhase('ended');
@@ -641,6 +658,8 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
           streak: data?.streak || myPersonalVerdict?.streak,
           participantVerdicts: data?.participantVerdicts || null,
         };
+        setIsEvaluating(false);
+        setEndResult(null);
         setJudgeVerdict(mergedVerdict);
         setDebateInfo((prev) => prev ? { ...prev, status: 'completed' } : prev);
         setPhase('ended');
@@ -737,13 +756,17 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
             }
             if (data?.status === 'completed' || data?.endedAt) {
               const myUid = userRef.current?.id || userRef.current?._id;
-              const myPart = (data?.participants || []).find(
-                (p) => !p.isAI && (p.userId === myUid || p.userId?._id === myUid)
-              );
-              const savedVerdict = myPart?.judgeScoreSnapshot || (data?.judgeScore?.feedback ? data.judgeScore : null);
+              const savedVerdict = extractSavedVerdict(data, myUid);
               if (savedVerdict) {
                 setJudgeVerdict(savedVerdict);
+              } else {
+                setEndResult({
+                  winner: data.winner || 'ai',
+                  userFinalScore: data.userFinalScore ?? 0,
+                  forfeit: true,
+                });
               }
+              setIsEvaluating(false);
               setPhase('ended');
             }
           }
@@ -808,15 +831,17 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         if (fresh.status === 'completed' || fresh.endedAt) {
           setDebateInfo(fresh);
           const myUid = userRef.current?.id || userRef.current?._id;
-          const myPart = (fresh.participants || []).find(
-            (p) => !p.isAI && (p.userId === myUid || p.userId?._id === myUid)
-          );
-          const personalVerdict = myPart?.judgeScoreSnapshot || (fresh.judgeScore?.feedback ? fresh.judgeScore : null);
+          const personalVerdict = extractSavedVerdict(fresh, myUid);
           if (personalVerdict) {
             setJudgeVerdict(personalVerdict);
           } else {
-            setEndResult((prev) => prev || { winner: fresh.winner || 'ai', endedByHost: true });
+            setEndResult((prev) => prev || {
+              winner: fresh.winner || 'ai',
+              userFinalScore: fresh.userFinalScore ?? 0,
+              endedByHost: true,
+            });
           }
+          setIsEvaluating(false);
           setPhase('ended');
         }
       } catch { /* ignore transient network blips */ }
@@ -828,39 +853,134 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debateId, debateInfo?.format, debateInfo?.status, phase]);
 
-  /* ── Navigate to dashboard after debate ends ──
-       Only auto-redirect when ended early (Esc / End button)
-       and there's no judge verdict to display. ── */
+  /* ── Handle End Debate / Leave Table with evaluating state ── */
+  const myCurrentUid = user?.id || user?._id;
+  const canEndDebate =
+    debateInfo?.format !== 'group_discussion' ||
+    !debateInfo?.userId ||
+    !myCurrentUid ||
+    (debateInfo.userId?._id || debateInfo.userId) === myCurrentUid;
+
+  const handleEndDebate = useCallback(() => {
+    if (isEvaluating || phase === 'ended') return;
+    if (!canEndDebate) {
+      navigate('/lobby');
+      return;
+    }
+    endRequestedRef.current = true;
+    fallbackEndAttemptedRef.current = false;
+    setIsEvaluating(true);
+    const sent = endDebate();
+    endEmittedRef.current = Boolean(sent);
+  }, [isEvaluating, phase, canEndDebate, navigate, endDebate]);
+
+  /* ── Polling & HTTP fallback while awaiting AI Judge Score after End Debate ──
+       Guarantees the score/report card renders immediately even if a socket event
+       is dropped/delayed on mobile or the socket briefly disconnects. ── */
+  useEffect(() => {
+    if (!debateId || !isEvaluating || judgeVerdict || endResult) return;
+    let cancelled = false;
+    const startedAt = Date.now();
+
+    if (connected && !endEmittedRef.current) {
+      const sent = endDebate();
+      if (sent) endEmittedRef.current = true;
+    }
+
+    const applyCompletedDebate = (fresh) => {
+      if (!fresh || (fresh.status !== 'completed' && !fresh.endedAt)) return false;
+      const myUid = userRef.current?.id || userRef.current?._id;
+      const savedVerdict = extractSavedVerdict(fresh, myUid);
+      setDebateInfo(fresh);
+      if (savedVerdict) {
+        setJudgeVerdict(savedVerdict);
+        if (savedVerdict.winner === 'user') setShowConfetti(true);
+      } else {
+        setEndResult({
+          winner: fresh.winner || 'ai',
+          userFinalScore: fresh.userFinalScore ?? 0,
+          forfeit: true,
+        });
+      }
+      setIsEvaluating(false);
+      setPhase('ended');
+      return true;
+    };
+
+    const checkDebateStatus = async () => {
+      try {
+        const res = await api.get(`/api/debates/${debateId}`);
+        if (cancelled) return;
+        const fresh = res.data?.debate ?? res.data;
+        if (applyCompletedDebate(fresh)) return;
+
+        const elapsed = Date.now() - startedAt;
+        const shouldUseHttpFallback =
+          !fallbackEndAttemptedRef.current &&
+          ((!endEmittedRef.current && elapsed > 4000) || elapsed > 25000);
+
+        if (shouldUseHttpFallback) {
+          fallbackEndAttemptedRef.current = true;
+          try {
+            const endRes = await api.post(`/api/debates/${debateId}/end`, {
+              tzOffsetMinutes: -new Date().getTimezoneOffset(),
+            });
+            if (cancelled) return;
+            const recheck = await api.get(`/api/debates/${debateId}`).catch(() => null);
+            const freshAfterEnd = recheck?.data?.debate ?? recheck?.data;
+            if (!applyCompletedDebate(freshAfterEnd)) {
+              setEndResult({
+                winner: endRes.data?.winner || 'ai',
+                userFinalScore: endRes.data?.userFinalScore ?? 0,
+                forfeit: true,
+                message: endRes.data?.message || 'Debate ended.',
+              });
+              setIsEvaluating(false);
+              setPhase('ended');
+            }
+          } catch {
+            /* keep polling if fallback failed */
+          }
+        }
+      } catch {
+        /* ignore transient network blips */
+      }
+    };
+
+    const initialTimer = setTimeout(checkDebateStatus, 1200);
+    const pollTimer = setInterval(checkDebateStatus, 2000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(initialTimer);
+      clearInterval(pollTimer);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debateId, isEvaluating, judgeVerdict, endResult, connected, endDebate]);
+
+  /* ── Auto-redirect only for non-host GD guests whose host ended the table ── */
   useEffect(() => {
     if (phase !== 'ended') return;
     if (judgeVerdict) return; // Let user inspect their individual report card manually
-    if (endResult?.endedByHost) {
+    if (endResult?.endedByHost && !endRequestedRef.current) {
       toast.info('Host ended the discussion. Redirecting to dashboard…');
       const fastT = setTimeout(() => navigate('/dashboard'), 3000);
       return () => clearTimeout(fastT);
     }
-    if (endResult?.winner === 'user') toast.success('🏆 You won the debate!');
-    else if (endResult?.winner === 'ai') toast.error('The AI won this round. Keep forging!');
-    else toast.info('Debate ended.');
-    const t = setTimeout(() => navigate('/dashboard'), 10000);
-    return () => clearTimeout(t);
   }, [phase, navigate, endResult, toast, judgeVerdict]);
 
   /* ── Keyboard shortcut: Escape to end debate (host only in GD) ── */
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === 'Escape' && phase !== 'ended') {
-        const myId = userRef.current?.id || userRef.current?._id;
-        const canEnd = debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !myId || debateInfo.userId === myId;
-        if (canEnd) {
-          endDebate();
-          setPhase('ended');
+      if (e.key === 'Escape' && phase !== 'ended' && !isEvaluating) {
+        if (canEndDebate) {
+          handleEndDebate();
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [phase, endDebate, debateInfo]);
+  }, [phase, isEvaluating, canEndDebate, handleEndDebate]);
 
   /* ── Auto-scroll chat ── */
   useEffect(() => {
@@ -1049,7 +1169,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         {/* ──── LEFT PANEL ──── */}
 
         {/* WebSocket disconnect banner */}
-        {!connected && !isEnded && (
+        {!connected && !isEnded && !isEvaluating && (
           <div className="debate-reconnect-banner">
             <span className="reconnect-dot" />
             <span>Connection lost — reconnecting…</span>
@@ -1062,68 +1182,25 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
           </div>
         )}
 
+        <div className="debate-main">
         <div className="debate-left">
 
           {/* Top bar */}
           <div className="debate-topbar">
             <div className="debate-topbar-primary">
-              <span className="debate-topic">
+              <span
+                className="debate-topic"
+                title={debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? ''}
+              >
                 {debateInfo?.topicSnapshot ?? debateInfo?.topic?.title ?? 'Loading topic…'}
               </span>
               <span className="debate-round">Round {round}</span>
-              <button
-                type="button"
-                className="debate-mobile-settings-btn"
-                onClick={() => setShowMobileControls((v) => !v)}
-                aria-label="Toggle voice and language settings"
-              >
-                {showMobileControls ? '✕' : '⚙️'}
-              </button>
-              <button
-                className="debate-end-btn debate-end-btn--mobile-inline"
-                onClick={() => {
-                  const myId = user?.id || user?._id;
-                  const canEnd = debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !myId || debateInfo.userId === myId;
-                  if (canEnd) {
-                    endDebate();
-                    setPhase('ended');
-                  } else {
-                    navigate('/lobby');
-                  }
-                }}
-              >
-                {(debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !(user?.id || user?._id) || debateInfo.userId === (user?.id || user?._id)) ? 'End' : 'Leave'}
-              </button>
             </div>
-            <div className={`debate-topbar-controls ${showMobileControls ? 'debate-topbar-controls--open' : ''}`}>
-              <select 
-                value={selectedVoiceURI} 
-                onChange={(e) => setSelectedVoiceURI(e.target.value)}
-                className="debate-voice-select"
-              >
-                <option value="">Default AI Voice</option>
-                {availableVoices.map(v => (
-                  <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>
-                ))}
-              </select>
-
-              <label className="debate-voice-label">
-                <input
-                  type="checkbox"
-                  checked={voiceEnabled}
-                  onChange={(e) => setVoiceEnabled(e.target.checked)}
-                  disabled={phase !== 'user_turn' || judgeVerdict}
-                  aria-label="AI voice"
-                />
-                <span className="debate-voice-label-text">
-                  AI voice
-                </span>
-              </label>
-
+            <div className="debate-topbar-controls">
               <select
                 value={debateLanguage}
                 onChange={(e) => setDebateLanguage(e.target.value)}
-                disabled={phase !== 'user_turn' || judgeVerdict}
+                disabled={isRecording || isProcessing || isEvaluating || isEnded || Boolean(judgeVerdict)}
                 aria-label="Debate language"
                 className="debate-lang-select"
               >
@@ -1133,21 +1210,53 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
               </select>
 
               <button
-                className="debate-end-btn debate-end-btn--desktop"
-                onClick={() => {
-                  const myId = user?.id || user?._id;
-                  const canEnd = debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !myId || debateInfo.userId === myId;
-                  if (canEnd) {
-                    endDebate();
-                    setPhase('ended');
-                  } else {
-                    navigate('/lobby');
-                  }
-                }}
+                type="button"
+                className="debate-mobile-settings-btn"
+                onClick={() => setShowMobileControls((v) => !v)}
+                aria-label="Toggle voice settings"
+                aria-expanded={showMobileControls}
               >
-                {(debateInfo?.format !== 'group_discussion' || !debateInfo?.userId || !(user?.id || user?._id) || debateInfo.userId === (user?.id || user?._id))
-                  ? <>End Debate <span className="debate-esc-text">(Esc)</span></>
-                  : 'Leave Table'}
+                {showMobileControls ? '✕ Voice' : '🎙️ Voice'}
+              </button>
+
+              <div className={`debate-voice-controls ${showMobileControls ? 'debate-voice-controls--open' : ''}`}>
+                <select
+                  value={selectedVoiceURI}
+                  onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                  aria-label="AI Voice"
+                  className="debate-voice-select"
+                >
+                  <option value="">Default AI Voice</option>
+                  {availableVoices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>
+                  ))}
+                </select>
+
+                <label className="debate-voice-label">
+                  <input
+                    type="checkbox"
+                    checked={voiceEnabled}
+                    onChange={(e) => setVoiceEnabled(e.target.checked)}
+                    disabled={isRecording || isProcessing || isEvaluating || isEnded || Boolean(judgeVerdict)}
+                    aria-label="AI voice"
+                  />
+                  <span className="debate-voice-label-text">
+                    AI voice
+                  </span>
+                </label>
+              </div>
+
+              <button
+                type="button"
+                className="debate-end-btn"
+                disabled={isEvaluating}
+                onClick={handleEndDebate}
+              >
+                {isEvaluating
+                  ? 'Scoring…'
+                  : canEndDebate
+                    ? <>End Debate <span className="debate-esc-text">(Esc)</span></>
+                    : 'Leave Table'}
               </button>
             </div>
           </div>
@@ -1610,7 +1719,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
                   isProcessing || isAISpeaking ? 'mic-btn--processing' : '',
                 ].join(' ')}
                 onClick={handleMicToggle}
-                disabled={isProcessing || isAISpeaking || isEnded}
+                disabled={isProcessing || isAISpeaking || isEvaluating || isEnded}
                 aria-label={isRecording ? 'Tap to Submit' : 'Tap to Speak'}
               >
                 {isProcessing ? (
@@ -1633,7 +1742,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
               onSubmit={(e) => {
                 e.preventDefault();
                 const trimmed = textInput.trim();
-                if (!trimmed || phase !== 'user_turn') return;
+                if (!trimmed || phase !== 'user_turn' || isEvaluating) return;
                 // Rely on transcript_final from socket to avoid double-messages
                 sendText(trimmed);
                 setTextInput('');
@@ -1646,12 +1755,12 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
                 placeholder="Or type your argument…"
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
-                disabled={phase !== 'user_turn' || isEnded}
+                disabled={phase !== 'user_turn' || isEvaluating || isEnded}
               />
               <button
                 className="text-input-send"
                 type="submit"
-                disabled={!textInput.trim() || phase !== 'user_turn' || isEnded}
+                disabled={!textInput.trim() || phase !== 'user_turn' || isEvaluating || isEnded}
               >
                 Send ➤
               </button>
@@ -1781,6 +1890,7 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
             </div>
           )}
         </div>
+        </div>
       </div>
 
       {/* ════════ FALLACY ALERT (fixed overlay) ════════ */}
@@ -1796,7 +1906,64 @@ _4-Seat Campus GD Arena · English & Telugu Support_`;
         </div>
       )}
 
-      {/* ════════ ENDED OVERLAY (Removed in favor of Report Card) ════════ */}
+      {/* ════════ EVALUATING / CALCULATING SCORE OVERLAY ════════ */}
+      {isEvaluating && !judgeVerdict && !endResult && (
+        <div className="judge-overlay" role="dialog" aria-modal="true" aria-label="Evaluating debate">
+          <div className="judge-card judge-card--evaluating">
+            <div className="judge-evaluating-spinner">
+              <div className="df-spinner">
+                <div className="df-spinner-core" />
+                <div className="df-spinner-orbit" />
+              </div>
+            </div>
+            <div className="judge-header">⚖️ Calculating Your Score…</div>
+            <p className="judge-evaluating-text">
+              Our AI Judge is reviewing your arguments, logic, evidence, and fallacies to build your report card.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ════════ EARLY-END SUMMARY OVERLAY (when ended before judge scoring) ════════ */}
+      {endResult && !judgeVerdict && (
+        <div className="judge-overlay" role="dialog" aria-modal="true" aria-label="Debate summary">
+          <div className="judge-card">
+            <div className="judge-header">📊 Debate Summary</div>
+            <div className={`judge-winner judge-winner--${endResult.winner || 'ai'}`}>
+              {endResult.winner === 'user' ? '🏆 You Win!' :
+               endResult.winner === 'draw' ? '🤝 Draw' : '🤖 AI Wins'}
+            </div>
+            <div className="judge-scores">
+              <div className="judge-score-col">
+                <span className="judge-score-number judge-score-number--user">
+                  {endResult.userFinalScore ?? 0}
+                </span>
+                <span className="judge-score-label">{user?.username || 'You'}</span>
+              </div>
+            </div>
+            <div className="judge-feedback">
+              <div className="judge-feedback-title">Summary</div>
+              <div className="judge-feedback-text">
+                {endResult.message || 'Debate ended early before a full AI Judge report card could be generated. Complete at least one full exchange for detailed judge feedback.'}
+              </div>
+            </div>
+            <div className="judge-actions">
+              <button
+                className="judge-btn judge-btn--primary"
+                onClick={() => navigate('/lobby')}
+              >
+                New Debate
+              </button>
+              <button
+                className="judge-btn judge-btn--secondary"
+                onClick={() => navigate('/dashboard')}
+              >
+                Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════════ JUDGE VERDICT OVERLAY (Addition 6) ════════ */}
       {judgeVerdict && (

@@ -30,6 +30,25 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.judge-card--evaluating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 440px;
+}
+
+.judge-evaluating-spinner {
+  margin-bottom: 4px;
+}
+
+.judge-evaluating-text {
+  margin: 0;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+}
+
 @keyframes judgeCardSlideUp {
   from { transform: translateY(40px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }
