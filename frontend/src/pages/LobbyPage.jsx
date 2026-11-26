@@ -355,7 +355,7 @@ export default function LobbyPage() {
                 Free Plan: <strong>{billingInfo.usage?.debatesRemaining ?? (Math.max(0, 5 - (billingInfo.usage?.debatesUsed ?? 0)))} of {billingInfo.usage?.debatesLimit ?? 5} free debates</strong> remaining this month
               </span>
               <Link to="/pricing" className="lobby-upgrade-cta">
-                ⚡ Upgrade (Day Pass ₹49 / Pro ₹299)
+                ⚡ Upgrade (Day Pass ₹49 / Pro ₹999)
               </Link>
             </div>
           )}
@@ -756,7 +756,7 @@ export default function LobbyPage() {
               <div className="lobby-upgrade-option lobby-upgrade-option--featured">
                 <div className="option-badge">POPULAR</div>
                 <div className="option-name">✨ Monthly Pro</div>
-                <div className="option-price">₹299/mo</div>
+                <div className="option-price">₹999/mo</div>
                 <div className="option-sub">Unlimited debates & advanced judging</div>
               </div>
             </div>
