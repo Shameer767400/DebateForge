@@ -75,8 +75,8 @@ function scheduleNotificationJobs() {
     await expireStalePrepaidPasses();
   });
 
-  /* ── Daily at 2:30 AM: reconcile orphaned captured payments from Razorpay ── */
-  cron.schedule('30 2 * * *', async () => {
+  /* ── Every 30 min: reconcile orphaned captured payments from Razorpay ── */
+  cron.schedule('*/30 * * * *', async () => {
     await reconcileOrphanedPayments();
   });
 

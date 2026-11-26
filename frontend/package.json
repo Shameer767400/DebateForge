@@ -34,7 +34,7 @@
   },
   "scripts": {
     "start": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-seo.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

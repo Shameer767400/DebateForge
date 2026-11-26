@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import SEOHead from '../components/SEOHead';
+import { trackEvent } from '../utils/analytics';
 import '../styles/auth.css';
 import AnimatedPasswordInput from '../components/AnimatedPasswordInput';
 
@@ -18,6 +19,7 @@ export default function RegisterPage() {
   const { login } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Password validation states
   const [passwordValidation, setPasswordValidation] = useState({
@@ -76,9 +78,18 @@ export default function RegisterPage() {
         { baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001', withCredentials: true }
       );
       login(res.data.token, res.data.user);
+      trackEvent('sign_up', { method: 'email' });
       const redirectParam = new URLSearchParams(window.location.search).get('redirect');
-      if (redirectParam && redirectParam.startsWith('/')) {
-        try { sessionStorage.setItem('df_post_login_redirect', redirectParam); } catch { /* ignore */ }
+      const stateFrom = location.state?.from;
+      const stateRedirect =
+        typeof stateFrom === 'string' && stateFrom.startsWith('/')
+          ? stateFrom
+          : stateFrom?.pathname
+          ? `${stateFrom.pathname}${stateFrom.search || ''}${stateFrom.hash || ''}`
+          : '';
+      const resolvedRedirect = (redirectParam && redirectParam.startsWith('/')) ? redirectParam : stateRedirect;
+      if (resolvedRedirect) {
+        try { sessionStorage.setItem('df_post_login_redirect', resolvedRedirect); } catch { /* ignore */ }
       }
       toast.success('Account created! Please check your email for a verification code.');
       const otpParam = res.data.verificationOTP ? `&demo_otp=${res.data.verificationOTP}` : '';
@@ -221,7 +232,7 @@ export default function RegisterPage() {
 
         <p className="auth-switch">
           Already have an account?{' '}
-          <Link to="/login" className="auth-link">
+          <Link to="/login" state={location.state} className="auth-link">
             Login
           </Link>
         </p>

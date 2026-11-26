@@ -143,7 +143,7 @@ export default function LoginPage() {
 
         <p className="auth-switch">
           Don't have an account?{' '}
-          <Link to="/register" className="auth-link">
+          <Link to="/register" state={location.state} className="auth-link">
             Register
           </Link>
         </p>

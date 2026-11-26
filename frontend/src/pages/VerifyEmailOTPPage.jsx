@@ -84,6 +84,16 @@ export default function VerifyEmailOTPPage() {
   };
 
   if (status === 'success') {
+    let pendingRedirect = '';
+    try {
+      pendingRedirect = sessionStorage.getItem('df_post_login_redirect') || '';
+    } catch { /* ignore */ }
+    const ctaLabel = pendingRedirect.startsWith('/pricing')
+      ? 'Continue to Pricing'
+      : pendingRedirect
+      ? 'Continue'
+      : 'Go to Lobby';
+
     return (
       <div className="df-center">
         <div className="auth-card" style={{ textAlign: 'center' }}>
@@ -104,7 +114,7 @@ export default function VerifyEmailOTPPage() {
               navigate(savedRedirect || '/lobby');
             }}
           >
-            Go to Lobby
+            {ctaLabel}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 {
+  "trailingSlash": false,
   "headers": [
     {
       "source": "/(.*)",
@@ -30,7 +31,12 @@
   "rewrites": [
     { "source": "/robots.txt", "destination": "/robots.txt" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
+    { "source": "/gd-topics", "destination": "/gd-topics/index.html" },
+    { "source": "/pricing", "destination": "/pricing/index.html" },
+    { "source": "/about", "destination": "/about/index.html" },
+    { "source": "/feedback", "destination": "/feedback/index.html" },
+    { "source": "/privacy", "destination": "/privacy/index.html" },
+    { "source": "/terms", "destination": "/terms/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
-

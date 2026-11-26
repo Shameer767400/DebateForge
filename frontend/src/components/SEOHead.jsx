@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { trackPageView } from '../utils/analytics';
 
 const defaults = {
   title: 'DebateForge — AI-Powered Debate Practice Platform',
@@ -48,6 +49,15 @@ export default function SEOHead({ title, description, path = '/', noindex = fals
       document.head.appendChild(canonical);
     }
     canonical.setAttribute('href', canonicalUrl);
+
+    if (!noindex) {
+      // Avoid duplicate page_view on the initial page load (gtag config already fires one)
+      if (typeof window !== 'undefined' && window.__dfInitialPageViewTracked) {
+        trackPageView(path, fullTitle);
+      } else if (typeof window !== 'undefined') {
+        window.__dfInitialPageViewTracked = true;
+      }
+    }
 
     return () => {
       document.title = defaults.title;

@@ -10,14 +10,18 @@
  * @module pages/PricingPage
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useApi } from '../hooks/useApi';
 import SEOHead from '../components/SEOHead';
+import { trackEvent } from '../utils/analytics';
 import '../styles/theme.css';
 import '../styles/pricing.css';
+
+const API_BASE = process.env.REACT_APP_API_URL || '';
 
 const PLANS = [
   {
@@ -209,8 +213,22 @@ export default function PricingPage() {
   const [billing, setBilling] = useState('monthly'); // 'monthly' | 'yearly'
   const [loading, setLoading] = useState(null);       // plan id currently processing
   const [openFaq, setOpenFaq] = useState(null);
+  const [remotePricing, setRemotePricing] = useState(null);
   const [inAppInfo] = useState(() => detectInAppBrowser());
   const [dismissInAppNotice, setDismissInAppNotice] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    axios
+      .get('/api/billing/config', { baseURL: API_BASE })
+      .then((res) => {
+        if (active && res.data?.pricing) {
+          setRemotePricing(res.data.pricing);
+        }
+      })
+      .catch(() => { /* keep static fallback prices */ });
+    return () => { active = false; };
+  }, []);
 
   const handleOpenExternal = () => {
     if (typeof window === 'undefined') return;
@@ -270,6 +288,20 @@ export default function PricingPage() {
           throw new Error('Invalid order response from payment service');
         }
 
+        const valueInInr = (Number(orderData.amount) || 0) / 100;
+        trackEvent('begin_checkout', {
+          currency: orderData.currency || 'INR',
+          value: valueInInr,
+          items: [
+            {
+              item_id: `${effectivePlanId}_${effectiveBillingCycle}`,
+              item_name: plan.name,
+              price: valueInInr,
+              quantity: 1,
+            },
+          ],
+        });
+
         // 3. Configure Razorpay modal options
         const options = {
           key: orderData.keyId,
@@ -306,6 +338,19 @@ export default function PricingPage() {
               });
 
               if (verifyRes.data?.success) {
+                trackEvent('purchase', {
+                  transaction_id: response.razorpay_payment_id || orderData.orderId,
+                  currency: orderData.currency || 'INR',
+                  value: valueInInr,
+                  items: [
+                    {
+                      item_id: `${effectivePlanId}_${effectiveBillingCycle}`,
+                      item_name: plan.name,
+                      price: valueInInr,
+                      quantity: 1,
+                    },
+                  ],
+                });
                 toast.success(`🎉 Payment verified! Welcome to ${plan.name}!`);
                 if (refreshSession) {
                   try { await refreshSession(); } catch { /* ignore */ }
@@ -341,11 +386,21 @@ export default function PricingPage() {
     }
   };
 
+  const getPlanNumericPrice = (plan, cycle = billing) => {
+    if (plan.isDayPass) {
+      return remotePricing?.pro?.daily ? remotePricing.pro.daily / 100 : plan.monthlyPrice;
+    }
+    if (plan.id === 'pro' || plan.id === 'institution') {
+      const paise = remotePricing?.[plan.id]?.[cycle];
+      if (typeof paise === 'number' && paise > 0) return paise / 100;
+    }
+    return cycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
+  };
+
   const getPrice = (plan) => {
     if (plan.monthlyPrice === null) return 'Custom';
     if (plan.monthlyPrice === 0) return 'Free';
-    if (plan.isDayPass) return '₹49';
-    const price = billing === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
+    const price = getPlanNumericPrice(plan, billing);
     return `₹${price.toLocaleString('en-IN')}`;
   };
 
@@ -357,9 +412,11 @@ export default function PricingPage() {
 
   const getSavings = (plan) => {
     if (plan.isDayPass) return null;
-    if (!plan.monthlyPrice || !plan.yearlyPrice) return null;
-    const annualIfMonthly = plan.monthlyPrice * 12;
-    const savings = annualIfMonthly - plan.yearlyPrice;
+    const monthly = getPlanNumericPrice(plan, 'monthly');
+    const yearly = getPlanNumericPrice(plan, 'yearly');
+    if (!monthly || !yearly) return null;
+    const annualIfMonthly = monthly * 12;
+    const savings = annualIfMonthly - yearly;
     const pct = Math.round((savings / annualIfMonthly) * 100);
     return { savings, pct };
   };
@@ -367,8 +424,8 @@ export default function PricingPage() {
   return (
     <div className="pricing-page">
       <SEOHead
-        title="Pricing - DebateForge"
-        description="Simple, transparent pricing for DebateForge. Start free, upgrade to Pro for advanced AI coaching, analytics, and unlimited debates via UPI and cards."
+        title="Pricing"
+        description="Simple, transparent pricing for DebateForge. Start free, try the ₹49 24-Hour Pass, or upgrade to Pro for unlimited debates via UPI and cards."
         path="/pricing"
       />
       {/* ── HEADER ── */}
